@@ -181,16 +181,103 @@ outcome reports it as a per-course failure — never treated as "everything was 
 `SyncOutcome.coursesFailed` surfaces this to the CLI/diagnostics without corrupting state.
 See `docs/THREAT_MODEL.md` for the corresponding "malformed source data" threat entry.
 
-## 8. What's deliberately NOT built yet
+## 8. Onboarding without a browser extension: the bookmarklet
 
-- The authenticated session connector (grades, due time, completion, announcements) —
-  needs a human with a live session running the Phase 2 userscript prototype to safely
-  capture real DOM/response shapes; see `ROADMAP.md`.
-- Apple Calendar / Reminders sync (EventKit) — Phase 4, needs the enrichment data above
-  first (deadline vs. work-session distinction, idempotent mapping table).
+Course discovery and grade/due-time enrichment both need to read an authenticated
+LearningSuite page — and per §2, that can only ever happen inside a browser session a
+human already opened, never a headless process. Before a packaged Safari Web Extension
+exists (Phase 3), a **bookmarklet** is the lightest way to do that: one click, no install,
+no code-signing, and — critically for a project other students will read the code of —
+fully readable, auditable JavaScript (`src/connectors/bookmarklet.ts`, served from
+`/connect`, linked directly from that page so nobody has to trust it blind).
+
+Two bookmarklets exist:
+
+- **Connect LearningSuite** — run on the Course List page. Reads course codes/titles and
+  the `cid-...` course ID out of each course link's `href`, POSTs the result (a same-origin
+  HTML form submission, not `fetch` — needs no CORS setup and can't silently exfiltrate
+  anywhere but the exact origin baked into the button) to `/connect/learningsuite/import`,
+  which writes `data/courses.config.json`. This is what replaced manually hunting down and
+  typing in each course's ID.
+- **Sync Grades & Due Times** — run on one course's Assignments page. Posts to
+  `/connect/learningsuite/import-assignments`, handled by `applySessionEnrichment()`
+  (`src/core/enrichment.ts`) — deliberately *not* run through the generic `reconcile()`
+  engine, because this is a partial patch of a few fields onto records the ICS connector
+  already owns, not "the complete authoritative listing from one source" that `reconcile()`
+  assumes. It matches rows to existing assignments **by normalized title only** (no
+  assignment ID is readable from this page without risking reading a session-bearing URL —
+  see below) and skips — never guesses — a row with no match or an *ambiguous* match
+  (two assignments sharing a title). This safety rule caught something real on the first
+  live run: LearningSuite's own ICS export sometimes lists the same assignment twice under
+  near-identical titles from separate calendar entries; both were correctly left
+  unenriched rather than one being guessed at.
+
+**Both extractors only ever read `.textContent` and, for the course list, one specific
+`href` pattern** — never a full element/HTML dump. This isn't cosmetic: during this
+project's own research, attempting to dump a table's outer HTML on an authenticated page
+tripped a tooling safety filter for containing what looked like session/query-string data
+(some links on that page embed the subsession-scoped URL). Reading only the specific text
+needed, never a raw dump, avoids that class of accidental exposure entirely — a real
+constraint the code is written around, not a hypothetical one.
+
+**A second real gotcha, also found live, not hypothesized:** LearningSuite renders the
+Assignments page differently depending on viewport width — full desktop width has every
+category's rows already in the DOM, but a narrower window collapses categories into
+click-to-expand accordions whose rows don't exist in the DOM until opened. A fixed
+cell-index read (`row.children[4]`) also silently grabs the wrong text on one layout vs.
+the other, since the two layouts split the same information across a different number of
+cells. The extractor handles this by reading via regex over each row's full text (layout-
+independent) and falling back to sequentially clicking each category open only if no rows
+are found up front — see the comment above `assignmentsExtractorSource()` for the details
+and the exact timing constant (450ms between clicks) that testing against the live page
+required for the re-render to reliably complete before the next read.
+
+## 9. Phone access
+
+The dashboard is a plain server-rendered page (no framework, works in any browser,
+responsive CSS down to phone width) — the only question is how a phone reaches a Node
+process running on a laptop. The server binds `0.0.0.0` rather than `localhost` and prints
+reachable addresses on startup, in priority order:
+
+1. **Same Wi-Fi, the machine's own `.local` mDNS hostname** — zero setup, works in Safari
+   with no install, the default instruction. Falls back to the raw LAN IP if mDNS doesn't
+   resolve.
+2. **Tailscale**, if installed — detected by asking the `tailscale` CLI directly for its
+   own address (`tailscale ip -4`), never by guessing from an IP range. That distinction
+   turned out to matter live: this project's own test network (BYU's campus Wi-Fi) hands
+   out addresses from the *same* 100.64.0.0/10 CGNAT block Tailscale's virtual interface
+   uses, so a naive "100.64–127.x.x = Tailscale" heuristic mislabeled an ordinary Wi-Fi
+   address. Asking the CLI for its actual address sidesteps that instead of guessing.
+   Presented as an optional fallback (most students won't have it installed), useful
+   specifically because campus/eduroam-style networks often isolate devices from each
+   other, breaking plan 1 even when both devices are on the same Wi-Fi.
+
+Nothing here is exposed to the public internet — both paths are private-network-only by
+construction (LAN scope or Tailscale's own private mesh), no port-forwarding involved.
+
+## 10. Keeping data current without a human
+
+Teachers add, move, and remove assignments continuously — the sync engine already handles
+this correctly (§5), but only when something actually triggers a sync. `scripts/install-
+launchd.sh` installs a macOS `launchd` user agent that runs `docket sync --source ics` on
+an interval (default hourly) unattended. This is safe specifically *because* the ICS
+connector needs no authentication (§2) — there is no session to keep alive, no credential
+to refresh, nothing that requires a human present, so "run this forever in the background"
+is a fundamentally different (and fine) proposition than it would be for anything touching
+an authenticated session.
+
+## 11. What's deliberately NOT built yet
+
+- Completion status and announcements from the authenticated session — the Assignments
+  page (§8) doesn't render completion state as readable text; that's the Prioritizer page,
+  a documented next step, not guessed at here.
+- A packaged Safari Web Extension (Phase 3) — the bookmarklet in §8 is the validated
+  prototype of exactly this logic; promoting it is packaging work, not open questions.
+- Apple Calendar / Reminders sync (EventKit) — Phase 4, needs completion status and a
+  deadline-vs-work-session distinction first.
 - Multi-device sync (CloudKit) — only justified once there's a native app; local-first
   JSON is correct for a single Mac today.
-- Packaging/signing/distribution — Phase 5.
+- Packaging/signing/distribution beyond what §10 already provides — Phase 5.
 
 None of this is deferred out of laziness — each is blocked on either a human-in-the-loop
 capture step (Duo) or on the layer below it being solid first, per the project's own

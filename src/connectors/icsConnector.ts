@@ -20,6 +20,11 @@ export interface KnownCourse {
   icsUrl: string;
 }
 
+/** LearningSuite's confirmed, unauthenticated per-course schedule feed URL pattern. */
+export function icalFeedUrl(courseId: string): string {
+  return `https://learningsuite.byu.edu/iCalFeed/ical.php?courseID=${encodeURIComponent(courseId)}`;
+}
+
 /**
  * Baseline connector: LearningSuite's per-course iCalendar feed. Confirmed
  * during prior research to require no authentication and to return the full

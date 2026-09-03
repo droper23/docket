@@ -32,7 +32,14 @@ export async function runSync(snapshot: AcademicSnapshot, connector: LearningPla
     existingRecords: snapshot.courses,
     existingSyncRecords: snapshot.syncRecords,
     hash: (c) => contentHash([c.code.value, c.title.value, c.instructor?.value, c.term?.value]),
-    describeChange: (_before, after) => ({ kind: "created", detail: `Course ${after.code.value} — ${after.title.value}` }),
+    // reconcile() only ever uses the returned `kind` for an actual in-place update (Case 3) —
+    // for a brand-new record (Case 1) it calls this with before===after and hardcodes "created"
+    // itself, ignoring the kind here. So `before === after` reliably means "this is the create
+    // path, the kind below is moot" — anything else is a genuine update to an existing course.
+    describeChange: (before, after) =>
+      before === after
+        ? { kind: "created", detail: `Course ${after.code.value} — ${after.title.value}` }
+        : { kind: "updated", detail: `Course ${after.code.value} — ${after.title.value} (details changed)` },
   });
   snapshot.courses = courseReconcile.mergedRecords;
   snapshot.syncRecords = courseReconcile.syncRecords;
@@ -95,7 +102,7 @@ export async function runSync(snapshot: AcademicSnapshot, connector: LearningPla
   return { ok, coursesSynced, coursesFailed, changeCount };
 }
 
-function assignmentHash(a: AssignmentRecord): string {
+export function assignmentHash(a: AssignmentRecord): string {
   return contentHash([
     a.title.value,
     a.dueDate?.value,
@@ -106,7 +113,7 @@ function assignmentHash(a: AssignmentRecord): string {
   ]);
 }
 
-function describeAssignmentChange(before: AssignmentRecord, after: AssignmentRecord): { kind: import("./types.js").ChangeKind; detail: string } | undefined {
+export function describeAssignmentChange(before: AssignmentRecord, after: AssignmentRecord): { kind: import("./types.js").ChangeKind; detail: string } | undefined {
   if (before.dueDate?.value !== after.dueDate?.value) {
     return { kind: "due_date_changed", detail: `${after.title.value}: due date moved from ${before.dueDate?.value ?? "unknown"} to ${after.dueDate?.value ?? "unknown"}` };
   }

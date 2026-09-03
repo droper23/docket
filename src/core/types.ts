@@ -120,7 +120,8 @@ export type ChangeKind =
   | "grade_posted"
   | "completed"
   | "announcement_new"
-  | "archived";
+  | "archived"
+  | "updated";
 
 export interface ChangeLogEntry {
   id: string;
