@@ -117,6 +117,7 @@ function validateAssignmentRows(raw: unknown): AssignmentPageRow[] {
       category: typeof r.category === "string" && r.category.length > 0 ? r.category.slice(0, MAX_FIELD_LEN) : undefined,
       description: typeof r.description === "string" && r.description.length > 0 ? r.description.slice(0, MAX_DESCRIPTION_LEN) : undefined,
       links: validateLinks(r.links),
+      completed: r.completed === true,
     };
   });
 }

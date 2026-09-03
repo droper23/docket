@@ -89,25 +89,25 @@ points, completion status, announcements — see Phase 2, part of which is now d
   confirmed real work; everything else gets a conservative title-keyword guess. See
   `docs/ARCHITECTURE.md` §12.
 
-**Not done yet** — needs a live session to safely capture, same constraint as before:
-- **Completion status** — closer than previously thought, but still genuinely unverified,
-  not guessed at. LearningSuite's Combined Schedule page (`student/top/schedule` — the
-  closest thing it has to a "Today" view, and the more relevant page to check than the
-  Prioritizer this doc previously pointed at) renders a real per-item completion
-  `<input type="checkbox">` next to every assignment, confirmed live to differ item-by-item
-  (not a rendering artifact) once correctly isolated from a separate, same-DOM filters
-  panel that also contains checkboxes — `.closest()`-walking up from an item's title to
-  the nearest ancestor containing *exactly one* checkbox reliably isolates the right one.
-  The open question is only *how to capture it in one click covering a whole course*
-  without live-toggling anything: the Assignments page's own detail panel has a "Check
-  off" button whose label plausibly flips to "Uncheck" once something is actually
-  completed (the code already strips both from `description` — see
-  `stripActionChrome()` in `src/connectors/bookmarklet.ts` — anticipating exactly this),
-  which would mean completion status is readable from the *same* panel already being
-  captured, no second bookmarklet needed. **Unverified because nothing in the live account
-  was actually completed yet to test it against** (Fall 2026 had just started at the time
-  this was investigated) — do not implement this from the untested guess; check again once
-  something real is marked done, or ask the user to point at a specific completed item.
+**Done, once real completed items existed to check against:**
+- **Completion status** — the original plan (above, kept for the false-starts record) was
+  to capture a checkbox on the Combined Schedule or Prioritizer page. That was never
+  implemented; once the live account actually had graded/completed items to test against
+  (it didn't at first — Fall 2026 had just started), the real signal turned out to already
+  be sitting in the Assignments page's own row text this project was already reading: the
+  Submission column literally says `"Completed"` for a done item, `"Submit"` for a
+  not-yet-done one, or `"Opens <date>"` for one not yet available — no second bookmarklet,
+  no checkbox-hunting, no click at all (it's read from the same row text as due date/score,
+  so it works on the fast/Shortcuts path too, not just desktop). One real wrinkle, also
+  only found by checking a live account with actual completed work on it: at least one
+  assignment type (a recurring poll quiz) leaves that column blank once graded rather than
+  ever printing "Completed" — a real earned score (present regardless) is the fallback
+  signal for that case. See the `completed` derivation in `assignmentsExtractorSource()`
+  (`src/connectors/bookmarklet.ts`) and `applySessionEnrichment()`
+  (`src/core/enrichment.ts`). `isOpen()` (`src/core/academicViews.ts`) already excluded
+  completed items from Today/Upcoming — that filter existed before this connector could
+  ever satisfy it, which is why a real production run without this fix showed already-done
+  work as "Overdue" and "Needs Attention": not a bug in the filter, a gap in what fed it.
 - Announcements. `LearningSuiteSessionConnector` is still an interface-conformant skeleton
   for this — every method returns `not_implemented` rather than a guessed parser.
 - The underlying `ajax.php` RPC surface remains mostly unexplored beyond the one
@@ -115,9 +115,7 @@ points, completion status, announcements — see Phase 2, part of which is now d
   actions or response shapes have been captured. DOM extraction via bookmarklet has
   covered what was needed so far without touching this.
 
-**Next concrete step**: capture the Prioritizer page's completion-checkbox structure the
-same way the Assignments page was captured — live, with a human, reading only text content
-(never a full HTML dump — see `docs/ARCHITECTURE.md` §8 for why that specifically matters).
+**Next concrete step**: Announcements, the remaining unimplemented capability above.
 
 ## Phase 3 — Promote to a signed Safari Web Extension — **not started**
 Package the validated Phase 2 logic for Mac + iOS from one codebase, narrowest possible

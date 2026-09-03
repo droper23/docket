@@ -155,3 +155,26 @@ test("re-enriching with unchanged category/description/links is still a no-op (n
 
   assert.equal(outcome2.changeCount, 0);
 });
+
+test("a row reporting completed: true marks the assignment completed", () => {
+  const a = makeAssignment("c1", "1", "Syllabus Video Quiz");
+  const snapshot = baseSnapshot([a]);
+
+  applySessionEnrichment(snapshot, "c1", [{ title: "Syllabus Video Quiz", due: "Sep 2 11:59 pm MDT", score: "/10.0", completed: true }]);
+
+  const updated = snapshot.assignments[0]!;
+  assert.equal(updated.completionStatus?.value, "completed");
+  assert.equal(updated.completionStatus?.provenance, "real");
+});
+
+test("a row without completed: true leaves completion status untouched — never un-completes something already confirmed done", () => {
+  const a: AssignmentRecord = { ...makeAssignment("c1", "1", "Syllabus Video Quiz"), completionStatus: realField("completed", "learningsuite-session:assignments-page") };
+  const snapshot = baseSnapshot([a]);
+
+  // A later sync where this row's title didn't match (page reflowed, renamed) or simply
+  // reported completed: false — either way, previously-confirmed completion must survive.
+  applySessionEnrichment(snapshot, "c1", [{ title: "Syllabus Video Quiz", due: "Sep 2 11:59 pm MDT", score: "/10.0", completed: false }]);
+
+  const updated = snapshot.assignments[0]!;
+  assert.equal(updated.completionStatus?.value, "completed");
+});

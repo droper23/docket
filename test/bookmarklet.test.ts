@@ -43,6 +43,26 @@ test(
   },
 );
 
+test(
+  "regression: the assignments script reads completion status from the row's own " +
+    "Submission column text (no click needed) instead of never capturing it — a real " +
+    "production bug where already-completed LearningSuite items kept showing as undone " +
+    'and overdue in Docket because nothing fed completionStatus. Checks for the literal ' +
+    '"Completed" word and, for the one assignment type observed to leave that column blank ' +
+    "once graded, a real earned score as a fallback signal",
+  () => {
+    const source = bookmarkletSource("assignments", ORIGIN);
+    assert.match(source, /\\bcompleted\\b\/i\.test\(submissionText\)/, "missing the Submission-column completion check");
+    assert.match(source, /completed:\s*completed/, "completed must be included in the row object sent to the server");
+    // Must be computed in the shared part of extractCategory(), outside the
+    // `!isShortcuts`-gated detail-panel block — completion has to work on the fast/phone
+    // path too, not just the desktop one, since no click is needed to read it.
+    const completedComputedIdx = source.search(/var completed = /);
+    const shortcutsGateIdx = source.search(/if\s*\(titleCell\s*&&\s*!isShortcuts\)/);
+    assert.ok(completedComputedIdx > 0 && shortcutsGateIdx > 0 && completedComputedIdx < shortcutsGateIdx, "completed must be computed before the isShortcuts-gated block, not inside it");
+  },
+);
+
 test("bookmarkletHref: produces a javascript: URI that round-trips back to the same source", () => {
   const href = bookmarkletHref("courses", ORIGIN);
   assert.ok(href.startsWith("javascript:"));

@@ -15,6 +15,14 @@ export interface AssignmentPageRow {
   description?: string;
   /** External (non-LearningSuite) resource links found in that same panel. */
   links?: AssignmentLink[];
+  /**
+   * Read directly off the row's own Submission column — real, not guessed. Whether the
+   * literal word "Completed" appears there, or (for assignment types that leave that
+   * column blank once graded, observed live for at least one course's recurring poll
+   * quizzes) a real earned score is present. Never set true from absence of "Submit"/
+   * "Opens <date>" text alone — those cases stay `false`, the conservative default.
+   */
+  completed?: boolean;
 }
 
 export interface EnrichmentOutcome {
@@ -98,6 +106,13 @@ export function applySessionEnrichment(snapshot: AcademicSnapshot, courseId: str
       // Confirmed real coursework: this title was actually found on the course's own
       // Assignments page, which pure calendar/schedule markers never appear on.
       kind: derivedField("assignment", "learningsuite-session:assignments-page", now),
+      // Real, not guessed — read directly off the row's own Submission column (see
+      // AssignmentPageRow.completed). Only ever moves forward from unset/false to
+      // "completed" on a row that actually reported it; a row that didn't report
+      // completed:true leaves the existing value alone rather than resetting it back to
+      // not_started, since a later sync omitting this row (title changed, page layout
+      // shifted) shouldn't un-complete something already confirmed done.
+      completionStatus: row.completed ? realField("completed", "learningsuite-session:assignments-page", now) : before.completionStatus,
     };
 
     const newHash = assignmentHash(after);

@@ -130,11 +130,17 @@ function courseListExtractorSource(): string {
  *    silently reads the wrong thing on one of the two, while text search
  *    doesn't care.
  *
- * Deliberately does not read completion-status: it isn't rendered as
- * readable text on this page (see docs/ROADMAP.md Phase 2 notes) — that's
- * the Prioritizer page, a documented next step, not guessed at here. Never
- * clicks "Check off" or "Submit" — only the row title (read-only expand)
- * and category headers (read-only expand) are ever clicked.
+ * Does read completion status, from the row's own Submission column text
+ * ("Completed" / "Submit" / "Opens <date>", or blank-once-graded for at
+ * least one assignment type observed live) — correcting an earlier
+ * assumption in this file that it "isn't rendered as readable text on this
+ * page." It is; the mistake was not looking at the row text carefully
+ * enough the first time. See the `completed` derivation inside
+ * `extractCategory()` and docs/ARCHITECTURE.md §8 for the full reasoning
+ * and its one real ambiguity (a column left blank rather than saying
+ * "Completed"). Never clicks "Check off" or "Submit" — only the row title
+ * (read-only expand) and category headers (read-only expand) are ever
+ * clicked; completion is read, never toggled.
  *
  * 4. Running as an iOS Shortcut specifically (detected via `typeof completion
  *    === "function"`, same signal used for the completion() call itself)
@@ -229,8 +235,26 @@ function assignmentsExtractorSource(): string {
         var due = dueMatch ? dueMatch[0] : "";
         var beforeGrade = rowText.split(/of Grade/i)[0];
         var afterDue = due ? beforeGrade.slice(beforeGrade.indexOf(due) + due.length) : beforeGrade;
-        var scoreMatch = afterDue.match(/(\\d+(?:\\.\\d+)?)?\\s*\\/\\s*(\\d+(?:\\.\\d+)?)/);
+        // "Opens <Mon> <D>" (not yet available) sits in this same span, and its bare day
+        // number reads as a false score numerator to the regex below otherwise — confirmed
+        // live: "Opens Sep 4 /10.0" was matching "4 /10.0" as the score, corrupting both
+        // the score field and (worse) the completion signal derived from it. Strip that
+        // prefix before searching for a real score.
+        var afterDueForScore = afterDue.replace(/^\\s*Opens\\s+[A-Z][a-z]{2}\\s+\\d{1,2}/, "");
+        var scoreMatch = afterDueForScore.match(/(\\d+(?:\\.\\d+)?)?\\s*\\/\\s*(\\d+(?:\\.\\d+)?)/);
         var score = scoreMatch ? scoreMatch[0] : "";
+
+        // Real, read straight off the row's own Submission column — no click needed, so
+        // this works on the fast (Shortcuts) path too, not just the desktop one. The
+        // column holds one of a few literal strings: "Submit" (not done), "Opens <date>"
+        // (not yet available), or "Completed" — but at least one assignment type observed
+        // live (a recurring poll quiz) leaves this column blank once graded rather than
+        // ever showing "Completed", so a real earned score (the part of scoreMatch before
+        // the slash) counts as completion evidence too. Never inferred from the *absence*
+        // of "Submit"/"Opens" text alone — an unrecognized/blank column stays not-complete,
+        // the conservative default, rather than being guessed at.
+        var submissionText = (scoreMatch ? afterDueForScore.slice(0, scoreMatch.index) : afterDueForScore).trim();
+        var completed = /\\bcompleted\\b/i.test(submissionText) || !!(scoreMatch && scoreMatch[1]);
 
         var description = "";
         var links = [];
@@ -258,7 +282,7 @@ function assignmentsExtractorSource(): string {
           await sleep(250);
         }
 
-        results.push({ title: title, due: due, score: score, category: categoryName || "", description: description, links: links });
+        results.push({ title: title, due: due, score: score, category: categoryName || "", description: description, links: links, completed: completed });
       }
     }
 

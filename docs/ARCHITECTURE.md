@@ -287,6 +287,30 @@ account and inspecting what came back, not by reasoning about the DOM in the abs
   after a first, empty chevron-icon child) is the clean category name alone; grabbing the
   whole header's text pollutes the `category` field with the grading weight on every course.
 
+**Completion status — a documented assumption that turned out to be wrong, caught by a
+real user report:** earlier documentation (this file and `docs/ROADMAP.md`) said
+completion status "isn't rendered as readable text" on the Assignments page and pointed at
+a future checkbox-hunt on a different page as the real path there. That was wrong — a
+production user reported items they'd already checked off in LearningSuite still showing as
+undone and overdue in Docket, which is what actually prompted looking again, live, at the
+exact row text `extractCategory()` already reads for due date and score. The Submission
+column sitting between them says `"Completed"` for a done item, `"Submit"` for a
+not-yet-done one, or `"Opens <date>"` for one not yet available — plain text, no click
+needed, so it's captured on the fast/Shortcuts path too (`completed` is computed in the
+shared part of `extractCategory()`, before the `!isShortcuts`-gated detail-panel block).
+One real wrinkle, also only visible with actual completed work in a live account to check
+against: at least one assignment type (a recurring poll quiz) leaves that column blank once
+graded instead of ever printing "Completed" — a real earned score (the part of the score
+match before the slash) is the fallback signal for that case specifically, never inferred
+from the mere absence of "Submit"/"Opens" text. `applySessionEnrichment()`
+(`src/core/enrichment.ts`) only ever moves `completionStatus` forward to `"completed"`; a
+row that doesn't report `completed: true` leaves whatever was already stored alone, so a
+later sync that misses a title (renamed, page reflowed) can't un-complete something already
+confirmed done. `isOpen()` (`src/core/academicViews.ts`) — which excludes completed items
+from Today/Upcoming/workload — already existed and was already correct; it simply had
+nothing real feeding it until this fix, which is why the symptom looked like a filtering bug
+when the actual gap was upstream, in what the connector captured.
+
 **Phone-native install, no computer involved at all:** a browser bookmarklet's usual
 install gesture — drag a link to the bookmarks bar — doesn't really exist on a phone.
 Rather than accept "you need a laptop to run this once," `/connect` offers the *same*
