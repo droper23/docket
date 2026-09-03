@@ -77,6 +77,15 @@ function courseListExtractorSource(): string {
     form.parentNode.removeChild(form);
   } catch (e) {
     alert("Docket bookmarklet error: " + (e && e.message ? e.message : e));
+  } finally {
+    // Present only when this is running as an iOS Shortcut's "Run JavaScript on Web Page"
+    // action, never as a plain bookmarklet or userscript — that action requires the script
+    // to explicitly call completion() when done, or it shows an error ("the script must
+    // call the function completion(result) when finished") instead of just finishing. A
+    // plain "finally" (not tacked onto the end of the try body) is what makes this run
+    // after every exit path above, including the early "wrong page" alerts-and-returns,
+    // not just the success path.
+    if (typeof completion === "function") completion("done");
   }
 })();`;
 }
@@ -257,6 +266,11 @@ function assignmentsExtractorSource(): string {
     form.parentNode.removeChild(form);
   } catch (e) {
     alert("Docket bookmarklet error: " + (e && e.message ? e.message : e));
+  } finally {
+    // See the matching comment in courseListExtractorSource() — required by iOS
+    // Shortcuts' "Run JavaScript on Web Page" action specifically, harmless as a plain
+    // bookmarklet (no global completion() exists there, so this is simply skipped).
+    if (typeof completion === "function") completion("done");
   }
 })();`;
 }
