@@ -54,8 +54,20 @@ function layout(activePath: string, title: string, body: string): string {
   h1 { font-size: 22px; margin: 0 0 4px; }
   .subtitle { opacity: 0.6; font-size: 13px; margin: 0 0 24px; }
   .section-label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.55; margin: 28px 0 10px; }
-  .day-header { font-size: 13px; font-weight: 700; padding: 7px 12px; margin: 18px 0 8px; background: rgba(120,110,90,0.14); border-radius: 8px; }
-  .day-header:first-child { margin-top: 4px; }
+  .day-group { margin: 18px 0 8px; }
+  .day-group:first-of-type { margin-top: 4px; }
+  .day-header {
+    font-size: 13px; font-weight: 700; padding: 9px 14px; background: rgba(120,110,90,0.14);
+    border-radius: 8px; cursor: pointer; list-style: none; position: relative;
+    display: flex; align-items: center; gap: 8px; -webkit-tap-highlight-color: transparent;
+  }
+  .day-header::-webkit-details-marker { display: none; }
+  .day-header::marker { content: ""; }
+  .day-header::after { content: "›"; position: absolute; right: 12px; top: 50%; transform: translateY(-50%) rotate(90deg); font-size: 18px; opacity: 0.45; transition: transform 0.15s ease; }
+  .day-group:not([open]) .day-header::after { transform: translateY(-50%) rotate(0deg); }
+  .day-header:hover { background: rgba(120,110,90,0.2); }
+  .day-count { opacity: 0.55; font-weight: 600; font-size: 11.5px; }
+  .day-items { padding-top: 8px; }
   .card { background: rgba(120,110,90,0.08); border: 1px solid rgba(120,110,90,0.16); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; overflow: hidden; }
   /* Cancels the parent .card's own padding so this fills the full tile — then re-applies
      matching padding on .card-summary/.card-body below. Only affects cards that opt into
@@ -214,8 +226,10 @@ function agendaCard(item: AgendaItem, urgent: boolean): string {
 function renderDayGroups(items: AgendaItem[]): string {
   return groupByDueDate(items)
     .map(
-      (group) => `<div class="day-header">${esc(dayLabel(group.date))}</div>
-${group.items.map((i) => agendaCard(i, (i.daysUntilDue ?? 99) <= 1)).join("")}`,
+      (group) => `<details class="day-group" open>
+  <summary class="day-header">${esc(dayLabel(group.date))} <span class="day-count">${group.items.length}</span></summary>
+  <div class="day-items">${group.items.map((i) => agendaCard(i, (i.daysUntilDue ?? 99) <= 1)).join("")}</div>
+</details>`,
     )
     .join("");
 }

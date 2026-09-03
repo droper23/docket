@@ -32,9 +32,10 @@ integration are not built yet — see [`docs/ROADMAP.md`](docs/ROADMAP.md).
 - Shows a **Today** view (what's due now), **Upcoming** (next two weeks), **Courses**
   (estimated workload per class), **What Changed** (since your last check), and
   **Diagnostics** (is the connection healthy) — grouped by day like LearningSuite's own
-  Combined Schedule, with a "due in N days" countdown on every card so what needs doing
-  today is obvious at a glance. Tap or click anywhere on a card (not a small link buried
-  in it) to expand its real category, full description, and any linked resources, so you
+  Combined Schedule, each day collapsible so you can focus on one at a time, with a
+  "due in N days" countdown on every card so what needs doing today is obvious at a
+  glance. Tap or click anywhere on a card (not a small link buried in it) to expand its
+  real category, full description, and any linked resources, so you
   rarely need to open LearningSuite at all.
 - Deployable to a free Vercel URL that works on your phone from anywhere — no laptop
   needs to be on, ever (see **Deploying so it works from anywhere**). A local-only mode
