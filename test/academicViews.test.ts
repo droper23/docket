@@ -1,13 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { todayView, upcomingView, workloadView } from "../src/core/academicViews.js";
+import { todayInSchoolTimeZone } from "../src/core/schoolTime.js";
 import { derivedField, realField } from "../src/core/types.js";
 import type { AcademicSnapshot, AssignmentRecord, CourseRecord } from "../src/core/types.js";
 
+// Anchored to BYU's own timezone, matching what academicViews.ts itself now uses — a
+// server-local `new Date()` here would make this test only pass by coincidence on a
+// machine that happens to already be set to America/Denver (exactly how the real "most
+// assignments show up as due today" bug went unnoticed locally and only appeared deployed).
 function iso(daysFromNow: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + daysFromNow);
-  return d.toISOString().slice(0, 10);
+  const [y, m, d] = todayInSchoolTimeZone().split("-").map(Number);
+  return new Date(Date.UTC(y!, m! - 1, d! + daysFromNow)).toISOString().slice(0, 10);
 }
 
 function snapshotWith(assignments: AssignmentRecord[], courses: CourseRecord[]): AcademicSnapshot {

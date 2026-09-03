@@ -2,6 +2,7 @@ import type { AcademicSnapshot } from "../core/types.js";
 import type { AgendaItem, CourseWorkload } from "../core/academicViews.js";
 import type { DiagnosticsReport } from "../core/diagnostics.js";
 import type { ChangeLogEntry } from "../core/types.js";
+import { daysBetween, todayInSchoolTimeZone } from "../core/schoolTime.js";
 
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -147,14 +148,19 @@ function dueCountdown(daysUntilDue: number | undefined): string | undefined {
 
 /** "Today" / "Tomorrow" / "Wednesday, September 3" — mirrors LearningSuite's own Combined Schedule day headers. */
 function dayLabel(dateStr: string): string {
-  const date = new Date(`${dateStr}T00:00:00`);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const diffDays = Math.round((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  // daysBetween anchors "today" to BYU's own timezone (src/core/schoolTime.ts), not the
+  // server's — this is the same class of bug that made most assignments show up as "due
+  // today," now fixed in one shared place both the countdown and this label go through.
+  const diffDays = daysBetween(todayInSchoolTimeZone(), dateStr);
   if (diffDays === 0) return "Today";
   if (diffDays === 1) return "Tomorrow";
   if (diffDays === -1) return "Yesterday";
-  return date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+  // UTC here is deliberate, not a shortcut: dateStr is a bare calendar date with no
+  // time-of-day, so parsing/formatting it consistently in one fixed zone (rather than
+  // whichever zone the server happens to be running in) is what keeps "September 4"
+  // from ever silently becoming "September 3" or "September 5" depending on server TZ.
+  const date = new Date(`${dateStr}T00:00:00Z`);
+  return date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
 }
 
 /**
@@ -240,7 +246,7 @@ export function renderToday(items: AgendaItem[]): string {
     "/",
     "Today",
     `<h1>Today</h1>
-<p class="subtitle">${new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</p>
+<p class="subtitle">${new Date(`${todayInSchoolTimeZone()}T00:00:00Z`).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })}</p>
 <form class="sync-form" method="post" action="/sync"><button type="submit">Sync now</button></form>
 <div class="section-label">Needs attention</div>
 ${list}

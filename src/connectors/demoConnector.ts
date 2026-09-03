@@ -1,6 +1,7 @@
 import type { AnnouncementRecord, AssignmentRecord, CourseRecord } from "../core/types.js";
 import { derivedField, realField } from "../core/types.js";
 import { announcementStableId, assignmentStableId } from "../core/stableId.js";
+import { todayInSchoolTimeZone } from "../core/schoolTime.js";
 import { connectorOk } from "./types.js";
 import type { ConnectorResult, LearningPlatformConnector } from "./types.js";
 
@@ -69,9 +70,12 @@ const DEMO_COURSES = [
 ];
 
 function iso(daysFromNow: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + daysFromNow);
-  return d.toISOString().slice(0, 10);
+  // Offsets from "today" in BYU's own timezone (src/core/schoolTime.ts), not the server's
+  // — otherwise a demo item meant to be "due tomorrow" can silently land on the wrong
+  // calendar day depending on what timezone the server happens to be running in.
+  const [y, m, d] = todayInSchoolTimeZone().split("-").map(Number);
+  const date = new Date(Date.UTC(y!, m! - 1, d! + daysFromNow));
+  return date.toISOString().slice(0, 10);
 }
 
 const DEMO_ASSIGNMENTS = [

@@ -1,3 +1,4 @@
+import { daysUntilInSchoolTimeZone } from "./schoolTime.js";
 import type { AcademicSnapshot, AssignmentRecord, ChangeLogEntry, CourseRecord } from "./types.js";
 
 /** Companion-owned effort heuristic, by LearningSuite's own assignment `type` string. Always "derived" — never shown as fact. */
@@ -19,9 +20,11 @@ export function estimateEffortMinutes(a: AssignmentRecord): number {
 
 function daysUntil(dateStr: string | undefined): number | undefined {
   if (!dateStr) return undefined;
-  const due = new Date(`${dateStr}T23:59:59`);
-  const now = new Date();
-  return Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  // Anchored to BYU's own timezone, not the server's — see src/core/schoolTime.ts for why
+  // this isn't optional. A naive `new Date()` here is exactly the bug that made most
+  // assignments show up as "due today" once this ran on a UTC server instead of a
+  // Mountain-Time dev machine.
+  return daysUntilInSchoolTimeZone(dateStr);
 }
 
 function isActive(snapshot: AcademicSnapshot, assignmentId: string): boolean {

@@ -181,6 +181,27 @@ outcome reports it as a per-course failure — never treated as "everything was 
 `SyncOutcome.coursesFailed` surfaces this to the CLI/diagnostics without corrupting state.
 See `docs/THREAT_MODEL.md` for the corresponding "malformed source data" threat entry.
 
+## 7.5. "Today" has to mean BYU's today, not the server's
+
+Every "days until due" / "which day is this" computation goes through
+`src/core/schoolTime.ts`, anchored to `America/Denver`, never a bare `new Date()`. This is a
+real bug that shipped and was only caught by a user report ("almost all my assignments show
+up as being due today"), not by testing: this project's own local dev machine happens to
+already be set to Mountain Time, so a server-local `new Date()` was *correct by accident*
+in every local check and every screenshot taken during development — and silently wrong the
+moment it ran on Vercel, whose Node runtime defaults to UTC. Concretely, checking Docket in
+the evening (Mountain Time, still "today" locally) could already be past midnight UTC on the
+server — so a bare `new Date()` reported "tomorrow" as the current date, shifting the whole
+day-difference calculation by one and clustering assignments from two different real due
+dates into a single wrong bucket. `schoolTime.ts` fixes this two ways: `todayInSchoolTimeZone()`
+gets "today" via `Intl.DateTimeFormat` with an explicit `timeZone`, never the runtime's
+default, and `daysBetween()` does pure calendar-date arithmetic (both dates anchored to
+synthetic UTC-midnight instants) rather than wall-clock-time subtraction, so there's no
+fractional-day rounding surprise on top of the timezone fix. Hardcoding BYU's timezone
+rather than trying to detect the viewer's own is deliberate, not a shortcut: a due date is
+fixed by LearningSuite in Mountain Time regardless of what timezone a student happens to be
+physically sitting in when they check.
+
 ## 8. Onboarding without a browser extension: the bookmarklet
 
 Course discovery and grade/due-time enrichment both need to read an authenticated
