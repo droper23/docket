@@ -18,13 +18,17 @@ const COURSES_KEY = "docket:courses";
 
 /**
  * True when a Redis store is provisioned (deployed to Vercel with the
- * Upstash Marketplace integration — see docs/ARCHITECTURE.md §12). Local
+ * Upstash Marketplace integration — see docs/ARCHITECTURE.md §9). Local
  * dev/demo runs without it, using plain files, no external account needed.
  * Everything above `config.ts` is unaware of which mode is active — that's
- * the point of `SnapshotStorage` (`src/core/store.ts`).
+ * the point of `SnapshotStorage` (`src/core/store.ts`). Checks
+ * `KV_REST_API_URL` specifically — the actual variable name the
+ * `upstash-kv` Marketplace integration provisions (confirmed live), not
+ * the `UPSTASH_REDIS_REST_URL` name `@upstash/redis`'s own `fromEnv()`
+ * looks for by default — see `src/core/redisStore.ts`'s `getRedisClient()`.
  */
 export function isCloudMode(): boolean {
-  return !!process.env.UPSTASH_REDIS_REST_URL;
+  return !!process.env.KV_REST_API_URL;
 }
 
 let cachedStore: SnapshotStorage | undefined;
@@ -49,8 +53,8 @@ export async function getSnapshotStore(): Promise<SnapshotStorage> {
  */
 export async function loadKnownCourses(): Promise<KnownCourse[]> {
   if (isCloudMode()) {
-    const { Redis } = await import("@upstash/redis");
-    const data = await Redis.fromEnv().get<KnownCourse[]>(COURSES_KEY);
+    const { getRedisClient } = await import("./core/redisStore.js");
+    const data = await getRedisClient().get<KnownCourse[]>(COURSES_KEY);
     return data ?? [];
   }
   try {
@@ -85,8 +89,8 @@ export async function saveDiscoveredCourses(discovered: DiscoveredCourse[]): Pro
   }));
 
   if (isCloudMode()) {
-    const { Redis } = await import("@upstash/redis");
-    await Redis.fromEnv().set(COURSES_KEY, known);
+    const { getRedisClient } = await import("./core/redisStore.js");
+    await getRedisClient().set(COURSES_KEY, known);
     return known;
   }
 

@@ -254,7 +254,7 @@ to open this on my phone from anywhere, without needing my laptop to be on" — 
 tuning problem, it's a different architecture. Docket now runs in two modes from the exact
 same code, chosen automatically by environment (`isCloudMode()` in `src/config.ts`):
 
-- **Local mode** (no `UPSTASH_REDIS_REST_URL` set) — the original design: a local JSON
+- **Local mode** (no `KV_REST_API_URL` set) — the original design: a local JSON
   file (`FileSnapshotStore`), the local dev server, `launchd` for background sync. Zero
   external accounts, nothing leaves the machine. Good for development, demos, and anyone
   who's fine with "reachable only while my computer is on."
@@ -296,11 +296,15 @@ check the dashboard from.
 ## 10. Keeping data current without a human
 
 Teachers add, move, and remove assignments continuously — the sync engine already handles
-this correctly (§5), but only when something actually triggers a sync. Two equivalent
-mechanisms exist depending on mode: locally, `scripts/install-launchd.sh` installs a
-macOS `launchd` user agent running `docket sync --source ics` hourly; deployed, a Vercel
-Cron job hits `/api/cron/sync` on the same schedule (protected by a `CRON_SECRET` bearer
-check so a random visitor can't trigger unlimited syncs). Both are safe to run completely
+this correctly (§5), but only when something actually triggers a sync. Two mechanisms
+exist depending on mode: locally, `scripts/install-launchd.sh` installs a macOS `launchd`
+user agent running `docket sync --source ics` hourly; deployed, a Vercel Cron job hits
+`/api/cron/sync` once a day (protected by a `CRON_SECRET` bearer check so a random
+visitor can't trigger unlimited syncs) — Vercel's Hobby (free) plan caps cron jobs at
+once daily, confirmed by an actual failed deploy attempt during this build rather than
+assumed; a Pro plan removes that cap if more frequent background sync is ever wanted. The
+**Sync now** button on the dashboard always works regardless of plan, for "I want this
+current right now." Both automated paths are safe to run completely
 unattended specifically *because* the ICS connector needs no authentication (§2) — there
 is no session to keep alive, no credential to refresh, nothing that requires a human
 present, so "run this forever in the background" is a fundamentally different (and fine)

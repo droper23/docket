@@ -9,3 +9,9 @@ data/*.jsonl
 legacy/store.json
 .vercel
 .env*
+# Auto-installed AI-agent reference docs for the Upstash integration (vercel CLI tooling
+# cache, regenerated on demand — not project source). Scoped to skills/ specifically
+# rather than all of .claude/, in case real Claude Code project settings land there later.
+.agents/
+.claude/skills/
+skills-lock.json

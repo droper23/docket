@@ -114,7 +114,9 @@ runs if you never deploy).
 ## Keeping it up to date automatically
 
 Teachers add, remove, and reschedule assignments constantly. If you deployed (above), this
-is already handled — a Vercel Cron job syncs hourly with no setup. Running locally instead:
+is already handled — a Vercel Cron job syncs once a day with no setup (Vercel's free plan
+caps cron frequency at daily; the **Sync now** button on the dashboard always works
+instantly regardless). Running locally instead, hourly:
 
 ```sh
 npm run build

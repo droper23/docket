@@ -11,7 +11,7 @@ const PORT = Number(process.env.PORT ?? 4127);
 
 if (isCloudMode()) {
   console.warn(
-    "Warning: UPSTASH_REDIS_REST_URL is set, but this is the local dev server — it will write to your cloud store, not a local file. That's usually not what you want for local development.",
+    "Warning: KV_REST_API_URL is set, but this is the local dev server — it will write to your cloud store, not a local file. That's usually not what you want for local development.",
   );
 }
 
