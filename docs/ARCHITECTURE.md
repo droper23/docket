@@ -492,3 +492,108 @@ Fix: prefer `endDate`/`endDateTime` over `startDate`/`startDateTime` in
 None of this is deferred out of laziness — each is blocked on either a human-in-the-loop
 capture step (Duo) or on the layer below it being solid first, per the project's own
 stated priority: "prefer maintainability over short-term implementation speed."
+
+## 14. Multi-tenant hosted mode: one deployment, many students
+
+Every prior section describes a **single-tenant** deployment — one Vercel project, one
+Redis database, one student, zero concept of identity anywhere in the code. That's still
+the default and the recommended path for anyone who just wants their own private
+dashboard. **Multi-tenant mode** is a separate, purely additive capability for running
+*one* Docket deployment that many students share, each with their own isolated data —
+the "make this a real product, not just my own tool" goal from the project's original
+spec, not attempted until now.
+
+**The mode switch** (`isMultiTenantMode()`, `src/config.ts`) is the presence of
+`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in the environment — the same pattern as
+`isCloudMode()` checking for `KV_REST_API_URL`. Absent, a deployment behaves *exactly* as
+described in every section above: no login, every route implicitly acts on
+`DEFAULT_USER_ID`. This isn't a compatibility shim bolted on after the fact — the storage
+layer's `userId` parameter (below) is the *same code path* either way; only whether login
+is *enforced* branches on the mode.
+
+**Sign-in: Google OAuth2, hand-rolled.** Not BYU/LearningSuite auth — a completely
+separate, unrelated login, purely to keep one student's Docket data apart from another's
+on the same shared instance. No auth SDK or platform (Clerk/Auth0/etc.) is used;
+`src/server/auth.ts` talks to Google's plain REST/OpenID-Connect endpoints directly with
+`fetch`, and verifies the returned ID token's RS256 signature with only Node's built-in
+`node:crypto` (`createPublicKey({format:"jwk"})`, a real Node ≥20 capability — no library
+needed to import an RSA public key from a JWK and verify a signature against it). This
+matches the project's existing "one documented dependency exception (`@upstash/redis`),
+hand-roll everything else with a small, readable surface area" philosophy — the same
+reasoning `icsParser.ts` gives for its own hand-rolled ICS parser. Restricting sign-in to
+real `@byu.edu` accounts specifically was considered and deliberately **not** implemented:
+BYU's student email backend (Google Workspace vs. something else) was never confirmed, so
+this ships open to any Google account rather than guessing at a restriction that might not
+even apply.
+
+A session is a high-entropy random opaque string (`crypto.randomBytes(32)`), not a JWT —
+it's purely a Redis lookup key (`docket:session:<id>` → `{userId, createdAt}`, TTL'd),
+which needs no signing or verification beyond "does this key exist," sidestepping an
+entire class of token-signing bugs for no security cost (already unguessable, and
+instantly server-revocable by deleting the key). It's carried in an `HttpOnly`,
+`SameSite=Lax` cookie.
+
+**Storage: the same `SnapshotStorage` interface, now keyed by user.**
+`load()/save()/reset()` (`src/core/store.ts`) each take a `userId`.
+`RedisSnapshotStore` (`src/core/redisStore.ts`) builds the actual key from it —
+`` `docket:snapshot:${userId}` `` — with one deliberate exception: `DEFAULT_USER_ID`
+always maps to the exact legacy unsuffixed key (`docket:snapshot`, `docket:courses`) a
+single-tenant deployment already has real data sitting under, so turning on multi-tenant
+mode can never orphan an existing self-deployed instance's data. `FileSnapshotStore`
+(local mode) accepts the parameter to satisfy the shared interface but ignores it —
+multi-tenancy is a cloud-mode-only concern; local dev stays single-user by design. A
+`docket:users` Redis **SET** tracks every registered multi-tenant `userId`, populated once
+per account in `upsertUser()` (`src/server/auth.ts`), so `api/cron/sync.js` can enumerate
+everyone without a separate database.
+
+**The bookmarklet's identity problem, and why it isn't cookies.** The bookmarklet/Shortcut
+POST (§8) originates from the LearningSuite tab's own origin — it can never carry
+Docket's session cookie cross-site, login or no login. Instead, each user gets a
+long-lived opaque **bookmarklet token** (`docket:bmtoken:<token>` → `userId`), generated
+once at account creation and regenerable any time from `/account` (invalidates the old
+one — useful if a copy of the script ever leaked). `bookmarkletSource()`/`bookmarkletHref()`
+(`src/connectors/bookmarklet.ts`) gained a third parameter that embeds this token as a
+hidden form field (`%TOKEN%`, substituted the same way `%ORIGIN%` already was) right next
+to the `courses`/`rows` payload — so the *same* script generation logic that always
+existed now personalizes itself per logged-in user. On a single-tenant instance this
+parameter is simply omitted (defaults to `""`), and the import routes
+(`/connect/learningsuite/import*`, `src/server/handler.ts`) accept any request exactly as
+they always did — this is a strict superset of the old behavior, not a breaking change to
+it. On a multi-tenant instance, those same routes resolve `userId` from the submitted
+token *before* touching any payload, rejecting a missing or unrecognized one outright —
+which is, as a side effect, a genuine security improvement over the old "anyone who can
+reach the deployment can overwrite the course list" trust model even for someone who only
+ever runs single-tenant, since the code path is shared.
+
+**Cron** (`api/cron/sync.js`) branches once, at the top: single-tenant mode syncs the one
+implicit user exactly as before; multi-tenant mode reads `docket:users` and syncs each
+registered student in a loop, wrapping every user's sync in its own `try`/`catch` so one
+student's broken course config or a transient network hiccup can never abort the run for
+everyone else — the same "stale is better than wrong" resilience this project already
+applies elsewhere, now applied per-tenant.
+
+**Hardening added alongside the core feature, not deferred:**
+- A Redis-backed fixed-window rate limiter (`src/core/rateLimit.ts` — `INCR` + `EXPIRE`,
+  no new dependency) guards the OAuth callback and the bookmarklet import routes, so a
+  leaked/guessed token or a scripted sign-in attempt costs more than it's worth rather
+  than being free to hammer.
+- CSRF protection on cookie-authenticated state-changing routes (`/sync`, `/reset`,
+  `/account/delete`, etc.) is an Origin/Referer header check
+  (`isSameOriginRequest()`, `src/server/handler.ts`) rather than a synchronizer token —
+  simpler to implement correctly and to reason about than threading a token through every
+  page template, and a well-regarded modern CSRF defense in its own right, on top of
+  `SameSite=Lax` already blocking most cross-site cookie attachment. The bookmarklet
+  import routes are deliberately exempt from this check: they were never
+  cookie-authenticated to begin with (see above), so there's no session to forge in the
+  first place — a cross-site form can't fabricate a valid per-user token it doesn't know.
+- `/privacy` (public) and `/account` (export your data as JSON, delete your account and
+  everything under it, regenerate your bookmarklet token) exist so a real second user has
+  real, immediate control over their own data on someone else's deployment — not a
+  promise to add later.
+
+**What operating a multi-tenant instance actually means, plainly:** the person running it
+has the same technical access to the shared Redis database any operator of any hosted
+service has to their own servers — `/privacy` says so directly, deliberately, rather than
+leaving it implicit. This is a genuinely different trust posture than a single-tenant
+deployment (where only the one student who deployed it can ever see their own data), and
+is treated as such in `docs/THREAT_MODEL.md` rather than glossed over.

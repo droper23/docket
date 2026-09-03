@@ -14,7 +14,29 @@ export const DATA_DIR = resolve(process.cwd(), "data") + "/";
 export const SNAPSHOT_PATH = `${DATA_DIR}snapshot.json`;
 export const COURSES_CONFIG_PATH = `${DATA_DIR}courses.config.json`;
 
-const COURSES_KEY = "docket:courses";
+/**
+ * The implicit user identity for every self-deployed, single-tenant
+ * instance (the project's original and still-default deployment model —
+ * one deployment, one student, no login). Every storage call in that mode
+ * passes this constant, which `RedisSnapshotStore`/course-list storage
+ * deliberately map back onto the exact unsuffixed legacy Redis keys
+ * (`docket:snapshot`, `docket:courses`) a production deployment already has
+ * real data under — see `src/core/redisStore.ts`.
+ */
+export const DEFAULT_USER_ID = "default";
+
+/**
+ * True when this deployment is a shared, multi-student hosted instance —
+ * see docs/ARCHITECTURE.md §14. Purely additive: a self-deployed instance
+ * with no Google OAuth credentials set behaves exactly as before (no login,
+ * everything scoped to `DEFAULT_USER_ID`). Checking for both env vars
+ * (rather than, say, a separate `MULTI_TENANT=true` flag) means multi-tenant
+ * mode can never accidentally turn on half-configured — either both the
+ * client id and secret are present, or the deployment is single-tenant.
+ */
+export function isMultiTenantMode(): boolean {
+  return !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET;
+}
 
 /**
  * True when a Redis store is provisioned (deployed to Vercel with the
@@ -45,16 +67,26 @@ export async function getSnapshotStore(): Promise<SnapshotStorage> {
 }
 
 /**
+ * Same legacy-key-preservation reasoning as `snapshotKey()` in
+ * `src/core/redisStore.ts`: `DEFAULT_USER_ID` maps onto the exact
+ * unsuffixed `docket:courses` key a single-tenant deployment already has
+ * real data under; only a real multi-tenant userId gets a suffix.
+ */
+function coursesKey(userId: string): string {
+  return userId === DEFAULT_USER_ID ? "docket:courses" : `docket:courses:${userId}`;
+}
+
+/**
  * The user's real course list + per-course ICS feed URLs, added during
  * onboarding (docs/ROADMAP.md Phase 1/2). Never fabricated — Docket never
  * guesses a LearningSuite courseID (see docs/ARCHITECTURE.md §1.4 privacy
  * note: the ICS endpoint has no auth, so only ever fetch courses the user
  * told us they're enrolled in).
  */
-export async function loadKnownCourses(): Promise<KnownCourse[]> {
+export async function loadKnownCourses(userId: string): Promise<KnownCourse[]> {
   if (isCloudMode()) {
     const { getRedisClient } = await import("./core/redisStore.js");
-    const data = await getRedisClient().get<KnownCourse[]>(COURSES_KEY);
+    const data = await getRedisClient().get<KnownCourse[]>(coursesKey(userId));
     return data ?? [];
   }
   try {
@@ -79,7 +111,7 @@ export interface DiscoveredCourse {
  * accumulate stale semesters. Never guesses an ICS URL from anything but
  * LearningSuite's own confirmed pattern.
  */
-export async function saveDiscoveredCourses(discovered: DiscoveredCourse[]): Promise<KnownCourse[]> {
+export async function saveDiscoveredCourses(userId: string, discovered: DiscoveredCourse[]): Promise<KnownCourse[]> {
   const known: KnownCourse[] = discovered.map((c) => ({
     courseId: c.courseId,
     code: c.code,
@@ -90,7 +122,7 @@ export async function saveDiscoveredCourses(discovered: DiscoveredCourse[]): Pro
 
   if (isCloudMode()) {
     const { getRedisClient } = await import("./core/redisStore.js");
-    await getRedisClient().set(COURSES_KEY, known);
+    await getRedisClient().set(coursesKey(userId), known);
     return known;
   }
 

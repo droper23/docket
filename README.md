@@ -121,6 +121,32 @@ laptop. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §9 for how this work
 compromising the project's local-first default (local mode still exists and is still what
 runs if you never deploy).
 
+### Optional: hosting it for other students too (multi-tenant mode)
+
+Everything above deploys a **single-tenant** instance — yours alone, no login. If you'd
+rather run *one* deployment that other students can sign into with their own isolated
+data, turn on multi-tenant mode:
+
+1. In the [Google Cloud Console](https://console.cloud.google.com/apis/credentials),
+   create an OAuth 2.0 Client ID (application type: Web application). Add
+   `https://<your-deployment>.vercel.app/auth/callback` as an authorized redirect URI.
+2. Set the two env vars Vercel doesn't provision automatically:
+   ```sh
+   vercel env add GOOGLE_CLIENT_ID
+   vercel env add GOOGLE_CLIENT_SECRET
+   npm run deploy
+   ```
+3. That's it — the same deployment now requires signing in with Google (not your BYU
+   login; a completely separate, unrelated account, purely to keep your data apart from
+   anyone else's on the shared instance) before showing anything, and each account gets
+   its own personalized `/connect` scripts and fully isolated data.
+
+Before sharing the link with anyone, read [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+§14 and the updated rows in [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) — running this
+for other people means you (the operator) have the same access to the shared database any
+operator of any hosted service has to their own servers, disclosed plainly to every user
+on `/privacy`.
+
 ## Keeping it up to date automatically
 
 Teachers add, remove, and reschedule assignments constantly. If you deployed (above), this

@@ -106,6 +106,9 @@ function layout(activePath: string, title: string, body: string): string {
   .provenance-note { font-size: 11px; opacity: 0.5; margin-top: 24px; }
   form.sync-form { margin-bottom: 20px; }
   button { font: inherit; padding: 7px 14px; border-radius: 8px; border: 1px solid rgba(120,110,90,0.35); background: rgba(120,110,90,0.1); cursor: pointer; }
+  .danger-btn { border-color: rgba(180,60,50,0.4); background: rgba(180,60,50,0.1); color: #b43c32; }
+  @media (prefers-color-scheme: dark) { .danger-btn { color: #e08b80; } }
+  .fine-print { font-size: 12px; opacity: 0.6; }
   .connect-body { font-size: 13.5px; line-height: 1.5; opacity: 0.85; max-width: 60ch; }
   .bookmarklet-btn { display: inline-block; font-weight: 600; font-size: 14px; padding: 10px 16px; border-radius: 10px; background: #8a6d3b; color: #fff; text-decoration: none; cursor: grab; }
   a { color: inherit; }
@@ -369,11 +372,17 @@ export function renderConnect(opts: {
   courseListSource: string;
   assignmentsSource: string;
   knownCourseCount: number;
+  /** Only set on a multi-tenant hosted instance — the logged-in user's own identity, embedded in the scripts above so imports land on their account. */
+  account?: { email: string };
 }): string {
   const status =
     opts.knownCourseCount > 0
       ? `<div class="card"><div class="card-title">✓ ${opts.knownCourseCount} course${opts.knownCourseCount === 1 ? "" : "s"} connected</div><div class="card-meta">Re-run step 1 any time your enrollment changes — it always reflects your current course list, it never accumulates old semesters.</div></div>`
       : `<div class="card"><div class="card-title">No courses connected yet</div><div class="card-meta">Follow the steps below — pick whichever tab matches what you're on right now.</div></div>`;
+
+  const accountBanner = opts.account
+    ? `<div class="card"><div class="card-meta">Signed in as ${esc(opts.account.email)}. The scripts below are personalized to your account — copies made by someone else won't work, and someone else's won't work for you. <a href="/account">Manage account, or regenerate this if you think it's leaked</a>.</div></div>`
+    : "";
 
   const copyBlock = (id: string, label: string, source: string) => `
 <div class="script-box">
@@ -387,6 +396,7 @@ export function renderConnect(opts: {
     "Connect",
     `<h1>Connect LearningSuite</h1>
 <p class="subtitle">No password, ever. This only ever reads your own already-signed-in LearningSuite tab, on your own device.</p>
+${accountBanner}
 ${status}
 
 <div class="tabs">
@@ -484,4 +494,80 @@ export function renderImportResult(kind: "courses" | "assignments", body: string
 ${body}
 <p class="close-note">You can close this tab and go back to Docket.</p>
 </body></html>`;
+}
+
+/**
+ * The landing/sign-in page — only ever shown on a multi-tenant hosted
+ * instance (docs/ARCHITECTURE.md §14), when nobody's logged in yet. A
+ * self-deployed single-tenant instance never shows this; `/` is always the
+ * dashboard there, exactly as before multi-tenant mode existed.
+ */
+export function renderLogin(): string {
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docket — Sign in</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f6f5f2; color: #1c1b19; padding: 24px; }
+  @media (prefers-color-scheme: dark) { body { background: #171614; color: #ece9e3; } }
+  .box { max-width: 380px; text-align: center; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  p { opacity: 0.75; font-size: 14px; line-height: 1.5; }
+  .signin-btn { display: inline-block; margin-top: 20px; padding: 12px 22px; border-radius: 10px; background: #1c1b19; color: #fff; text-decoration: none; font-weight: 600; }
+  @media (prefers-color-scheme: dark) { .signin-btn { background: #ece9e3; color: #171614; } }
+  .fine-print { margin-top: 28px; font-size: 12px; opacity: 0.55; }
+  .fine-print a { color: inherit; }
+</style></head>
+<body>
+<div class="box">
+  <h1>Docket</h1>
+  <p>a productivity layer for LearningSuite</p>
+  <p>Sign in to keep your own dashboard separate from everyone else's on this shared instance. This is a Docket account, not your BYU login — Docket never asks for or sees your BYU NetID or password.</p>
+  <a class="signin-btn" href="/auth/login">Sign in with Google</a>
+  <p class="fine-print">By continuing you agree to how your data is handled — see the <a href="/privacy">privacy page</a>.</p>
+</div>
+</body></html>`;
+}
+
+export function renderAccount(opts: { email: string; name?: string; bookmarkletToken: string; origin: string; regenerated?: boolean }): string {
+  return layout(
+    "/account",
+    "Account",
+    `<h1>Account</h1>
+<p class="subtitle">${esc(opts.name ? `${opts.name} — ` : "")}${esc(opts.email)}</p>
+${opts.regenerated ? `<div class="card"><div class="card-title">✓ Token regenerated</div><div class="card-meta">Copy the new scripts from <a href="/connect">Connect</a> — old copies (including any Shortcut you set up before) will stop working.</div></div>` : ""}
+
+<div class="section-label">Your bookmarklet identity</div>
+<div class="card"><div class="card-meta">This token is baked into your personalized scripts on the <a href="/connect">Connect</a> page — it's how imports from your LearningSuite tab land on your account instead of someone else's. Treat it like a password: regenerate it if you ever think a copy of your script leaked (posted somewhere public, shared by accident).</div></div>
+<form method="post" action="/account/regenerate-token" onsubmit="return confirm('Regenerate your token? Any script or Shortcut copied before now will stop working until you copy the new one.');"><button type="submit">Regenerate token</button></form>
+
+<div class="section-label">Your data</div>
+<p class="connect-body"><a href="/account/export">Export my data</a> — downloads everything Docket has stored for your account, as JSON.</p>
+<form method="post" action="/account/delete" onsubmit="return confirm('Permanently delete your Docket account and all its data? This cannot be undone. Your actual LearningSuite account is never touched.');"><button type="submit" class="danger-btn">Delete my account</button></form>
+
+<div class="section-label">Session</div>
+<form method="post" action="/auth/logout"><button type="submit">Sign out</button></form>
+
+<p class="fine-print" style="margin-top:24px;opacity:0.6;font-size:12px;">See the <a href="/privacy">privacy page</a> for what's collected and why.</p>`,
+  );
+}
+
+/** Public — no login needed. Plain-language disclosure for a multi-tenant hosted instance (docs/ARCHITECTURE.md §14). */
+export function renderPrivacy(): string {
+  return layout(
+    "/privacy",
+    "Privacy",
+    `<h1>Privacy</h1>
+<p class="subtitle">Plain language, not legal boilerplate.</p>
+
+<div class="section-label">What Docket collects</div>
+<div class="card"><div class="card-meta">Your Google account's email and name (for sign-in only), plus whatever your own "Connect LearningSuite" scripts send: course codes/titles/IDs, and assignment titles, due dates/times, scores, grading categories, descriptions, and any external links attached to them. Never your BYU NetID or password, never a LearningSuite cookie or session ID — see the <a href="https://github.com/droper23/docket/blob/main/docs/THREAT_MODEL.md">threat model</a> for the full technical analysis of what the connector scripts do and don't read.</div></div>
+
+<div class="section-label">Who can see it</div>
+<div class="card"><div class="card-meta">Only you, through your own logged-in dashboard — and the person operating this shared instance, who has the same technical access to the underlying database any operator of any hosted service has to their own servers. Your data is never shared with anyone else, sold, or used for anything but showing it back to you.</div></div>
+
+<div class="section-label">Your control over it</div>
+<div class="card"><div class="card-meta">Export or permanently delete everything Docket has stored for your account at any time, from <a href="/account">your account page</a> — no waiting, no support ticket needed.</div></div>`,
+  );
 }

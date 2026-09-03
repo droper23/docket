@@ -30,6 +30,13 @@
 function courseListExtractorSource(): string {
   return `(function(){
   var ORIGIN = "%ORIGIN%";
+  // Empty string on a single-tenant (self-deployed, no login) instance — the import
+  // routes there accept any request, exactly as before multi-tenant mode existed. On a
+  // multi-tenant hosted instance this is a real per-user token, baked in when this script
+  // was generated on the logged-in /connect page, so the server knows whose data this is
+  // without needing a cookie (this POST comes from LearningSuite's own origin, which can
+  // never carry Docket's session cookie cross-site) — see docs/ARCHITECTURE.md §14.
+  var TOKEN = "%TOKEN%";
   try {
     if (!/learningsuite\\.byu\\.edu$/.test(location.hostname)) {
       alert("Docket: open this on your LearningSuite Course List page first (learningsuite.byu.edu > Home > Course List).");
@@ -71,6 +78,11 @@ function courseListExtractorSource(): string {
     input.name = "courses";
     input.value = JSON.stringify(results);
     form.appendChild(input);
+    var tokenInput = document.createElement("input");
+    tokenInput.type = "hidden";
+    tokenInput.name = "token";
+    tokenInput.value = TOKEN;
+    form.appendChild(tokenInput);
     document.body.appendChild(form);
     window.open("", "docket-import");
     form.submit();
@@ -157,6 +169,9 @@ function courseListExtractorSource(): string {
 function assignmentsExtractorSource(): string {
   return `(async function(){
   var ORIGIN = "%ORIGIN%";
+  // See the matching comment in courseListExtractorSource() — empty on a single-tenant
+  // instance, a real per-user identity token on a multi-tenant hosted one.
+  var TOKEN = "%TOKEN%";
   try {
     if (!/learningsuite\\.byu\\.edu$/.test(location.hostname)) {
       alert("Docket: open this on a LearningSuite course's Assignments page first.");
@@ -310,8 +325,11 @@ function assignmentsExtractorSource(): string {
     courseInput.type = "hidden"; courseInput.name = "courseId"; courseInput.value = courseId;
     var rowsInput = document.createElement("input");
     rowsInput.type = "hidden"; rowsInput.name = "rows"; rowsInput.value = JSON.stringify(results);
+    var tokenInput = document.createElement("input");
+    tokenInput.type = "hidden"; tokenInput.name = "token"; tokenInput.value = TOKEN;
     form.appendChild(courseInput);
     form.appendChild(rowsInput);
+    form.appendChild(tokenInput);
     document.body.appendChild(form);
     window.open("", "docket-import");
     form.submit();
@@ -329,13 +347,20 @@ function assignmentsExtractorSource(): string {
 
 export type BookmarkletKind = "courses" | "assignments";
 
-/** Human-readable source (for display/audit on the /connect page — not minified, meant to be read). */
-export function bookmarkletSource(kind: BookmarkletKind, origin: string): string {
+/**
+ * Human-readable source (for display/audit on the /connect page — not
+ * minified, meant to be read). `token` is the user's own bookmarklet
+ * identity token (docs/ARCHITECTURE.md §14) on a multi-tenant hosted
+ * instance — omit it (or pass `""`) for a single-tenant self-deployed
+ * instance, where the import routes accept any request exactly as before
+ * multi-tenant mode existed.
+ */
+export function bookmarkletSource(kind: BookmarkletKind, origin: string, token = ""): string {
   const raw = kind === "courses" ? courseListExtractorSource() : assignmentsExtractorSource();
-  return raw.replace("%ORIGIN%", origin);
+  return raw.replace("%ORIGIN%", origin).replace("%TOKEN%", token);
 }
 
 /** The actual `javascript:` URI a student drags to their bookmarks bar. */
-export function bookmarkletHref(kind: BookmarkletKind, origin: string): string {
-  return `javascript:${encodeURIComponent(bookmarkletSource(kind, origin))}`;
+export function bookmarkletHref(kind: BookmarkletKind, origin: string, token = ""): string {
+  return `javascript:${encodeURIComponent(bookmarkletSource(kind, origin, token))}`;
 }

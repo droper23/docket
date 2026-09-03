@@ -12,23 +12,33 @@ import { emptySnapshot } from "./types.js";
  * phone without my laptop being on"). `src/config.ts`'s `getSnapshotStore()`
  * picks between them based on environment; nothing else needs to know
  * which one is active.
+ *
+ * Every method takes a `userId` — added for multi-tenant hosted mode
+ * (docs/ARCHITECTURE.md §14), where one deployment serves many students'
+ * isolated data. `FileSnapshotStore` (local, single-user by design) ignores
+ * the value entirely; `RedisSnapshotStore` uses it to key which student's
+ * blob is being read/written. In single-tenant mode (self-deployed, no
+ * Google OAuth env vars) every caller passes the same `DEFAULT_USER_ID`
+ * constant (`src/config.ts`), so this is one code path either way, not two.
  */
 export interface SnapshotStorage {
-  load(): Promise<AcademicSnapshot>;
-  save(snapshot: AcademicSnapshot): Promise<void>;
-  reset(): Promise<void>;
+  load(userId: string): Promise<AcademicSnapshot>;
+  save(userId: string, snapshot: AcademicSnapshot): Promise<void>;
+  reset(userId: string): Promise<void>;
 }
 
 /**
  * Local-first persistence: one JSON file on disk, written atomically
  * (write-to-temp, then rename) so a crash mid-write can never corrupt the
  * student's academic data — "stale is better than wrong"
- * (docs/ARCHITECTURE.md §Failure Philosophy).
+ * (docs/ARCHITECTURE.md §Failure Philosophy). Deliberately single-user:
+ * `userId` is accepted (to satisfy `SnapshotStorage`) but ignored — local
+ * mode is the personal-machine dev/demo path, not the multi-tenant one.
  */
 export class FileSnapshotStore implements SnapshotStorage {
   constructor(private readonly filePath: string) {}
 
-  async load(): Promise<AcademicSnapshot> {
+  async load(_userId: string): Promise<AcademicSnapshot> {
     try {
       const raw = await readFile(this.filePath, "utf-8");
       return JSON.parse(raw) as AcademicSnapshot;
@@ -43,15 +53,15 @@ export class FileSnapshotStore implements SnapshotStorage {
     }
   }
 
-  async save(snapshot: AcademicSnapshot): Promise<void> {
+  async save(_userId: string, snapshot: AcademicSnapshot): Promise<void> {
     await mkdir(dirname(this.filePath), { recursive: true });
     const tmpPath = `${this.filePath}.tmp-${process.pid}`;
     await writeFile(tmpPath, JSON.stringify(snapshot, null, 2), "utf-8");
     await rename(tmpPath, this.filePath);
   }
 
-  async reset(): Promise<void> {
-    await this.save(emptySnapshot());
+  async reset(userId: string): Promise<void> {
+    await this.save(userId, emptySnapshot());
   }
 }
 

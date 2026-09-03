@@ -1,6 +1,6 @@
 import { DemoConnector } from "./connectors/demoConnector.js";
 import { IcsConnector } from "./connectors/icsConnector.js";
-import { getSnapshotStore, loadKnownCourses } from "./config.js";
+import { DEFAULT_USER_ID, getSnapshotStore, loadKnownCourses } from "./config.js";
 import { runSync } from "./core/syncRunner.js";
 
 async function main() {
@@ -8,7 +8,7 @@ async function main() {
   const store = await getSnapshotStore();
 
   if (command === "reset") {
-    await store.reset();
+    await store.reset(DEFAULT_USER_ID);
     console.log("Docket data reset. Nothing was changed on LearningSuite itself.");
     return;
   }
@@ -20,10 +20,10 @@ async function main() {
     const connector =
       source === "demo"
         ? new DemoConnector()
-        : new IcsConnector(await loadKnownCourses());
+        : new IcsConnector(await loadKnownCourses(DEFAULT_USER_ID));
 
     if (source === "ics") {
-      const known = await loadKnownCourses();
+      const known = await loadKnownCourses(DEFAULT_USER_ID);
       if (known.length === 0) {
         console.error(
           `No courses configured. Add your real courses (with their LearningSuite ICS feed URLs) to data/courses.config.json first — see README.md "Connecting a real LearningSuite account".`,
@@ -33,9 +33,9 @@ async function main() {
       }
     }
 
-    const snapshot = await store.load();
+    const snapshot = await store.load(DEFAULT_USER_ID);
     const outcome = await runSync(snapshot, connector);
-    await store.save(snapshot);
+    await store.save(DEFAULT_USER_ID, snapshot);
 
     console.log(`Sync via "${connector.id}": ${outcome.coursesSynced} course(s) processed, ${outcome.changeCount} change(s) recorded.`);
     if (outcome.coursesFailed.length > 0) {

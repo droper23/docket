@@ -140,11 +140,45 @@ Security/dependency/permission/logging audits should happen continuously, not as
 one-time gate at the end — `docs/THREAT_MODEL.md` is a living document, updated as each
 phase actually ships code, not written once and left stale.
 
+## Phase 7 — Multi-tenant hosted mode — **built, needs a real Google OAuth client to go live**
+
+One Docket deployment many students can share, each with fully isolated data, instead of
+every student needing their own Vercel account/Redis database/CLI setup — the "make this a
+real product" goal from the original spec. Purely additive: a single-tenant self-deploy
+(the default, and still the recommended path for anyone who just wants their own
+dashboard) behaves exactly as before. See `docs/ARCHITECTURE.md` §14 for the full design —
+Google OAuth2 sign-in (hand-rolled, no auth SDK, RS256 ID-token verification via Node's
+built-in `crypto.createPublicKey({format:"jwk"})`, zero new runtime dependencies), a
+`userId`-scoped `SnapshotStorage` interface with legacy-key preservation for
+`DEFAULT_USER_ID`, a per-user bookmarklet identity token (the connector script can't carry
+a session cookie cross-site), multi-tenant-aware cron, Redis-backed rate limiting on the
+auth callback and import routes, an Origin/Referer-based CSRF check on cookie-authenticated
+routes, and `/privacy` + `/account` (export/delete/token-regenerate) pages. Covered by 15
+new unit tests (`test/auth.test.ts`) for everything testable without live Redis or a real
+Google client — ID-token verification (signature, expiry, audience, issuer, algorithm) via
+an injectable JWKS fetcher and fixture keypair, cookie parsing, auth-URL construction,
+session-cookie header formatting.
+
+**Not yet done — needs the user to actually go live, not a code gap:**
+- Create a real Google OAuth client in Google Cloud Console and set
+  `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` on the deployment that should run multi-tenant.
+- Live end-to-end verification with a real login, a real second Google account confirming
+  full data isolation, and cron actually iterating multiple real users — the Redis-backed
+  parts of this (sessions, tokens, rate limiting, per-user storage) have no unit-test
+  mocking infrastructure in this codebase (matching the existing precedent:
+  `RedisSnapshotStore` itself has never had unit tests either, only live verification), so
+  this is real, not optional, before advertising the shared link to anyone.
+- Whether to restrict sign-in to real `@byu.edu` accounts specifically — deliberately not
+  implemented, since BYU's student email backend (Google Workspace vs. something else) was
+  never confirmed; verify that first rather than guessing at a restriction that might not
+  even apply.
+
 ## What the next session should do first
 
-1. Finish Phase 2: capture the Prioritizer page's completion-status structure live, with a
-   human present, the same way the Course List and Assignments pages were captured — don't
-   guess a DOM shape or ship a parser against one that wasn't actually observed.
+1. Go live with Phase 7: create a real Google OAuth client, set the two env vars on a
+   deployment, and do the live end-to-end verification listed above — this is the one
+   piece of this feature that genuinely needs a human with Google Cloud Console access,
+   not something to guess or skip.
 2. Then Phase 3: promote the two validated bookmarklets into a packaged Safari Web
    Extension so the same logic runs opportunistically without a manual click, on Mac + iOS.
 3. Re-run `npm test` and a live `npm run sync:ics` after *any* change to the sync engine,

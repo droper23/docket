@@ -12,6 +12,18 @@ test("bookmarkletSource: origin placeholder is fully substituted, for both kinds
   }
 });
 
+test("bookmarkletSource: token placeholder is always substituted — empty by default (single-tenant), a real value when given (multi-tenant)", () => {
+  for (const kind of ["courses", "assignments"] as const) {
+    const withoutToken = bookmarkletSource(kind, ORIGIN);
+    assert.ok(!withoutToken.includes("%TOKEN%"), `${kind}: no unsubstituted placeholder should remain`);
+    assert.match(withoutToken, /var TOKEN = "";/, `${kind}: defaults to an empty token`);
+
+    const withToken = bookmarkletSource(kind, ORIGIN, "user-secret-token-123");
+    assert.ok(withToken.includes('"user-secret-token-123"'), `${kind}: token should appear literally in the source`);
+    assert.ok(!withToken.includes("%TOKEN%"), `${kind}: no unsubstituted placeholder should remain`);
+  }
+});
+
 test(
   "regression: both scripts call completion() in a finally block when running as an iOS " +
     "Shortcut (\"Run JavaScript on Web Page\" errors with \"the script must call the " +

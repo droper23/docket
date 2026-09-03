@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { DemoConnector } from "../connectors/demoConnector.js";
 import { IcsConnector } from "../connectors/icsConnector.js";
 import { bookmarkletHref, bookmarkletSource } from "../connectors/bookmarklet.js";
-import { getSnapshotStore, isCloudMode, loadKnownCourses, saveDiscoveredCourses } from "../config.js";
+import { DEFAULT_USER_ID, getSnapshotStore, isCloudMode, isMultiTenantMode, loadKnownCourses, saveDiscoveredCourses } from "../config.js";
 import type { DiscoveredCourse } from "../config.js";
 import { recentChanges, todayView, upcomingView, workloadView } from "../core/academicViews.js";
 import { computeDiagnostics } from "../core/diagnostics.js";
@@ -10,20 +10,64 @@ import { applySessionEnrichment } from "../core/enrichment.js";
 import type { AssignmentPageRow } from "../core/enrichment.js";
 import type { AssignmentLink } from "../core/types.js";
 import { runSync } from "../core/syncRunner.js";
+import { checkRateLimit } from "../core/rateLimit.js";
+import {
+  buildGoogleAuthUrl,
+  clearSessionCookieHeader,
+  completeGoogleLogin,
+  createSession,
+  deleteAccount,
+  deleteSession,
+  getUserProfile,
+  parseCookies,
+  regenerateBookmarkletToken,
+  resolveUserId,
+  resolveUserIdFromBookmarkletToken,
+  sessionCookieHeader,
+  sessionIdFromCookieHeader,
+  upsertUser,
+} from "./auth.js";
 import type { PhoneAccessInfo } from "./render.js";
 import {
+  renderAccount,
   renderChanges,
   renderConnect,
   renderCourses,
   renderDiagnostics,
   renderImportResult,
+  renderLogin,
+  renderPrivacy,
   renderToday,
   renderUpcoming,
 } from "./render.js";
 
-async function pickConnector() {
-  const known = await loadKnownCourses();
+async function pickConnector(userId: string) {
+  const known = await loadKnownCourses(userId);
   return known.length > 0 ? new IcsConnector(known) : new DemoConnector();
+}
+
+/** IP for rate-limiting purposes — Vercel forwards the real client IP via `x-forwarded-for`; a bare local server has no proxy in front of it, so `req.socket.remoteAddress` is the real thing there. */
+function clientIp(req: IncomingMessage): string {
+  const forwarded = (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim();
+  return forwarded || req.socket.remoteAddress || "unknown";
+}
+
+/**
+ * Cross-site POSTs can't be blocked by `SameSite=Lax` alone in every
+ * browser configuration, so cookie-authenticated state-changing routes
+ * (unlike the bookmarklet import routes, which use their own per-user
+ * token and are never cookie-authenticated) also check that the request
+ * actually originated from this deployment — a standard, dependency-free
+ * CSRF defense. Missing entirely (a very old browser, or a non-browser
+ * client with no Origin/Referer at all) is treated as a failure, not an
+ * exemption — a real cross-site form POST omits neither header in any
+ * browser capable of sending cookies in the first place.
+ */
+function isSameOriginRequest(req: IncomingMessage, origin: string): boolean {
+  const originHeader = req.headers.origin as string | undefined;
+  if (originHeader) return originHeader === origin;
+  const referer = req.headers.referer as string | undefined;
+  return !!referer && referer.startsWith(`${origin}/`);
 }
 
 /** Reads and caps a request body — this endpoint is reachable by anyone who can reach the deployment, not just the bookmarklet, so never trust size or shape. */
@@ -163,27 +207,26 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, g
     const origin = requestOrigin(req);
     const url = new URL(req.url ?? "/", origin);
     const store = await getSnapshotStore();
+    const multiTenant = isMultiTenantMode();
 
-    if (req.method === "POST" && url.pathname === "/sync") {
-      const snapshot = await store.load();
-      const connector = await pickConnector();
-      await runSync(snapshot, connector);
-      await store.save(snapshot);
-      redirect(res, "/");
-      return;
-    }
-
-    if (req.method === "POST" && url.pathname === "/reset") {
-      await store.reset();
-      redirect(res, "/diagnostics");
-      return;
-    }
-
+    // --- Bookmarklet import routes: identity comes from a per-user token embedded in the
+    // script (docs/ARCHITECTURE.md §14), never from a cookie — this request originates from
+    // the LearningSuite tab's own origin, which can't carry Docket's session cookie
+    // cross-site. Handled before the cookie-based login gate below, since these requests
+    // never have a Docket session at all, by design. On a single-tenant instance (no
+    // multi-tenant mode) this resolves to DEFAULT_USER_ID unconditionally, exactly
+    // reproducing the "anyone who can reach this deployment" trust model that existed
+    // before multi-tenancy — nothing changes there.
     if (req.method === "POST" && url.pathname === "/connect/learningsuite/import") {
       const body = parseFormBody(await readBody(req));
       try {
+        const userId = await resolveImportUserId(body.token, multiTenant);
+        if (isCloudMode()) {
+          const rl = await checkRateLimit("import", userId, 30, 60);
+          if (!rl.allowed) throw new Error("Too many import attempts — wait a minute and try again");
+        }
         const discovered = validateDiscoveredCourses(JSON.parse(body.courses ?? "null"));
-        const known = await saveDiscoveredCourses(discovered);
+        const known = await saveDiscoveredCourses(userId, discovered);
         const list = known.map((c) => `<li>${esc(c.code)} — ${esc(c.title)}</li>`).join("");
         html(res, renderImportResult("courses", `<p>Found ${known.length} course(s):</p><ul>${list}</ul><p>Go back to Docket and click <strong>Sync now</strong> to pull in their schedules.</p>`));
       } catch (err) {
@@ -195,12 +238,17 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, g
     if (req.method === "POST" && url.pathname === "/connect/learningsuite/import-assignments") {
       const body = parseFormBody(await readBody(req));
       try {
+        const userId = await resolveImportUserId(body.token, multiTenant);
+        if (isCloudMode()) {
+          const rl = await checkRateLimit("import", userId, 30, 60);
+          if (!rl.allowed) throw new Error("Too many import attempts — wait a minute and try again");
+        }
         const courseId = body.courseId;
         if (!isNonEmptyShortString(courseId)) throw new Error("Missing courseId");
         const rows = validateAssignmentRows(JSON.parse(body.rows ?? "null"));
-        const snapshot = await store.load();
+        const snapshot = await store.load(userId);
         const outcome = applySessionEnrichment(snapshot, courseId, rows);
-        await store.save(snapshot);
+        await store.save(userId, snapshot);
         const unmatchedNote =
           outcome.unmatched.length > 0
             ? `<p>${outcome.unmatched.length} row(s) couldn't be matched to a synced assignment (run <strong>Sync now</strong> first if you haven't synced this course yet): ${outcome.unmatched.map((t) => esc(t)).join(", ")}</p>`
@@ -218,7 +266,116 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, g
       return;
     }
 
-    const snapshot = await store.load();
+    // --- Public routes: never need a Docket login. On a single-tenant instance these are
+    // harmless dead ends (redirected straight back to "/") rather than 404s, since nothing
+    // in that mode ever links to them.
+    if (req.method === "GET" && url.pathname === "/privacy") {
+      return html(res, renderPrivacy());
+    }
+    if (req.method === "GET" && url.pathname === "/auth/login") {
+      if (!multiTenant) return redirect(res, "/");
+      const state = Math.random().toString(36).slice(2);
+      res.setHeader("Set-Cookie", `docket_oauth_state=${state}; HttpOnly; SameSite=Lax; Path=/auth; Max-Age=600${origin.startsWith("https://") ? "; Secure" : ""}`);
+      return redirect(res, buildGoogleAuthUrl(origin, state));
+    }
+    if (req.method === "GET" && url.pathname === "/auth/callback") {
+      if (!multiTenant) return redirect(res, "/");
+      if (isCloudMode()) {
+        const rl = await checkRateLimit("auth-callback", clientIp(req), 20, 60);
+        if (!rl.allowed) {
+          res.writeHead(429, { "Content-Type": "text/plain" });
+          res.end("Too many sign-in attempts — wait a minute and try again.");
+          return;
+        }
+      }
+      const code = url.searchParams.get("code");
+      const state = url.searchParams.get("state");
+      const expectedState = parseCookies(req.headers.cookie)["docket_oauth_state"];
+      if (!code || !state || !expectedState || state !== expectedState) {
+        res.writeHead(400, { "Content-Type": "text/plain" });
+        res.end("Sign-in failed: missing or mismatched state. Try signing in again from /auth/login.");
+        return;
+      }
+      try {
+        const identity = await completeGoogleLogin(code, origin);
+        const profile = await upsertUser(identity);
+        const sessionId = await createSession(profile.sub);
+        res.setHeader("Set-Cookie", [sessionCookieHeader(sessionId, origin), `docket_oauth_state=; Max-Age=0; Path=/auth`]);
+        return redirect(res, "/");
+      } catch (err) {
+        console.error("Docket sign-in failed:", err instanceof Error ? err.message : err);
+        res.writeHead(400, { "Content-Type": "text/plain" });
+        res.end("Sign-in failed. Try again from /auth/login.");
+        return;
+      }
+    }
+    if (req.method === "POST" && url.pathname === "/auth/logout") {
+      const sessionId = sessionIdFromCookieHeader(req.headers.cookie);
+      if (sessionId) await deleteSession(sessionId);
+      res.setHeader("Set-Cookie", clearSessionCookieHeader(origin));
+      return redirect(res, multiTenant ? "/auth/login" : "/");
+    }
+
+    // --- Everything below requires a resolved identity. Single-tenant: always
+    // DEFAULT_USER_ID, no login, exactly as before multi-tenant mode existed.
+    // Multi-tenant: resolved from the session cookie; redirect to sign in if absent.
+    const userId = multiTenant ? await resolveUserId(req.headers.cookie) : DEFAULT_USER_ID;
+    if (!userId) {
+      if (req.method === "GET") return html(res, renderLogin());
+      return redirect(res, "/auth/login");
+    }
+
+    // Cookie-authenticated state-changing routes get CSRF protection via an
+    // Origin/Referer check (see isSameOriginRequest) — the bookmarklet import routes above
+    // are exempt because they were never cookie-authenticated in the first place.
+    if (req.method === "POST" && multiTenant && !isSameOriginRequest(req, origin)) {
+      res.writeHead(403, { "Content-Type": "text/plain" });
+      res.end("Request rejected: origin mismatch.");
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/account") {
+      if (!multiTenant) return redirect(res, "/");
+      const profile = await getUserProfile(userId);
+      if (!profile) return redirect(res, "/auth/login");
+      const regenerated = url.searchParams.get("regenerated") === "1";
+      return html(res, renderAccount({ email: profile.email, name: profile.name, bookmarkletToken: profile.bookmarkletToken, origin, regenerated }));
+    }
+    if (req.method === "GET" && url.pathname === "/account/export") {
+      if (!multiTenant) return redirect(res, "/");
+      const snapshot = await store.load(userId);
+      res.writeHead(200, { "Content-Type": "application/json", "Content-Disposition": "attachment; filename=docket-export.json" });
+      res.end(JSON.stringify(snapshot, null, 2));
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/account/regenerate-token") {
+      if (!multiTenant) return redirect(res, "/");
+      await regenerateBookmarkletToken(userId);
+      return redirect(res, "/account?regenerated=1");
+    }
+    if (req.method === "POST" && url.pathname === "/account/delete") {
+      if (!multiTenant) return redirect(res, "/");
+      await deleteAccount(userId);
+      res.setHeader("Set-Cookie", clearSessionCookieHeader(origin));
+      return redirect(res, "/auth/login");
+    }
+
+    if (req.method === "POST" && url.pathname === "/sync") {
+      const snapshot = await store.load(userId);
+      const connector = await pickConnector(userId);
+      await runSync(snapshot, connector);
+      await store.save(userId, snapshot);
+      redirect(res, "/");
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/reset") {
+      await store.reset(userId);
+      redirect(res, "/diagnostics");
+      return;
+    }
+
+    const snapshot = await store.load(userId);
 
     if (req.method === "GET" && url.pathname === "/") {
       return html(res, renderToday(todayView(snapshot)));
@@ -238,15 +395,18 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, g
       return html(res, renderDiagnostics(computeDiagnostics(snapshot), phone, deployed));
     }
     if (req.method === "GET" && url.pathname === "/connect") {
-      const known = await loadKnownCourses();
+      const known = await loadKnownCourses(userId);
+      const profile = multiTenant ? await getUserProfile(userId) : null;
+      const token = profile?.bookmarkletToken ?? "";
       return html(
         res,
         renderConnect({
-          courseListHref: bookmarkletHref("courses", origin),
-          assignmentsHref: bookmarkletHref("assignments", origin),
-          courseListSource: bookmarkletSource("courses", origin),
-          assignmentsSource: bookmarkletSource("assignments", origin),
+          courseListHref: bookmarkletHref("courses", origin, token),
+          assignmentsHref: bookmarkletHref("assignments", origin, token),
+          courseListSource: bookmarkletSource("courses", origin, token),
+          assignmentsSource: bookmarkletSource("assignments", origin, token),
           knownCourseCount: known.length,
+          account: profile ? { email: profile.email } : undefined,
         }),
       );
     }
@@ -259,4 +419,13 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, g
     res.writeHead(500, { "Content-Type": "text/plain" });
     res.end("Docket hit an internal error. Your data is untouched.");
   }
+}
+
+/** Resolves which user a bookmarklet import belongs to: the embedded token on a multi-tenant instance (rejecting a missing/invalid one outright), or `DEFAULT_USER_ID` unconditionally on a single-tenant one — unchanged from before multi-tenancy existed there. */
+async function resolveImportUserId(token: string | undefined, multiTenant: boolean): Promise<string> {
+  if (!multiTenant) return DEFAULT_USER_ID;
+  if (!token) throw new Error("Missing identity token — copy a fresh script from /connect while signed in");
+  const userId = await resolveUserIdFromBookmarkletToken(token);
+  if (!userId) throw new Error("Unrecognized or revoked identity token — copy a fresh script from /connect while signed in");
+  return userId;
 }
