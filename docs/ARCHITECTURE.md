@@ -437,21 +437,48 @@ Two sources feed `kind`, in order of trust:
 2. **ICS-only guess** (`inferEventKind()`, `src/connectors/icsConnector.ts`) — for
    everything not yet enriched, a deliberately conservative title-keyword match against
    real, observed BYU calendar markers ("Labor Day," "Start of Classes," "Fall Break," and
-   similar). Unmatched titles default to `"assignment"` — a false "this is real work" is
+   similar), plus a second, separately-verified category of markers for lecture-slide/
+   recording postings (`"download"`, `"zoom recording"`, `".pdf"` — e.g. "00 Syllabus.pdf
+   Download"). Unmatched titles default to `"assignment"` — a false "this is real work" is
    harmless clutter; a false "this is just a calendar marker" would hide something the
    student actually needs to do. Same asymmetric-risk reasoning as §7's "stale is better
-   than wrong," applied here as "shown is better than hidden."
+   than wrong," applied here as "shown is better than hidden." The lecture-content markers
+   were added after a real user report of stray non-actionable items ("00 Syllabus.pdf
+   Download," "Intro to Linux ShellLinux Survival Tutorial") showing up as things needing
+   attention; verified safe by checking a real account's full ICS feed across all 5 courses
+   for any due-dated item (one carrying a real `DTEND`, see below) whose title contained
+   any of these three substrings — none did.
 
 This is also where the `category` field (§8) does double duty: a course's own real grading
 category (e.g. "Programming Assignments") is always a better signal than the generic
 `type` guess, so the dashboard prefers it wherever enrichment has run — see the badge logic
 in `src/server/render.ts`.
 
+**A second, more consequential bug found during that same investigation:** `dueDate` was
+always read from `DTSTART`, never `DTEND`. Both are optional per-VEVENT properties, and it
+turns out LearningSuite's feed uses them inconsistently depending on where the item lives in
+LearningSuite: something posted on a course's Content page (most homework, in practice)
+carries `DTSTART` = the day it became available — the *same* date shared by every other
+Content item in the course, since content typically all unlocks on day one — and `DTEND` =
+its real, individually different due date; something posted straight from the Assignments
+tab (e.g. "Bomb Programming Assignment") carries only `DTSTART`, which *is* the due date, no
+`DTEND` at all. Reading `DTSTART` unconditionally meant every Content-page item showed as
+due on literally the first day of the semester, silently correct-looking for one connector
+call but wrong in a way invisible until a real account had real homework due mid-semester —
+exactly the "false 'due today'" pattern a user later reported (dozens of items marked
+overdue that weren't). Confirmed against a real 5-course account before fixing: `DTEND`,
+when present, is always later than `DTSTART` and matches the item's real due date exactly as
+independently confirmed via the Assignments-page bookmarklet (§8) for at least one item.
+Fix: prefer `endDate`/`endDateTime` over `startDate`/`startDateTime` in
+`IcsConnector.getAssignments()`, falling back to start only when no end exists.
+
 ## 13. What's deliberately NOT built yet
 
-- Completion status and announcements from the authenticated session — the Assignments
-  page (§8) doesn't render completion state as readable text; that's the Prioritizer page,
-  a documented next step, not guessed at here.
+- Announcements from the authenticated session — `LearningSuiteSessionConnector` is still an
+  interface-conformant skeleton for this, every method returning `not_implemented` rather
+  than a guessed parser. (Completion status *was* in this list until a real user report of
+  already-done work showing as overdue prompted looking again — it turned out to already be
+  readable, in the same Assignments-page row text as due time/score; see §8.)
 - A packaged Safari Web Extension (Phase 3) — the bookmarklet in §8 is the validated
   prototype of exactly this logic; promoting it is packaging work, not open questions. The
   phone-native Shortcuts install path (§8) covers the "no laptop" requirement in the

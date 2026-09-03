@@ -98,8 +98,21 @@ export class IcsConnector implements LearningPlatformConnector {
       // this to a confirmed "assignment" once the item is actually seen on a real
       // Assignments page — this is only the ICS-only best guess.
       kind: derivedField(inferEventKind(ev.summary), "title-keyword-heuristic", capturedAt),
-      dueDate: (ev.startDate ?? ev.startDateTime?.slice(0, 10))
-        ? realField((ev.startDate ?? ev.startDateTime!.slice(0, 10))!, "learningsuite-ics", capturedAt)
+      // DTEND, when present, is the real due date — DTSTART is only when the item became
+      // available/assigned. Confirmed live across all 5 of a real student's courses: a
+      // "Content" item like "HW17 - Assembly Memory Management Part 2" carries
+      // DTSTART=the first day of class (same value shared by every item on that page,
+      // clearly an "opens" date, not a due date) and DTEND weeks or months later,
+      // matching its real due date exactly as later confirmed via the Assignments page.
+      // A DTSTART-only event (no DTEND) is a single-day marker and IS the due date —
+      // that's the common case for items straight off the Assignments tab (e.g. "Bomb
+      // Programming Assignment", confirmed against the live page's own "Nov 20" due
+      // date) as well as pure calendar/lecture-topic markers, so falling back to
+      // startDate there is correct for both. Using DTSTART unconditionally (the original
+      // bug) meant every "Content"-page item showed as due on day one of the semester —
+      // the root cause of a real user report of dozens of items wrongly marked overdue.
+      dueDate: (ev.endDate ?? ev.endDateTime?.slice(0, 10) ?? ev.startDate ?? ev.startDateTime?.slice(0, 10))
+        ? realField((ev.endDate ?? ev.endDateTime?.slice(0, 10) ?? ev.startDate ?? ev.startDateTime!.slice(0, 10))!, "learningsuite-ics", capturedAt)
         : undefined,
       // The ICS feed never carries a time component per prior research — all-day only.
     }));
@@ -131,6 +144,15 @@ export class IcsConnector implements LearningPlatformConnector {
  * just a calendar marker" would hide something the student actually needs
  * to do — see docs/ARCHITECTURE.md §7 "stale is better than wrong,"
  * applied here as "shown is better than hidden."
+ *
+ * The lecture-content markers below (`"download"`, `"zoom recording"`,
+ * `".pdf"`) are a second, separately-verified category: real lecture-slide/
+ * recording postings, not schedule/holiday markers, but equally not
+ * something a student needs to *do*. Confirmed safe against a real live
+ * account across all 5 of a student's courses: none of that account's
+ * genuinely due-dated items (the ones carrying a real DTEND — see
+ * `IcsConnector.getAssignments()`) contain any of these three substrings in
+ * their title, so this can't currently hide something actually due.
  */
 export function inferEventKind(title: string): "assignment" | "calendar_event" {
   const t = title.toLowerCase();
@@ -157,6 +179,9 @@ export function inferEventKind(title: string): "assignment" | "calendar_event" {
     "reading day",
     "university closed",
     "byu closed",
+    "download",
+    "zoom recording",
+    ".pdf",
   ];
   return markers.some((m) => t.includes(m)) ? "calendar_event" : "assignment";
 }
