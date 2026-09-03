@@ -135,6 +135,18 @@ function courseListExtractorSource(): string {
  * the Prioritizer page, a documented next step, not guessed at here. Never
  * clicks "Check off" or "Submit" — only the row title (read-only expand)
  * and category headers (read-only expand) are ever clicked.
+ *
+ * 4. Running as an iOS Shortcut specifically (detected via `typeof completion
+ *    === "function"`, same signal used for the completion() call itself)
+ *    skips opening each row's detail panel — due time/score/category are
+ *    unaffected (read from the row before that step), but description/links
+ *    stay empty. This isn't a shortcut for its own sake: Apple's Shortcuts
+ *    documentation confirms "Run JavaScript on Web Page" has a strict, short
+ *    time limit and fails outright with a "JavaScript Timeout" error if
+ *    exceeded — and opening a detail panel costs ~650ms *per row*, which
+ *    reliably blows through that budget for anything but a tiny course. The
+ *    desktop bookmarklet has no such limit and always does the full
+ *    extraction. See docs/ARCHITECTURE.md §8.
  */
 function assignmentsExtractorSource(): string {
   return `(async function(){
@@ -172,6 +184,22 @@ function assignmentsExtractorSource(): string {
       return text.replace(/\\s*(Check off|Uncheck|Submit|Mark (as )?complete)(\\s+(Check off|Uncheck|Submit|Mark (as )?complete))*\\s*$/i, "").trim();
     }
 
+    // iOS Shortcuts' "Run JavaScript on Web Page" action has a strict, short time limit —
+    // exceed it and the whole thing fails with a "JavaScript Timeout" error instead of
+    // whatever alert/result the script would otherwise produce (confirmed against Apple's
+    // own documentation, not guessed at: support.apple.com/guide/shortcuts/apd218e2187d).
+    // Reading a full detail panel costs ~650ms per row (a click + wait + a second click +
+    // wait, per assignment) — fine for a handful of rows on a desktop bookmarklet with no
+    // such limit, but for anything but a tiny course this reliably blows through Shortcuts'
+    // budget. So on Shortcuts specifically (detected the same way as the completion() call
+    // below — nothing else reliably signals this environment), skip opening each row's
+    // panel entirely: due time, score, and category are already read from the row's own
+    // text before that step and are unaffected; description/links stay empty for a
+    // Shortcuts run, same as if enrichment had never been run for that item (the dashboard
+    // explains this rather than silently showing nothing — see the "hasAnyEnrichment" hint
+    // logic in src/server/render.ts).
+    var isShortcuts = typeof completion === "function";
+
     var seenTitles = {};
     var results = [];
 
@@ -207,7 +235,7 @@ function assignmentsExtractorSource(): string {
         var description = "";
         var links = [];
         var titleCell = row.children[1];
-        if (titleCell) {
+        if (titleCell && !isShortcuts) {
           titleCell.click();
           await sleep(400);
           var panel = findDescriptionPanel(row);

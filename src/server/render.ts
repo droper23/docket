@@ -206,10 +206,18 @@ function agendaCard(item: AgendaItem, urgent: boolean): string {
   // nothing reads as broken, not as "no data" — see docs/ARCHITECTURE.md §8 for how this
   // detail gets captured (a one-click bookmarklet, run per course) and why most
   // assignments won't have it until that's been run for their course.
-  const body =
-    description || linkChips
-      ? `${description ? `<p class="card-description">${esc(description)}</p>` : ""}${linkChips ? `<div class="link-chips">${linkChips}</div>` : ""}`
-      : `<p class="card-hint">No extra detail synced yet for this item. On <a href="/connect">Connect</a>, run "Sync Grades &amp; Due Times" on ${esc(item.course?.code.value ?? a.courseId)}'s Assignments page to pull in its real description and links.</p>`;
+  //
+  // Two different "nothing here" states, not one: the iOS Shortcut skips the slow
+  // per-row detail-panel step (Apple's "Run JavaScript on Web Page" action times out
+  // otherwise — see docs/ARCHITECTURE.md §8), so a phone sync can leave category/due
+  // time/score filled in with description/links still empty. Telling someone who just
+  // ran the phone sync to go run it again would be confusing and wrong; they need to
+  // know the desktop bookmarklet is the one that captures this specific detail.
+  const hasAnyEnrichment = !!(a.category?.value || a.dueTime?.value || a.pointsPossible?.value);
+  const hint = hasAnyEnrichment
+    ? `<p class="card-hint">Due time, score, and category are synced, but description and links aren't — those need the desktop bookmarklet (the phone Shortcut skips this step so it can finish before iOS's time limit). On a computer, visit <a href="/connect">Connect</a> and run "Sync Grades &amp; Due Times" on ${esc(item.course?.code.value ?? a.courseId)}'s Assignments page.</p>`
+    : `<p class="card-hint">No extra detail synced yet for this item. On <a href="/connect">Connect</a>, run "Sync Grades &amp; Due Times" on ${esc(item.course?.code.value ?? a.courseId)}'s Assignments page to pull in its real description and links.</p>`;
+  const body = description || linkChips ? `${description ? `<p class="card-description">${esc(description)}</p>` : ""}${linkChips ? `<div class="link-chips">${linkChips}</div>` : ""}` : hint;
 
   return `<div class="card">
   <details class="card-expand">
@@ -400,7 +408,7 @@ ${status}
   <p class="connect-body">Open LearningSuite in Safari, sign in, go to <strong>Home → Course List</strong>, tap <strong>Share</strong>, then tap <strong>Connect LearningSuite</strong>. That's it — no typing, no links to copy, works from anywhere your phone does.</p>
 
   <div class="section-label">Optional: real grades &amp; due times</div>
-  <p class="connect-body">Same idea, second shortcut — run it on a course's <strong>Assignments</strong> page instead. The ICS schedule only has dates, not exact times or grades.</p>
+  <p class="connect-body">Same idea, second shortcut — run it on a course's <strong>Assignments</strong> page instead. The ICS schedule only has dates, not exact times or grades. Note: on the phone this pulls due time, score, and category only — not the assignment's full description or its links, since iOS Shortcuts cuts scripts off after a few seconds and reading those takes longer than that for most courses. Run the same script from the "On a computer" tab instead if you want those too.</p>
   ${copyBlock("script-assignments-mobile", "📋 Copy the grades/due-time script", opts.assignmentsSource)}
 
   <div class="section-label">Android</div>

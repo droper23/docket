@@ -302,6 +302,35 @@ was observed, during this project's own testing, to hang indefinitely rather tha
 in at least one automated-browser context — with a visible, selectable fallback textarea
 underneath either way, so a stuck clipboard call never leaves the button silently dead.
 
+**Two real constraints "Run JavaScript on Web Page" imposes that a plain bookmarklet
+doesn't, both found by actually running it on a phone, not by reading Apple's docs
+first:**
+
+- It requires the script to explicitly call a `completion(result)` function when done —
+  a plain bookmarklet has no such contract and neither script originally called one,
+  which surfaced as "the script must call the function completion(result) when finished."
+  Both scripts now call `completion("done")` from a top-level `finally` block (a `finally`
+  runs after every `try` exit path, including early `return`s, so this is one line that
+  covers every exit rather than needing to be threaded through each one) — guarded by
+  `typeof completion === "function"` so it's a silent no-op as a plain bookmarklet, where
+  no such global exists.
+- Separately, and less visibly, the action also enforces a strict, short overall time
+  limit — confirmed against Apple's own support documentation
+  (support.apple.com/guide/shortcuts/apd218e2187d), not guessed at — and exceeding it fails
+  the whole thing with a "JavaScript Timeout" error instead of whatever the script would
+  otherwise have produced. The Sync Grades & Due Times script's per-row detail-panel read
+  (§8 above — a click, a ~400ms wait, a second click, a ~250ms wait, per assignment) costs
+  ~650ms per row, which reliably exceeds that budget for anything but a tiny course. The
+  fix isn't tuning the delays down — the fix is that the same script, detected via the
+  same `typeof completion === "function"` check used for the `completion()` call, skips
+  opening each row's detail panel entirely when running as a Shortcut: due time, score,
+  and category are read from the row's own text earlier and are unaffected, but
+  description/links stay empty for a phone-run sync. The desktop bookmarklet has no such
+  limit and always does the full extraction. The dashboard's card hint (`agendaCard()` in
+  `src/server/render.ts`) distinguishes "never synced" from "phone-synced but no
+  description/links yet" so this doesn't read as broken — see the `hasAnyEnrichment` check
+  there.
+
 ## 9. Deployment: reachable from anywhere, no laptop required
 
 A single JSON file on one Mac (§6 as originally written) cannot satisfy "I should be able

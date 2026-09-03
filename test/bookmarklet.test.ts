@@ -30,6 +30,19 @@ test(
   },
 );
 
+test(
+  "regression: the assignments script skips opening each row's detail panel when running " +
+    "as an iOS Shortcut (that per-row click+wait step reliably exceeds Shortcuts' undocumented " +
+    "\"Run JavaScript on Web Page\" time limit for anything but a tiny course, producing a " +
+    '"JavaScript Timeout" error) — due time/score/category are read from row text earlier and ' +
+    "are unaffected; only description/links are skipped",
+  () => {
+    const source = bookmarkletSource("assignments", ORIGIN);
+    assert.match(source, /isShortcuts\s*=\s*typeof completion === "function"/, "missing isShortcuts detection");
+    assert.match(source, /if\s*\(titleCell\s*&&\s*!isShortcuts\)/, "detail-panel click should be gated on !isShortcuts");
+  },
+);
+
 test("bookmarkletHref: produces a javascript: URI that round-trips back to the same source", () => {
   const href = bookmarkletHref("courses", ORIGIN);
   assert.ok(href.startsWith("javascript:"));
