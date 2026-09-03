@@ -1,16 +1,15 @@
 import { DemoConnector } from "./connectors/demoConnector.js";
 import { IcsConnector } from "./connectors/icsConnector.js";
-import { SNAPSHOT_PATH, loadKnownCourses } from "./config.js";
-import { SnapshotStore } from "./core/store.js";
+import { getSnapshotStore, loadKnownCourses } from "./config.js";
 import { runSync } from "./core/syncRunner.js";
 
 async function main() {
   const [command, ...rest] = process.argv.slice(2);
-  const store = new SnapshotStore(SNAPSHOT_PATH);
+  const store = await getSnapshotStore();
 
   if (command === "reset") {
     await store.reset();
-    console.log("Local Docket data reset. Nothing was changed on LearningSuite itself.");
+    console.log("Docket data reset. Nothing was changed on LearningSuite itself.");
     return;
   }
 

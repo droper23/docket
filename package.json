@@ -13,7 +13,11 @@
     "sync:demo": "npm run build && node dist/src/cli.js sync --source demo",
     "sync:ics": "npm run build && node dist/src/cli.js sync --source ics",
     "serve": "npm run build && node dist/src/server/index.js",
-    "reset": "npm run build && node dist/src/cli.js reset"
+    "reset": "npm run build && node dist/src/cli.js reset",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "@upstash/redis": "^1.34.3"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

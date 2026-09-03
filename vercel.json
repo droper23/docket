@@ -1,0 +1,9 @@
+{
+  "buildCommand": "npm run build",
+  "rewrites": [
+    { "source": "/((?!api/).*)", "destination": "/api/index" }
+  ],
+  "crons": [
+    { "path": "/api/cron/sync", "schedule": "0 * * * *" }
+  ]
+}

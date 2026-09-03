@@ -232,39 +232,79 @@ are found up front — see the comment above `assignmentsExtractorSource()` for 
 and the exact timing constant (450ms between clicks) that testing against the live page
 required for the re-render to reliably complete before the next read.
 
-## 9. Phone access
+**Phone-native install, no computer involved at all:** a browser bookmarklet's usual
+install gesture — drag a link to the bookmarks bar — doesn't really exist on a phone.
+Rather than accept "you need a laptop to run this once," `/connect` offers the *same*
+script (`bookmarkletSource()`, not a second implementation) through iOS's built-in
+**Shortcuts** app: its "Run JavaScript on Web Page" action executes arbitrary JS in the
+current Safari tab, which is exactly what a bookmarklet does — Shortcuts is just a
+different, phone-native installation mechanism for the identical code. Set up once (paste
+the copied script into that one action, a few taps), it then runs from the Share sheet
+with a single tap, on any future visit, forever — not "paste a link per course," a
+one-time setup followed by a tap. The `/connect` page's copy button has a hard 1.2s
+timeout race around `navigator.clipboard.writeText()` specifically because that promise
+was observed, during this project's own testing, to hang indefinitely rather than reject
+in at least one automated-browser context — with a visible, selectable fallback textarea
+underneath either way, so a stuck clipboard call never leaves the button silently dead.
 
-The dashboard is a plain server-rendered page (no framework, works in any browser,
-responsive CSS down to phone width) — the only question is how a phone reaches a Node
-process running on a laptop. The server binds `0.0.0.0` rather than `localhost` and prints
-reachable addresses on startup, in priority order:
+## 9. Deployment: reachable from anywhere, no laptop required
 
-1. **Same Wi-Fi, the machine's own `.local` mDNS hostname** — zero setup, works in Safari
-   with no install, the default instruction. Falls back to the raw LAN IP if mDNS doesn't
-   resolve.
-2. **Tailscale**, if installed — detected by asking the `tailscale` CLI directly for its
-   own address (`tailscale ip -4`), never by guessing from an IP range. That distinction
-   turned out to matter live: this project's own test network (BYU's campus Wi-Fi) hands
-   out addresses from the *same* 100.64.0.0/10 CGNAT block Tailscale's virtual interface
-   uses, so a naive "100.64–127.x.x = Tailscale" heuristic mislabeled an ordinary Wi-Fi
-   address. Asking the CLI for its actual address sidesteps that instead of guessing.
-   Presented as an optional fallback (most students won't have it installed), useful
-   specifically because campus/eduroam-style networks often isolate devices from each
-   other, breaking plan 1 even when both devices are on the same Wi-Fi.
+A single JSON file on one Mac (§6 as originally written) cannot satisfy "I should be able
+to open this on my phone from anywhere, without needing my laptop to be on" — that's not a
+tuning problem, it's a different architecture. Docket now runs in two modes from the exact
+same code, chosen automatically by environment (`isCloudMode()` in `src/config.ts`):
 
-Nothing here is exposed to the public internet — both paths are private-network-only by
-construction (LAN scope or Tailscale's own private mesh), no port-forwarding involved.
+- **Local mode** (no `UPSTASH_REDIS_REST_URL` set) — the original design: a local JSON
+  file (`FileSnapshotStore`), the local dev server, `launchd` for background sync. Zero
+  external accounts, nothing leaves the machine. Good for development, demos, and anyone
+  who's fine with "reachable only while my computer is on."
+- **Deployed mode** — the same `handleRequest()` handler (`src/server/handler.ts`, shared
+  by both modes — there is exactly one implementation of every route, not two) runs as a
+  Vercel serverless function (`api/index.js`), and the snapshot lives in a small Redis
+  store (`RedisSnapshotStore`, via the Upstash Marketplace integration) instead of a file.
+  A Vercel Cron job (`api/cron/sync.js`, `vercel.json`) replaces `launchd`, hitting the
+  ICS feed on a schedule — safe unattended for the same reason `launchd` was (§10): no
+  authentication needed. Once deployed, the dashboard has one stable HTTPS URL reachable
+  from any device, any network, with nothing running on anyone's laptop.
+
+**Why this doesn't compromise the local-first principle it seemingly contradicts:** the
+project's own stated rule (§8 of the original brief) is "a backend should only exist if
+there is a compelling product requirement that cannot reasonably be satisfied locally" —
+and "reachable from a phone with no computer involved, ever" is exactly that requirement,
+not a convenience default. Local mode is still fully intact and still the default for
+anyone who runs this without deploying it.
+
+**Storage stays a single blob, deliberately.** `RedisSnapshotStore` stores the *entire*
+`AcademicSnapshot` under one key (`docket:snapshot`) — same shape as the file store, just
+a different address. This was a conscious choice over a relational schema: Docket's access
+pattern is "read the whole thing, maybe write the whole thing back," never a partial
+query, so a single JSON blob in Redis is both the simplest correct option and requires no
+new query logic anywhere else in the app (`SnapshotStorage` in `src/core/store.ts` is
+still the only contract the rest of the code depends on).
+
+**The connect flow gets a nice side effect from this, not just the dashboard.** The
+bookmarklet's cross-origin POST target (§8) becomes the deployment's stable HTTPS URL
+instead of `localhost`. That's not just "still works" — it's *more* correct: an
+HTTPS-to-HTTPS POST from LearningSuite never risks the mixed-content blocking an
+HTTP-only `localhost` origin could theoretically hit (`requestOrigin()` in
+`src/server/handler.ts` reads Vercel's `x-forwarded-proto` header to always bake in the
+right scheme). And because the deployed store is shared, running "Connect LearningSuite"
+from *any* device with an authenticated LearningSuite session immediately updates what the
+phone sees — the one-time connect step doesn't have to happen on the same device you
+check the dashboard from.
 
 ## 10. Keeping data current without a human
 
 Teachers add, move, and remove assignments continuously — the sync engine already handles
-this correctly (§5), but only when something actually triggers a sync. `scripts/install-
-launchd.sh` installs a macOS `launchd` user agent that runs `docket sync --source ics` on
-an interval (default hourly) unattended. This is safe specifically *because* the ICS
-connector needs no authentication (§2) — there is no session to keep alive, no credential
-to refresh, nothing that requires a human present, so "run this forever in the background"
-is a fundamentally different (and fine) proposition than it would be for anything touching
-an authenticated session.
+this correctly (§5), but only when something actually triggers a sync. Two equivalent
+mechanisms exist depending on mode: locally, `scripts/install-launchd.sh` installs a
+macOS `launchd` user agent running `docket sync --source ics` hourly; deployed, a Vercel
+Cron job hits `/api/cron/sync` on the same schedule (protected by a `CRON_SECRET` bearer
+check so a random visitor can't trigger unlimited syncs). Both are safe to run completely
+unattended specifically *because* the ICS connector needs no authentication (§2) — there
+is no session to keep alive, no credential to refresh, nothing that requires a human
+present, so "run this forever in the background" is a fundamentally different (and fine)
+proposition than it would be for anything touching an authenticated session.
 
 ## 11. What's deliberately NOT built yet
 
@@ -272,12 +312,14 @@ an authenticated session.
   page (§8) doesn't render completion state as readable text; that's the Prioritizer page,
   a documented next step, not guessed at here.
 - A packaged Safari Web Extension (Phase 3) — the bookmarklet in §8 is the validated
-  prototype of exactly this logic; promoting it is packaging work, not open questions.
+  prototype of exactly this logic; promoting it is packaging work, not open questions. The
+  phone-native Shortcuts install path (§8) covers the "no laptop" requirement in the
+  meantime without waiting on it.
 - Apple Calendar / Reminders sync (EventKit) — Phase 4, needs completion status and a
   deadline-vs-work-session distinction first.
-- Multi-device sync (CloudKit) — only justified once there's a native app; local-first
-  JSON is correct for a single Mac today.
-- Packaging/signing/distribution beyond what §10 already provides — Phase 5.
+- A native app / true multi-device CloudKit sync — the Vercel+Redis deployment (§9)
+  already satisfies "reachable from my phone from anywhere" for the web dashboard; CloudKit
+  would only become the better answer once there's a native app to justify it.
 
 None of this is deferred out of laziness — each is blocked on either a human-in-the-loop
 capture step (Duo) or on the layer below it being solid first, per the project's own

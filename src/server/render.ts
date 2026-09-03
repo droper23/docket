@@ -77,6 +77,15 @@ function layout(activePath: string, title: string, body: string): string {
   a { color: inherit; }
   main a:not(.bookmarklet-btn):not(.nav-link) { color: #8a6d3b; }
   @media (prefers-color-scheme: dark) { main a:not(.bookmarklet-btn):not(.nav-link) { color: #d8b878; } }
+  .tabs { display: flex; gap: 6px; margin: 20px 0 4px; border-bottom: 1px solid rgba(120,110,90,0.2); }
+  .tab-btn { background: none; border: none; border-bottom: 2px solid transparent; border-radius: 0; padding: 8px 4px; margin-right: 16px; font-size: 14px; font-weight: 600; opacity: 0.55; cursor: pointer; }
+  .tab-btn.active { opacity: 1; border-bottom-color: #8a6d3b; }
+  .setup-steps { font-size: 13.5px; line-height: 1.6; opacity: 0.9; padding-left: 20px; max-width: 60ch; }
+  .setup-steps li { margin-bottom: 4px; }
+  .script-box { margin: 10px 0 4px; }
+  .script-source { width: 100%; max-width: 60ch; height: 70px; font-family: ui-monospace, monospace; font-size: 10.5px; padding: 8px; border-radius: 8px; border: 1px solid rgba(120,110,90,0.3); background: rgba(120,110,90,0.06); color: inherit; resize: vertical; box-sizing: border-box; }
+  .copy-btn { display: block; margin: 6px 0 2px; font-weight: 600; }
+  .script-fallback { font-size: 11px; opacity: 0.5; margin: 2px 0 0; }
 </style>
 </head>
 <body>
@@ -185,12 +194,15 @@ export interface PhoneAccessInfo {
   port: number;
 }
 
-export function renderDiagnostics(report: DiagnosticsReport, phone?: PhoneAccessInfo): string {
+export function renderDiagnostics(report: DiagnosticsReport, phone?: PhoneAccessInfo, deployed?: boolean): string {
   const row = (label: string, value: string, ok: boolean) =>
     `<div class="diag-row"><span class="${ok ? "diag-ok" : "diag-warn"}">${esc(label)}</span><span>${esc(value)}</span></div>`;
 
-  const phoneSection = phone
+  const phoneSection = deployed
     ? `<div class="section-label">Phone access</div>
+<div class="card"><div class="card-title">✓ Reachable from anywhere</div><div class="card-meta">This is a deployed instance — open this same URL on your phone any time, on any network. Nothing needs to be running on your computer.</div></div>`
+    : phone
+      ? `<div class="section-label">Phone access</div>
 ${
   phone.lan.length > 0
     ? `<div class="card"><div class="card-title">Same Wi-Fi (no install needed)</div><div class="card-meta">Open this on your phone: <strong>http://${esc(phone.localHostname ?? "")}:${phone.port}</strong></div></div>`
@@ -199,9 +211,9 @@ ${
 ${
   phone.tailscale.length > 0
     ? `<div class="card"><div class="card-title">Tailscale detected</div><div class="card-meta">Also reachable from anywhere (off Wi-Fi too) at: http://${esc(phone.tailscale[0] ?? "")}:${phone.port}</div></div>`
-    : `<div class="card"><div class="card-meta">If the same-Wi-Fi link doesn't load — common on campus networks that isolate devices from each other — install <a href="https://tailscale.com/download">Tailscale</a> (free) on this computer and your phone for a reliable connection from anywhere. Optional, not required.</div></div>`
+    : `<div class="card"><div class="card-meta">This only works while your computer is on and this server is running. For access from anywhere, any time — no laptop needed — <a href="https://github.com/droper23/docket#deploying-so-it-works-from-anywhere">deploy it</a> (free). Or, for same-Wi-Fi reliability in the meantime: install <a href="https://tailscale.com/download">Tailscale</a> (free) on this computer and your phone.</div></div>`
 }`
-    : "";
+      : "";
 
   return layout(
     "/diagnostics",
@@ -221,32 +233,108 @@ ${row("Changes in last 24h", `${report.recentChangeCount}`, true)}
   );
 }
 
-export function renderConnect(opts: { courseListHref: string; assignmentsHref: string; knownCourseCount: number }): string {
+export function renderConnect(opts: {
+  courseListHref: string;
+  assignmentsHref: string;
+  courseListSource: string;
+  assignmentsSource: string;
+  knownCourseCount: number;
+}): string {
   const status =
     opts.knownCourseCount > 0
       ? `<div class="card"><div class="card-title">✓ ${opts.knownCourseCount} course${opts.knownCourseCount === 1 ? "" : "s"} connected</div><div class="card-meta">Re-run step 1 any time your enrollment changes — it always reflects your current course list, it never accumulates old semesters.</div></div>`
-      : `<div class="card"><div class="card-title">No courses connected yet</div><div class="card-meta">Follow step 1 below.</div></div>`;
+      : `<div class="card"><div class="card-title">No courses connected yet</div><div class="card-meta">Follow the steps below — pick whichever tab matches what you're on right now.</div></div>`;
+
+  const copyBlock = (id: string, label: string, source: string) => `
+<div class="script-box">
+  <textarea id="${id}" class="script-source" readonly onclick="this.select()">${esc(source)}</textarea>
+  <button type="button" class="copy-btn" onclick="copyScript('${id}', this)">${label}</button>
+  <p class="script-fallback">If the button doesn't work: tap the box above to select the text, then copy it manually.</p>
+</div>`;
 
   return layout(
     "/connect",
     "Connect",
     `<h1>Connect LearningSuite</h1>
-<p class="subtitle">No password, ever. These read only your own already-signed-in LearningSuite tab.</p>
+<p class="subtitle">No password, ever. This only ever reads your own already-signed-in LearningSuite tab, on your own device.</p>
 ${status}
 
-<div class="section-label">Step 1 — Find your courses (one click, run it once per semester)</div>
-<p class="connect-body">Drag this button to your bookmarks bar. Then, while signed into LearningSuite, open <strong>Home → Course List</strong> and click it.</p>
-<p><a class="bookmarklet-btn" href="${opts.courseListHref}" onclick="alert('Drag this to your bookmarks bar instead of clicking it — bookmarklets only work as bookmarks, not as a normal click here.'); return false;">📚 Connect LearningSuite</a></p>
+<div class="tabs">
+  <button type="button" class="tab-btn active" onclick="showTab('phone')">📱 On your phone</button>
+  <button type="button" class="tab-btn" onclick="showTab('computer')">💻 On a computer</button>
+</div>
 
-<div class="section-label">Step 2 — Add real grades &amp; due times (optional, run per course)</div>
-<p class="connect-body">The schedule feed alone only has dates, not exact due <em>times</em> or grades. Open a course's <strong>Assignments</strong> tab, then click this to pull those in too — safe to re-run any time, it only updates matching assignments, never creates duplicates.</p>
-<p><a class="bookmarklet-btn" href="${opts.assignmentsHref}" onclick="alert('Drag this to your bookmarks bar instead of clicking it.'); return false;">🎯 Sync Grades &amp; Due Times</a></p>
+<div id="tab-phone" class="tab-panel">
+  <div class="section-label">One-time setup (about a minute, iPhone/iPad)</div>
+  <ol class="setup-steps">
+    <li>Open the <strong>Shortcuts</strong> app (built into iOS) → <strong>+</strong> to create a new shortcut.</li>
+    <li>Tap <strong>Add Action</strong>, search for <strong>"Run JavaScript on Web Page"</strong>, and add it.</li>
+    <li>Tap the copy button below, then paste it into that action's text box.</li>
+    <li>Name the shortcut "Connect LearningSuite" and turn on <strong>Show in Share Sheet</strong> (in the shortcut's settings, ⓘ icon).</li>
+  </ol>
+  ${copyBlock("script-courses-mobile", "📋 Copy the course-finder script", opts.courseListSource)}
+
+  <div class="section-label">Every time after that (one tap)</div>
+  <p class="connect-body">Open LearningSuite in Safari, sign in, go to <strong>Home → Course List</strong>, tap <strong>Share</strong>, then tap <strong>Connect LearningSuite</strong>. That's it — no typing, no links to copy, works from anywhere your phone does.</p>
+
+  <div class="section-label">Optional: real grades &amp; due times</div>
+  <p class="connect-body">Same idea, second shortcut — run it on a course's <strong>Assignments</strong> page instead. The ICS schedule only has dates, not exact times or grades.</p>
+  ${copyBlock("script-assignments-mobile", "📋 Copy the grades/due-time script", opts.assignmentsSource)}
+
+  <div class="section-label">Android</div>
+  <p class="connect-body">Chrome doesn't have an equivalent built-in automation app. Use the "On a computer" tab's bookmarklet from Chrome's address bar: bookmark any page, edit that bookmark's URL to the code below, then type the bookmark's name in the address bar and select it while on the right LearningSuite page.</p>
+</div>
+
+<div id="tab-computer" class="tab-panel" hidden>
+  <div class="section-label">Step 1 — Find your courses (one click, run it once per semester)</div>
+  <p class="connect-body">Drag this button to your bookmarks bar. Then, while signed into LearningSuite, open <strong>Home → Course List</strong> and click it.</p>
+  <p><a class="bookmarklet-btn" href="${opts.courseListHref}" onclick="alert('Drag this to your bookmarks bar instead of clicking it — bookmarklets only work as bookmarks, not as a normal click here.'); return false;">📚 Connect LearningSuite</a></p>
+
+  <div class="section-label">Step 2 — Add real grades &amp; due times (optional, run per course)</div>
+  <p class="connect-body">Open a course's <strong>Assignments</strong> tab, then click this to pull real due times and grades in too — safe to re-run any time, it only updates matching assignments, never creates duplicates.</p>
+  <p><a class="bookmarklet-btn" href="${opts.assignmentsHref}" onclick="alert('Drag this to your bookmarks bar instead of clicking it.'); return false;">🎯 Sync Grades &amp; Due Times</a></p>
+</div>
 
 <div class="section-label">What this does and doesn't do</div>
-<div class="card"><div class="card-meta">Reads the page you're already looking at — your course list or one course's assignment table. Sends only course codes/titles/IDs or assignment titles/due-times/scores to your own Docket server running on this machine. Never reads or sends a password, cookie, or session ID — see <a href="https://github.com/droper23/docket/blob/main/docs/THREAT_MODEL.md">the threat model</a> for the full analysis. The source of both buttons is plain, readable JavaScript — <a href="https://github.com/droper23/docket/blob/main/src/connectors/bookmarklet.ts">view it here</a> before you trust it.</div></div>
+<div class="card"><div class="card-meta">Reads the page you're already on — your course list or one course's assignment table. Sends only course codes/titles/IDs or assignment titles/due-times/scores to Docket. Never reads or sends a password, cookie, or session ID — see <a href="https://github.com/droper23/docket/blob/main/docs/THREAT_MODEL.md">the threat model</a> for the full analysis. The script is plain, readable JavaScript, the same one in both tabs — <a href="https://github.com/droper23/docket/blob/main/src/connectors/bookmarklet.ts">view the source</a> before you trust it.</div></div>
 
 <div class="section-label">After connecting</div>
-<form class="sync-form" method="post" action="/sync"><button type="submit">Sync now</button></form>`,
+<form class="sync-form" method="post" action="/sync"><button type="submit">Sync now</button></form>
+<script>
+function copyScript(id, btn) {
+  var el = document.getElementById(id);
+  var label = btn.textContent;
+  var settled = false;
+  var done = function (ok) {
+    if (settled) return; // the clipboard call and the timeout race — only the first to arrive wins
+    settled = true;
+    btn.textContent = ok ? 'Copied!' : 'Select the box above and copy manually';
+    setTimeout(function () { btn.textContent = label; }, 2000);
+  };
+  // Some contexts (permission dialogs that never resolve, restrictive webviews) leave
+  // writeText's promise pending forever instead of rejecting — never leave the button
+  // silently unresponsive because of that.
+  setTimeout(function () {
+    if (!settled) { el.select(); done(false); }
+  }, 1200);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(el.value).then(function () { done(true); }, function () {
+      el.select();
+      done(false);
+    });
+  } else {
+    el.select();
+    done(false);
+  }
+}
+function showTab(name) {
+  document.getElementById('tab-phone').hidden = name !== 'phone';
+  document.getElementById('tab-computer').hidden = name !== 'computer';
+  document.querySelectorAll('.tab-btn').forEach(function(b, i) {
+    b.classList.toggle('active', (name === 'phone') === (i === 0));
+  });
+}
+</script>`,
   );
 }
 

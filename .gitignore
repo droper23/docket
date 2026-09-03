@@ -7,3 +7,5 @@ data/*.jsonl
 *.log
 .DS_Store
 legacy/store.json
+.vercel
+.env*

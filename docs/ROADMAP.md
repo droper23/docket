@@ -8,6 +8,24 @@ makes unavoidable.
 Connector abstraction, data ownership/provenance model, threat model, sync semantics.
 `docs/ARCHITECTURE.md`, `docs/THREAT_MODEL.md`.
 
+## Phase 1.5 — Deployment (reachable without a laptop) — **done**
+Added after real usage surfaced a real gap: local mode only works while a specific
+computer is on. Now Docket runs in two modes from one codebase (`isCloudMode()`,
+`docs/ARCHITECTURE.md` §9):
+- `src/server/handler.ts` — the one implementation of every route, shared by both modes
+  (previously embedded directly in the local server; extracted so nothing is duplicated
+  between local and deployed).
+- `src/core/redisStore.ts` — `SnapshotStorage` backed by Upstash Redis (Vercel Marketplace),
+  same one-blob-of-JSON shape as the file store.
+- `api/index.js`, `api/cron/sync.js`, `vercel.json` — Vercel serverless entry point and a
+  Cron job replacing `launchd` in deployed mode, `CRON_SECRET`-protected.
+- Phone-native connect: the *same* bookmarklet script, installed via iOS Shortcuts'
+  "Run JavaScript on Web Page" action instead of a bookmarks-bar drag — one-time setup,
+  then one tap from the Share sheet, no computer involved for either connecting or
+  viewing. `/connect` now has both install paths side by side.
+- Local mode is unchanged and still the default when nothing is deployed — this was
+  additive, not a replacement.
+
 ## Phase 1 — Core data layer + ICS connector — **done, verified against the live account**
 - Canonical schema with `Field<T>` provenance wrapper (`src/core/types.ts`)
 - Local JSON store, atomic writes (`src/core/store.ts`)

@@ -4,17 +4,28 @@ import type { AcademicSnapshot } from "./types.js";
 import { emptySnapshot } from "./types.js";
 
 /**
+ * Storage contract the rest of the app depends on — not how or where the
+ * snapshot actually lives. Two implementations exist: `FileSnapshotStore`
+ * (local dev/demo, no external account needed) and `RedisSnapshotStore`
+ * (`src/core/redisStore.ts`, used when deployed — see docs/ARCHITECTURE.md
+ * §12 for why a single local JSON file can't satisfy "reachable from my
+ * phone without my laptop being on"). `src/config.ts`'s `getSnapshotStore()`
+ * picks between them based on environment; nothing else needs to know
+ * which one is active.
+ */
+export interface SnapshotStorage {
+  load(): Promise<AcademicSnapshot>;
+  save(snapshot: AcademicSnapshot): Promise<void>;
+  reset(): Promise<void>;
+}
+
+/**
  * Local-first persistence: one JSON file on disk, written atomically
  * (write-to-temp, then rename) so a crash mid-write can never corrupt the
  * student's academic data — "stale is better than wrong"
  * (docs/ARCHITECTURE.md §Failure Philosophy).
- *
- * A single JSON file is deliberately simple for a single-user local tool.
- * If/when this needs to back a native app too, this class is the only
- * place that would change — everything else depends on AcademicSnapshot,
- * not on how it's stored.
  */
-export class SnapshotStore {
+export class FileSnapshotStore implements SnapshotStorage {
   constructor(private readonly filePath: string) {}
 
   async load(): Promise<AcademicSnapshot> {
