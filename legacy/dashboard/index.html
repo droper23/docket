@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Academic Control Tower</title>
+<style>
+  :root{
+    --paper:#eef1ec; --surface:#ffffff; --panel:#e2e6dd;
+    --ink:#182420; --ink-dim:#56635a;
+    --amber:#a6631a; --teal:#1f6358; --line:#c7cdc0;
+    --bad:#ab3b3b;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#121815; --surface:#1a2119; --panel:#202a22;
+      --ink:#e7ece6; --ink-dim:#9aa79c;
+      --amber:#e0973c; --teal:#5fb3a4; --line:#34413a;
+      --bad:#d67a7a;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:-apple-system, "Work Sans", ui-sans-serif, system-ui, sans-serif;
+    line-height:1.5;
+  }
+  .wrap{ max-width:880px; margin:0 auto; padding:40px 20px 100px; }
+  header{ margin-bottom:36px; padding-bottom:20px; border-bottom:1px solid var(--line); }
+  header h1{ font-size:26px; margin:0 0 6px; }
+  header .meta{ font-size:12.5px; color:var(--ink-dim); font-family: ui-monospace, "IBM Plex Mono", monospace; }
+  h2.section-title{
+    font-size:13px; text-transform:uppercase; letter-spacing:.07em;
+    color:var(--teal); margin:36px 0 12px;
+  }
+  .card{
+    background:var(--surface); border:1px solid var(--line); border-radius:8px;
+    padding:12px 16px; margin-bottom:8px; display:flex; align-items:baseline; gap:12px;
+  }
+  .card .date{ font-family: ui-monospace, "IBM Plex Mono", monospace; font-size:12px; color:var(--ink-dim); width:64px; flex-shrink:0; }
+  .card .course{ font-size:11.5px; color:var(--amber); font-family: ui-monospace, "IBM Plex Mono", monospace; width:74px; flex-shrink:0; }
+  .card .title{ flex:1; font-size:14.5px; }
+  .card .type{ font-size:10.5px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.04em; }
+  .empty{ color:var(--ink-dim); font-size:13.5px; padding:8px 0; }
+  .workload-row{ display:flex; align-items:center; gap:12px; margin-bottom:8px; font-size:13.5px; }
+  .workload-row .label{ width:90px; flex-shrink:0; font-family: ui-monospace, "IBM Plex Mono", monospace; font-size:12px; color:var(--ink-dim); }
+  .workload-row .bar-bg{ flex:1; background:var(--panel); border-radius:4px; height:10px; overflow:hidden; }
+  .workload-row .bar-fill{ background:var(--teal); height:100%; }
+  .workload-row .count{ width:24px; text-align:right; font-family: ui-monospace, "IBM Plex Mono", monospace; font-size:12px; color:var(--ink-dim); }
+  .change-item{ font-size:12.5px; color:var(--ink-dim); padding:5px 0; border-bottom:1px solid var(--line); font-family: ui-monospace, "IBM Plex Mono", monospace; }
+  .change-item .kind{ color:var(--amber); text-transform:uppercase; font-size:10px; margin-right:8px; }
+  .error{ color:var(--bad); font-size:13px; }
+  footer{ margin-top:48px; font-size:11.5px; color:var(--ink-dim); font-family: ui-monospace, "IBM Plex Mono", monospace; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Academic Control Tower</h1>
+    <div class="meta" id="synced-meta">loading…</div>
+  </header>
+
+  <h2 class="section-title">Today</h2>
+  <div id="today"></div>
+
+  <h2 class="section-title">Upcoming (7 days)</h2>
+  <div id="upcoming"></div>
+
+  <h2 class="section-title">Workload by course (next 14 days)</h2>
+  <div id="workload"></div>
+
+  <h2 class="section-title">Recent changes</h2>
+  <div id="changes"></div>
+
+  <footer>
+    Due dates come from LearningSuite's official per-course iCal feed — all-day granularity, no specific due time. Run <code>npm run sync</code> to refresh.
+  </footer>
+</div>
+
+<script>
+function fmtDate(iso) {
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+function daysFromToday(iso) {
+  const a = new Date(todayIso() + "T00:00:00");
+  const b = new Date(iso + "T00:00:00");
+  return Math.round((b - a) / 86400000);
+}
+
+async function render() {
+  const res = await fetch("/api/data");
+  const { store, courses } = await res.json();
+  const codeByCourse = Object.fromEntries(courses.map(c => [c.courseId, c.code]));
+  const assignments = Object.values(store.assignments);
+
+  document.getElementById("synced-meta").textContent = store.lastSyncAt
+    ? `last synced ${new Date(store.lastSyncAt).toLocaleString()} · ${assignments.length} tracked items across ${courses.length} courses`
+    : "never synced yet — run `npm run sync`";
+
+  const todayEl = document.getElementById("today");
+  const upcomingEl = document.getElementById("upcoming");
+  const today = assignments.filter(a => daysFromToday(a.dueDate) === 0).sort((a,b) => a.title.localeCompare(b.title));
+  const upcoming = assignments
+    .filter(a => { const d = daysFromToday(a.dueDate); return d > 0 && d <= 7; })
+    .sort((a,b) => a.dueDate.localeCompare(b.dueDate));
+
+  function card(a) {
+    return `<div class="card">
+      <div class="date">${fmtDate(a.dueDate)}</div>
+      <div class="course">${codeByCourse[a.courseId] ?? "?"}</div>
+      <div class="title">${a.title}</div>
+      <div class="type">${a.inferredType}</div>
+    </div>`;
+  }
+
+  todayEl.innerHTML = today.length ? today.map(card).join("") : '<div class="empty">Nothing due today.</div>';
+  upcomingEl.innerHTML = upcoming.length ? upcoming.map(card).join("") : '<div class="empty">Nothing in the next 7 days.</div>';
+
+  // Workload: count of items due in next 14 days, grouped by course.
+  const workloadEl = document.getElementById("workload");
+  const counts = {};
+  for (const a of assignments) {
+    const d = daysFromToday(a.dueDate);
+    if (d < 0 || d > 14) continue;
+    counts[a.courseId] = (counts[a.courseId] || 0) + 1;
+  }
+  const max = Math.max(1, ...Object.values(counts));
+  const rows = courses.map(c => {
+    const n = counts[c.courseId] || 0;
+    return `<div class="workload-row">
+      <div class="label">${c.code}</div>
+      <div class="bar-bg"><div class="bar-fill" style="width:${(n / max) * 100}%"></div></div>
+      <div class="count">${n}</div>
+    </div>`;
+  }).join("");
+  workloadEl.innerHTML = rows || '<div class="empty">No data yet.</div>';
+
+  // Recent changes
+  const changesEl = document.getElementById("changes");
+  const recent = [...store.changelog].filter(c => c.kind !== "missing").reverse().slice(0, 20);
+  changesEl.innerHTML = recent.length
+    ? recent.map(c => `<div class="change-item"><span class="kind">${c.kind}</span>${c.detail}</div>`).join("")
+    : '<div class="empty">No changes recorded yet.</div>';
+}
+
+render().catch(err => {
+  document.getElementById("synced-meta").innerHTML = `<span class="error">Failed to load data: ${err.message}</span>`;
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+node_modules/
+dist/
+data/*.json
+data/*.jsonl
+!data/.gitkeep
+!data/courses.config.example.json
+*.log
+.DS_Store
+legacy/store.json
