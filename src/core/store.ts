@@ -8,7 +8,7 @@ import { emptySnapshot } from "./types.js";
  * snapshot actually lives. Two implementations exist: `FileSnapshotStore`
  * (local dev/demo, no external account needed) and `RedisSnapshotStore`
  * (`src/core/redisStore.ts`, used when deployed — see docs/ARCHITECTURE.md
- * §12 for why a single local JSON file can't satisfy "reachable from my
+ * §9 for why a single local JSON file can't satisfy "reachable from my
  * phone without my laptop being on"). `src/config.ts`'s `getSnapshotStore()`
  * picks between them based on environment; nothing else needs to know
  * which one is active.

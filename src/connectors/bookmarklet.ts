@@ -12,12 +12,18 @@
  * logic is validated). This is also exactly the "prototype as a userscript
  * first" step docs/ROADMAP.md Phase 2 already called for.
  *
- * Both extractors below only ever read `.textContent` and, for the course
- * list, the `cid-...` course-link `href` (never a full element dump, never
- * `document.cookie`, never a query string) — see the comment above each
- * function. They POST the result as a same-origin-agnostic HTML form
- * submission (not `fetch`), which needs no CORS configuration and cannot
- * silently exfiltrate to anywhere but the exact origin baked in below.
+ * Both extractors below only ever read `.textContent`, plus a narrow,
+ * deliberate set of `href` attributes: the course list's `cid-...`
+ * course-link hrefs, and — in the assignments extractor's detail panels —
+ * external (explicitly non-`learningsuite.byu.edu`) resource links a
+ * teacher attached (e.g. an autograder or scoreboard URL). Never a full
+ * element/HTML dump, never `document.cookie`, never a LearningSuite-hosted
+ * link (which would need this session's own path-scoped subsessionID to
+ * mean anything, and is exactly the kind of session-scoped value never
+ * worth capturing) — see the comment above each function. They POST the
+ * result as a same-origin-agnostic HTML form submission (not `fetch`),
+ * which needs no CORS configuration and cannot silently exfiltrate to
+ * anywhere but the exact origin baked in below.
  */
 
 /** Extracts the student's current-term course list. Verified live against a real LearningSuite account. */
@@ -76,22 +82,50 @@ function courseListExtractorSource(): string {
 }
 
 /**
- * Extracts one course's assignment rows (real due time, real score) from
- * that course's Assignments page — data that genuinely does not exist in
- * the ICS feed. Verified live, including a real gotcha: LearningSuite
- * renders this page differently depending on viewport width — at normal
- * desktop width every category's rows are already in the DOM, but at
- * narrower widths (a resized window, or a phone) categories collapse into
- * click-to-expand accordions and their rows aren't rendered until opened.
- * `collectRows()` handles the common desktop case directly; only if that
- * finds nothing does it fall back to clicking each category open in turn.
- * Score/due-time are pulled via regex over each row's full text rather
- * than a fixed cell index, because the two layouts also split that text
- * across a different number of cells — a fixed index silently reads the
- * wrong thing on one of the two layouts, while text search doesn't care.
+ * Extracts one course's assignment rows — due time, score, real category,
+ * and the full detail panel (description + external links) LearningSuite
+ * only shows once you click into an assignment — from that course's
+ * Assignments page. Verified live, including real gotchas:
+ *
+ * 1. LearningSuite renders this page differently depending on viewport
+ *    width — full desktop width has every category's rows already in the
+ *    DOM, but narrower widths (a resized window, or a phone) collapse
+ *    categories into click-to-expand accordions. `extractCategory()` is
+ *    called once for whatever's already visible (covers desktop and
+ *    uncategorized courses) and again after opening each category header
+ *    in turn — a title already captured (via `seenTitles`) is never
+ *    processed twice, so this is safe to do unconditionally rather than
+ *    branching on viewport width.
+ * 2. A row's own detail panel (description, due/open/close info, and any
+ *    external links — e.g. a course-specific autograder or scoreboard
+ *    URL) is *also* click-to-expand, on **every** viewport width, and is
+ *    a completely separate toggle from the category accordion above. It's
+ *    inserted into the DOM near the row, not nested inside it, so
+ *    `findDescriptionPanel()` scans document order starting just after the
+ *    row for elements whose text starts with "Due:" or "Open:" (both
+ *    observed live, for assignment-style vs. exam-style items) and keeps
+ *    the *largest* such match. That sounds backwards — a wider ancestor's
+ *    text could in principle also include the next row — but in practice
+ *    never does, because the next row's own title text always appears
+ *    first in that ancestor and breaks the "starts with Due:/Open:" match;
+ *    the real failure mode this avoids is the *opposite* one, confirmed
+ *    live: the smallest match is often just a bare label span ("Open:",
+ *    5 characters, no date, no description) sitting inside the real panel,
+ *    which a *shortest*-match strategy picks by mistake and returns
+ *    almost nothing. Trailing UI chrome that rides along in the largest
+ *    match ("Check off", "Submit") is stripped afterward by
+ *    `stripActionChrome()` rather than solved by shrinking the match.
+ * 3. Score/due-time are pulled via regex over each row's own text rather
+ *    than a fixed cell index, because the two viewport layouts also split
+ *    that text across a different number of cells — a fixed index
+ *    silently reads the wrong thing on one of the two, while text search
+ *    doesn't care.
+ *
  * Deliberately does not read completion-status: it isn't rendered as
  * readable text on this page (see docs/ROADMAP.md Phase 2 notes) — that's
- * the Prioritizer page, a documented next step, not guessed at here.
+ * the Prioritizer page, a documented next step, not guessed at here. Never
+ * clicks "Check off" or "Submit" — only the row title (read-only expand)
+ * and category headers (read-only expand) are ever clicked.
  */
 function assignmentsExtractorSource(): string {
   return `(async function(){
@@ -105,15 +139,54 @@ function assignmentsExtractorSource(): string {
     if (!m) { alert("Docket: open a specific course's Assignments page (course > Assignments) and try again."); return; }
     var courseId = m[1];
 
-    var seen = {};
+    function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+    function findDescriptionPanel(rowEl) {
+      var all = document.querySelectorAll("main *");
+      var rowIdx = -1;
+      for (var i = 0; i < all.length; i++) { if (all[i] === rowEl) { rowIdx = i; break; } }
+      if (rowIdx === -1) return null;
+      var best = null, bestLen = -1;
+      var scanEnd = Math.min(all.length, rowIdx + 80);
+      for (var i = rowIdx + 1; i < scanEnd; i++) {
+        var t = all[i].textContent.trim();
+        if (/^(Due|Open):/.test(t) && t.length > bestLen) { best = all[i]; bestLen = t.length; }
+      }
+      return best;
+    }
+
+    // Strips trailing button labels ("Check off", "Submit", ...) that ride along in the
+    // description panel's textContent since they're DOM siblings/children of the real
+    // content, not because they were clicked — nothing here is ever clicked but the row
+    // title and category headers.
+    function stripActionChrome(text) {
+      return text.replace(/\\s*(Check off|Uncheck|Submit|Mark (as )?complete)(\\s+(Check off|Uncheck|Submit|Mark (as )?complete))*\\s*$/i, "").trim();
+    }
+
+    var seenTitles = {};
     var results = [];
-    function collectRows() {
+
+    async function extractCategory(categoryName) {
+      var titles = [];
       var rows = document.querySelectorAll("main .bg-base.text-highlight");
       for (var i = 0; i < rows.length; i++) {
-        var row = rows[i];
-        var titleCell = row.children[1];
-        var title = titleCell ? titleCell.textContent.replace(/\\s+/g, " ").trim() : "";
-        if (!title || seen[title]) continue;
+        var tc = rows[i].children[1];
+        var t = tc ? tc.textContent.replace(/\\s+/g, " ").trim() : "";
+        if (t && !seenTitles[t]) titles.push(t);
+      }
+      for (var i = 0; i < titles.length; i++) {
+        var title = titles[i];
+        if (seenTitles[title]) continue;
+        seenTitles[title] = true;
+
+        var freshRows = document.querySelectorAll("main .bg-base.text-highlight");
+        var row = null;
+        for (var j = 0; j < freshRows.length; j++) {
+          var tc2 = freshRows[j].children[1];
+          if (tc2 && tc2.textContent.replace(/\\s+/g, " ").trim() === title) { row = freshRows[j]; break; }
+        }
+        if (!row) continue;
+
         var rowText = row.textContent.replace(/\\s+/g, " ").trim();
         var dueMatch = rowText.match(/[A-Z][a-z]{2}\\s+\\d{1,2}\\s+\\d{1,2}:\\d{2}\\s*[ap]m\\s*[A-Z]{2,5}/);
         var due = dueMatch ? dueMatch[0] : "";
@@ -121,19 +194,47 @@ function assignmentsExtractorSource(): string {
         var afterDue = due ? beforeGrade.slice(beforeGrade.indexOf(due) + due.length) : beforeGrade;
         var scoreMatch = afterDue.match(/(\\d+(?:\\.\\d+)?)?\\s*\\/\\s*(\\d+(?:\\.\\d+)?)/);
         var score = scoreMatch ? scoreMatch[0] : "";
-        seen[title] = true;
-        results.push({ title: title, due: due, score: score });
+
+        var description = "";
+        var links = [];
+        var titleCell = row.children[1];
+        if (titleCell) {
+          titleCell.click();
+          await sleep(400);
+          var panel = findDescriptionPanel(row);
+          if (panel) {
+            description = stripActionChrome(panel.textContent.replace(/\\s+/g, " ").trim()).slice(0, 2000);
+            var anchors = panel.querySelectorAll("a");
+            for (var k = 0; k < anchors.length && links.length < 10; k++) {
+              var href = anchors[k].getAttribute("href");
+              var linkText = anchors[k].textContent.replace(/\\s+/g, " ").trim();
+              // Only external (non-LearningSuite) links: a link back into LearningSuite
+              // itself would need this session's own path-scoped subsessionID to work,
+              // which is exactly the kind of session-scoped value never worth capturing,
+              // and it's not useful to store long-term anyway.
+              if (href && /^https?:\\/\\//.test(href) && !/learningsuite\\.byu\\.edu/i.test(href)) {
+                links.push({ text: linkText.slice(0, 100), url: href.slice(0, 500) });
+              }
+            }
+          }
+          titleCell.click();
+          await sleep(250);
+        }
+
+        results.push({ title: title, due: due, score: score, category: categoryName || "", description: description, links: links });
       }
     }
 
-    collectRows();
-    if (results.length === 0) {
-      var headers = document.querySelectorAll("main .lineHeight > div.cursor-pointer");
-      for (var h = 0; h < headers.length; h++) {
-        headers[h].click();
-        await new Promise(function (r) { setTimeout(r, 450); });
-        collectRows();
-      }
+    await extractCategory(null);
+    var headers = document.querySelectorAll("main .lineHeight > div.cursor-pointer");
+    for (var h = 0; h < headers.length; h++) {
+      // headers[h] itself also contains the "of Grade: NN%" weight as a second child —
+      // its own second child (index 1: [chevron icon, name, weight]) is the clean name alone.
+      var nameEl = headers[h].children[1];
+      var headerText = (nameEl || headers[h]).textContent.replace(/\\s+/g, " ").trim();
+      headers[h].click();
+      await sleep(450);
+      await extractCategory(headerText);
     }
 
     if (!results.length) {

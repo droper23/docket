@@ -52,14 +52,37 @@ export interface CourseRecord {
 }
 
 /**
- * A gradeable/trackable item: assignment, quiz, exam, reading, project.
- * Stable ID = `${courseId}:${assignmentId}` per docs/ARCHITECTURE.md §Stable IDs.
+ * Is this actually gradable coursework, or just a calendar/schedule marker
+ * (a holiday, "Start of Classes", a lecture-topic reminder)? The ICS
+ * schedule feed conflates both into one stream of events — this
+ * distinction is what lets the dashboard stop showing "Labor Day" as
+ * something to do. Always `derived`: LearningSuite doesn't expose a real
+ * flag for this, it's inferred from title patterns and from whether the
+ * item ever showed up on a real Assignments page (see
+ * `inferEventKind()` in `src/connectors/icsConnector.ts`).
+ */
+export type AssignmentKind = "assignment" | "calendar_event";
+
+export interface AssignmentLink {
+  text: string;
+  url: string;
+}
+
+/**
+ * A gradeable/trackable item: assignment, quiz, exam, reading, project —
+ * or, per `kind` below, sometimes just a calendar marker that rode along
+ * in the same ICS feed. Stable ID = `${courseId}:${assignmentId}` per
+ * docs/ARCHITECTURE.md §Stable IDs.
  */
 export interface AssignmentRecord {
   id: string;
   courseId: string;
   title: Field<string>;
-  type?: Field<string>; // "assignment" | "exam" | "quiz" | "reading" | ... (LearningSuite's own vocabulary, not ours)
+  type?: Field<string>; // derived — generic kind ("exam"/"quiz"/"reading"/...) guessed from the title, used for effort estimates
+  kind?: Field<AssignmentKind>; // derived — real coursework vs. a calendar/schedule marker; see AssignmentKind
+  category?: Field<string>; // real — this course's own grading-category name (e.g. "Programming Assignments"), from the Assignments page
+  description?: Field<string>; // real — full instructions text, from the Assignments page's expandable detail panel
+  links?: Field<AssignmentLink[]>; // real — external resource/submission links found in that same panel
   dueDate?: Field<string>; // ISO date (YYYY-MM-DD) — may be all-day granularity from ICS
   dueTime?: Field<string>; // ISO time (HH:mm) — only available from the authenticated connector
   availableDate?: Field<string>;

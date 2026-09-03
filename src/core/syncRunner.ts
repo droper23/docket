@@ -110,6 +110,10 @@ export function assignmentHash(a: AssignmentRecord): string {
     a.pointsPossible?.value,
     a.pointsEarned?.value,
     a.completionStatus?.value,
+    a.category?.value,
+    a.description?.value,
+    a.links?.value ? JSON.stringify(a.links.value) : undefined,
+    a.kind?.value,
   ]);
 }
 

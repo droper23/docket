@@ -1,5 +1,5 @@
 import type { AnnouncementRecord, AssignmentRecord, CourseRecord } from "../core/types.js";
-import { realField } from "../core/types.js";
+import { derivedField, realField } from "../core/types.js";
 import { announcementStableId, assignmentStableId } from "../core/stableId.js";
 import { connectorOk } from "./types.js";
 import type { ConnectorResult, LearningPlatformConnector } from "./types.js";
@@ -35,9 +35,13 @@ export class DemoConnector implements LearningPlatformConnector {
       courseId,
       title: realField(a.title, "demo", now),
       type: realField(a.type, "demo", now),
+      kind: derivedField(a.kind ?? "assignment", "demo", now),
+      category: a.category ? realField(a.category, "demo", now) : undefined,
+      description: a.description ? realField(a.description, "demo", now) : undefined,
+      links: a.links ? realField(a.links, "demo", now) : undefined,
       dueDate: realField(a.dueDate, "demo", now),
       dueTime: a.dueTime ? realField(a.dueTime, "demo", now) : undefined,
-      pointsPossible: realField(a.pointsPossible, "demo", now),
+      pointsPossible: a.pointsPossible !== undefined ? realField(a.pointsPossible, "demo", now) : undefined,
       pointsEarned: a.pointsEarned !== undefined ? realField(a.pointsEarned, "demo", now) : undefined,
       completionStatus: realField(a.completionStatus, "demo", now),
     }));
@@ -71,10 +75,24 @@ function iso(daysFromNow: number): string {
 }
 
 const DEMO_ASSIGNMENTS = [
-  { courseId: "demo-cs235", localId: "lab3", title: "Lab 3: Binary Search Trees", type: "lab", dueDate: iso(1), dueTime: "23:59", pointsPossible: 20, pointsEarned: undefined, completionStatus: "in_progress" as const },
-  { courseId: "demo-cs235", localId: "quiz2", title: "Quiz 2: Hash Tables", type: "quiz", dueDate: iso(4), dueTime: "08:00", pointsPossible: 10, pointsEarned: 9, completionStatus: "completed" as const },
-  { courseId: "demo-math213", localId: "hw4", title: "Homework 4: Partial Derivatives", type: "homework", dueDate: iso(1), dueTime: "23:59", pointsPossible: 25, pointsEarned: undefined, completionStatus: "not_started" as const },
-  { courseId: "demo-math213", localId: "exam1", title: "Midterm Exam 1", type: "exam", dueDate: iso(6), dueTime: undefined, pointsPossible: 100, pointsEarned: undefined, completionStatus: "not_started" as const },
+  {
+    courseId: "demo-cs235",
+    localId: "lab3",
+    title: "Lab 3: Binary Search Trees",
+    type: "lab",
+    category: "Labs",
+    description: "Implement insert, delete, and in-order traversal for a BST. Submit via the autograder link below.",
+    links: [{ text: "Autograder", url: "https://autograder.example.edu/cs235/lab3" }],
+    dueDate: iso(1),
+    dueTime: "23:59",
+    pointsPossible: 20,
+    pointsEarned: undefined,
+    completionStatus: "in_progress" as const,
+  },
+  { courseId: "demo-cs235", localId: "quiz2", title: "Quiz 2: Hash Tables", type: "quiz", category: "Quizzes", dueDate: iso(4), dueTime: "08:00", pointsPossible: 10, pointsEarned: 9, completionStatus: "completed" as const },
+  { courseId: "demo-cs235", localId: "fallbreak", title: "Fall Break", type: "other", kind: "calendar_event" as const, dueDate: iso(10), dueTime: undefined, pointsPossible: undefined, pointsEarned: undefined, completionStatus: "not_started" as const },
+  { courseId: "demo-math213", localId: "hw4", title: "Homework 4: Partial Derivatives", type: "homework", category: "Homework", dueDate: iso(1), dueTime: "23:59", pointsPossible: 25, pointsEarned: undefined, completionStatus: "not_started" as const },
+  { courseId: "demo-math213", localId: "exam1", title: "Midterm Exam 1", type: "exam", category: "Exams", dueDate: iso(6), dueTime: undefined, pointsPossible: 100, pointsEarned: undefined, completionStatus: "not_started" as const },
   { courseId: "demo-wrtg316", localId: "reading5", title: "Reading: Chapter 5", type: "reading", dueDate: iso(3), dueTime: undefined, pointsPossible: 5, pointsEarned: undefined, completionStatus: "not_started" as const },
   { courseId: "demo-physcs121", localId: "quiz3", title: "Quiz 3: Kinematics", type: "quiz", dueDate: iso(2), dueTime: "10:00", pointsPossible: 10, pointsEarned: undefined, completionStatus: "not_started" as const },
   { courseId: "demo-physcs121", localId: "exam1", title: "Exam 1", type: "exam", dueDate: iso(6), dueTime: undefined, pointsPossible: 100, pointsEarned: undefined, completionStatus: "not_started" as const },

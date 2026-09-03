@@ -70,6 +70,24 @@ points, completion status, announcements — see Phase 2, part of which is now d
   changes at narrower viewport widths (accordion-collapsed categories, different cell
   layout) — the extractor is layout-independent (regex over row text, not fixed cell
   indices) and was verified against both layouts.
+- **Full assignment detail: real category, description, and external links** — the same
+  enrichment bookmarklet now also clicks each row's title to open LearningSuite's own
+  expandable detail panel (the same one a student sees clicking into an assignment) and
+  captures the real grading category, full instructions text, and any external resource
+  links (an autograder URL, a scoreboard, etc. — never a link back into LearningSuite
+  itself). Two real bugs found and fixed via live testing, not guessed at: the "pick the
+  shortest matching element" strategy for finding the detail panel returned almost nothing
+  (a bare `"Open:"` label, 5 characters, sits *inside* the real panel and is shorter than
+  it) — fixed by picking the *largest* matching element instead, which is safe for a
+  non-obvious reason documented in `docs/ARCHITECTURE.md` §8; and a category header's own
+  text included a second, unrelated "of Grade: NN%" label that had to be excluded
+  specifically rather than read wholesale.
+- **Real coursework vs. calendar markers** — `AssignmentKind` (`src/core/types.ts`) and
+  `isRealWork()` (`src/core/academicViews.ts`) keep pure calendar entries (holidays,
+  "Start of Classes") — which ride along in the same ICS stream as real assignments — out
+  of Today/Upcoming/workload. A title actually found on a real Assignments page is always
+  confirmed real work; everything else gets a conservative title-keyword guess. See
+  `docs/ARCHITECTURE.md` §12.
 
 **Not done yet** — needs a live session to safely capture, same constraint as before:
 - Completion status and announcements. `LearningSuiteSessionConnector` is still an

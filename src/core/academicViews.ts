@@ -33,6 +33,17 @@ function isOpen(a: AssignmentRecord): boolean {
   return a.completionStatus?.value !== "completed";
 }
 
+/**
+ * Excludes pure calendar/schedule markers (holidays, "Start of Classes") from
+ * every actionable view — see AssignmentKind in src/core/types.ts. `kind` is
+ * only ever `undefined` for connectors that don't set it (none currently
+ * do); treated as real work in that case, matching the "shown is better
+ * than hidden when unsure" rule the classifier itself follows.
+ */
+function isRealWork(a: AssignmentRecord): boolean {
+  return a.kind?.value !== "calendar_event";
+}
+
 export interface AgendaItem {
   assignment: AssignmentRecord;
   course?: CourseRecord;
@@ -56,7 +67,7 @@ function toAgendaItem(snapshot: AcademicSnapshot, a: AssignmentRecord): AgendaIt
 /** "What do I need to do today?" — open, active items due within 2 days, most urgent first. */
 export function todayView(snapshot: AcademicSnapshot): AgendaItem[] {
   return snapshot.assignments
-    .filter((a) => isActive(snapshot, a.id) && isOpen(a) && a.dueDate?.value)
+    .filter((a) => isActive(snapshot, a.id) && isOpen(a) && isRealWork(a) && a.dueDate?.value)
     .map((a) => toAgendaItem(snapshot, a))
     .filter((item) => item.daysUntilDue !== undefined && item.daysUntilDue <= 2)
     .sort((x, y) => (x.daysUntilDue ?? 0) - (y.daysUntilDue ?? 0));
@@ -65,7 +76,7 @@ export function todayView(snapshot: AcademicSnapshot): AgendaItem[] {
 /** Everything open and active beyond the urgent window, within `withinDays`. */
 export function upcomingView(snapshot: AcademicSnapshot, withinDays = 14): AgendaItem[] {
   return snapshot.assignments
-    .filter((a) => isActive(snapshot, a.id) && isOpen(a) && a.dueDate?.value)
+    .filter((a) => isActive(snapshot, a.id) && isOpen(a) && isRealWork(a) && a.dueDate?.value)
     .map((a) => toAgendaItem(snapshot, a))
     .filter((item) => item.daysUntilDue !== undefined && item.daysUntilDue > 2 && item.daysUntilDue <= withinDays)
     .sort((x, y) => (x.daysUntilDue ?? 0) - (y.daysUntilDue ?? 0));
@@ -80,7 +91,7 @@ export interface CourseWorkload {
 /** Estimated workload per course for the next `withinDays` — clearly derived, never presented as LearningSuite fact. */
 export function workloadView(snapshot: AcademicSnapshot, withinDays = 7): CourseWorkload[] {
   const items = snapshot.assignments
-    .filter((a) => isActive(snapshot, a.id) && isOpen(a) && a.dueDate?.value)
+    .filter((a) => isActive(snapshot, a.id) && isOpen(a) && isRealWork(a) && a.dueDate?.value)
     .map((a) => toAgendaItem(snapshot, a))
     .filter((item) => item.daysUntilDue !== undefined && item.daysUntilDue >= 0 && item.daysUntilDue <= withinDays);
 

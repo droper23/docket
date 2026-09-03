@@ -210,7 +210,17 @@ Two bookmarklets exist:
   (two assignments sharing a title). This safety rule caught something real on the first
   live run: LearningSuite's own ICS export sometimes lists the same assignment twice under
   near-identical titles from separate calendar entries; both were correctly left
-  unenriched rather than one being guessed at.
+  unenriched rather than one being guessed at. Beyond due time and points, this bookmarklet
+  also clicks each row's title to open LearningSuite's own expandable detail panel — the
+  same one a student sees clicking into an assignment — and captures the real grading
+  **category** (e.g. "Programming Assignments", replacing the title-keyword `type` guess
+  whenever available), the full **description**/instructions text, and any **external
+  resource links** a teacher attached (an autograder URL, a scoreboard, etc.) — never a
+  link back into LearningSuite itself, which would carry this session's own path-scoped
+  identifier and isn't useful to store anyway. This is what lets the dashboard answer "what
+  does this assignment actually want from me, and where's the submission link" without
+  opening LearningSuite at all — the actual product goal (see §12 for the related question
+  of telling real coursework apart from pure calendar markers in the same feed).
 
 **Both extractors only ever read `.textContent` and, for the course list, one specific
 `href` pattern** — never a full element/HTML dump. This isn't cosmetic: during this
@@ -231,6 +241,30 @@ independent) and falling back to sequentially clicking each category open only i
 are found up front — see the comment above `assignmentsExtractorSource()` for the details
 and the exact timing constant (450ms between clicks) that testing against the live page
 required for the re-render to reliably complete before the next read.
+
+**Two more real gotchas, both found by actually running the extractor against the live
+account and inspecting what came back, not by reasoning about the DOM in the abstract:**
+
+- The detail panel's due/open/close info sits inside several nested wrapping elements of
+  increasing size, and the *innermost* one is often just a bare label span — literally the
+  five characters `"Open:"`, with the actual date in a sibling the label doesn't contain.
+  `findDescriptionPanel()`'s first version picked the *shortest* element whose text starts
+  with `"Due:"`/`"Open:"` (reasoning: a wider ancestor's text also satisfies that prefix,
+  so avoid over-grabbing) — which silently returned almost nothing, live, for every
+  exam-style item. The fix is the opposite of the original reasoning: pick the *largest*
+  matching element instead. That's safe specifically because the very same "must start
+  with Due:/Open:" constraint that motivated the shortest-match instinct already prevents
+  over-grabbing — a wider ancestor that also included the *next* row would have that row's
+  title text appear first, breaking the prefix match, so the largest matching element is
+  reliably the full panel and nothing past it. Trailing UI chrome that rides along in that
+  largest match (button labels like "Check off", "Submit" — DOM siblings of the real
+  content, never clicked, just present in `.textContent`) is stripped by name afterward
+  (`stripActionChrome()`) rather than solved by shrinking the match.
+- A category header's own `.textContent` includes a second, separate label the UI renders
+  right next to it — `"Programming Assignments"` `.textContent` reads as `"Programming
+  Assignments of Grade: 20%"`. The header element's second child specifically (`children[1]`,
+  after a first, empty chevron-icon child) is the clean category name alone; grabbing the
+  whole header's text pollutes the `category` field with the grading weight on every course.
 
 **Phone-native install, no computer involved at all:** a browser bookmarklet's usual
 install gesture — drag a link to the bookmarks bar — doesn't really exist on a phone.
@@ -310,7 +344,36 @@ is no session to keep alive, no credential to refresh, nothing that requires a h
 present, so "run this forever in the background" is a fundamentally different (and fine)
 proposition than it would be for anything touching an authenticated session.
 
-## 11. What's deliberately NOT built yet
+## 12. Distinguishing real coursework from calendar markers
+
+LearningSuite's ICS schedule feed (§1) is one undifferentiated stream of VEVENTs — a real
+homework assignment and "Labor Day" come back with exactly the same shape. Left alone,
+that means Today/Upcoming would show a federal holiday as something to do. `AssignmentKind`
+(`src/core/types.ts`) exists to fix that: every assignment carries a `kind` of either
+`"assignment"` or `"calendar_event"`, and `isRealWork()` (`src/core/academicViews.ts`)
+filters `"calendar_event"` items out of every actionable view (Today, Upcoming, workload) —
+they still exist in the store, just never shown as something to do.
+
+Two sources feed `kind`, in order of trust:
+
+1. **Confirmed by enrichment** (`src/core/enrichment.ts`) — a title that was actually found
+   on a course's real Assignments page is definitively coursework; `kind` is set to
+   `"assignment"` unconditionally on a match. This is the reliable case: if it has a real
+   grading category and a real detail panel, it's real work, full stop.
+2. **ICS-only guess** (`inferEventKind()`, `src/connectors/icsConnector.ts`) — for
+   everything not yet enriched, a deliberately conservative title-keyword match against
+   real, observed BYU calendar markers ("Labor Day," "Start of Classes," "Fall Break," and
+   similar). Unmatched titles default to `"assignment"` — a false "this is real work" is
+   harmless clutter; a false "this is just a calendar marker" would hide something the
+   student actually needs to do. Same asymmetric-risk reasoning as §7's "stale is better
+   than wrong," applied here as "shown is better than hidden."
+
+This is also where the `category` field (§8) does double duty: a course's own real grading
+category (e.g. "Programming Assignments") is always a better signal than the generic
+`type` guess, so the dashboard prefers it wherever enrichment has run — see the badge logic
+in `src/server/render.ts`.
+
+## 13. What's deliberately NOT built yet
 
 - Completion status and announcements from the authenticated session — the Assignments
   page (§8) doesn't render completion state as readable text; that's the Prioritizer page,

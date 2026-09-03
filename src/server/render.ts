@@ -61,6 +61,14 @@ function layout(activePath: string, title: string, body: string): string {
   .badge-urgent { background: #f4d7d3; color: #8a2f23; }
   @media (prefers-color-scheme: dark) { .badge-urgent { background: #4a2620; color: #f4b6ab; } }
   .badge-estimate { background: rgba(120,110,90,0.18); }
+  .badge-category { background: #d9e6d0; color: #33511f; }
+  @media (prefers-color-scheme: dark) { .badge-category { background: #2b3a20; color: #c3dcae; } }
+  .card-details { margin-top: 8px; font-size: 12.5px; }
+  .card-details summary { cursor: pointer; opacity: 0.6; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .card-details summary:hover { opacity: 0.9; }
+  .card-description { opacity: 0.85; line-height: 1.5; margin: 8px 0; white-space: pre-wrap; }
+  .link-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .link-chip { display: inline-block; font-size: 11.5px; padding: 4px 9px; border-radius: 8px; background: rgba(120,110,90,0.12); border: 1px solid rgba(120,110,90,0.25); text-decoration: none; }
   .empty { opacity: 0.55; font-size: 14px; padding: 20px 0; }
   .workload-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 13px; }
   .workload-course { width: 110px; flex-shrink: 0; font-weight: 600; }
@@ -101,16 +109,37 @@ ${body}
 }
 
 function agendaCard(item: AgendaItem, urgent: boolean): string {
-  const due = item.assignment.dueDate?.value ?? "no due date";
-  const time = item.assignment.dueTime?.value;
+  const a = item.assignment;
+  const due = a.dueDate?.value ?? "no due date";
+  const time = a.dueTime?.value;
+  // Prefer the real, course-specific category (from the Assignments page) over the
+  // generic derived type guess — see docs/ARCHITECTURE.md §12.
+  const categoryLabel = a.category?.value ?? a.type?.value;
+  const categoryReal = !!a.category?.value;
+
+  const linkChips = (a.links?.value ?? [])
+    .map((l) => `<a class="link-chip" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.text || "Link")} ↗</a>`)
+    .join("");
+  const description = a.description?.value;
+  const details =
+    description || linkChips
+      ? `<details class="card-details">
+  <summary>Details</summary>
+  ${description ? `<p class="card-description">${esc(description)}</p>` : ""}
+  ${linkChips ? `<div class="link-chips">${linkChips}</div>` : ""}
+</details>`
+      : "";
+
   return `<div class="card">
-  <div class="card-title">${esc(item.assignment.title.value)}</div>
+  <div class="card-title">${esc(a.title.value)}</div>
   <div class="card-meta">
-    <span>${esc(item.course?.code.value ?? item.assignment.courseId)}</span>
+    <span>${esc(item.course?.code.value ?? a.courseId)}</span>
     <span>Due ${esc(due)}${time ? " " + esc(time) : ""}</span>
+    ${categoryLabel ? `<span class="badge ${categoryReal ? "badge-category" : "badge-estimate"}">${esc(categoryLabel)}</span>` : ""}
     <span class="badge badge-estimate">~${item.estimatedMinutes} min (estimate)</span>
     ${urgent ? '<span class="badge badge-urgent">Due soon</span>' : ""}
   </div>
+  ${details}
 </div>`;
 }
 

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { assignmentHash, describeAssignmentChange } from "./syncRunner.js";
-import { realField } from "./types.js";
-import type { AcademicSnapshot, AssignmentRecord } from "./types.js";
+import { derivedField, realField } from "./types.js";
+import type { AcademicSnapshot, AssignmentLink, AssignmentRecord } from "./types.js";
 
 export interface AssignmentPageRow {
   title: string;
@@ -9,6 +9,12 @@ export interface AssignmentPageRow {
   due: string;
   /** Raw text from the page, e.g. "/70.0" (ungraded) or "65/70.0" (graded). */
   score: string;
+  /** This course's own grading-category name (e.g. "Programming Assignments"), or "" if uncategorized. */
+  category?: string;
+  /** Full text from the assignment's expandable detail panel (instructions, open/close/due info). */
+  description?: string;
+  /** External (non-LearningSuite) resource links found in that same panel. */
+  links?: AssignmentLink[];
 }
 
 export interface EnrichmentOutcome {
@@ -86,6 +92,12 @@ export function applySessionEnrichment(snapshot: AcademicSnapshot, courseId: str
       dueTime: time ? realField(time, "learningsuite-session:assignments-page", now) : before.dueTime,
       pointsPossible: possible !== undefined ? realField(possible, "learningsuite-session:assignments-page", now) : before.pointsPossible,
       pointsEarned: earned !== undefined ? realField(earned, "learningsuite-session:assignments-page", now) : before.pointsEarned,
+      category: row.category ? realField(row.category, "learningsuite-session:assignments-page", now) : before.category,
+      description: row.description ? realField(row.description, "learningsuite-session:assignments-page", now) : before.description,
+      links: row.links && row.links.length > 0 ? realField(row.links, "learningsuite-session:assignments-page", now) : before.links,
+      // Confirmed real coursework: this title was actually found on the course's own
+      // Assignments page, which pure calendar/schedule markers never appear on.
+      kind: derivedField("assignment", "learningsuite-session:assignments-page", now),
     };
 
     const newHash = assignmentHash(after);

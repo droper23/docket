@@ -8,6 +8,7 @@ import { recentChanges, todayView, upcomingView, workloadView } from "../core/ac
 import { computeDiagnostics } from "../core/diagnostics.js";
 import { applySessionEnrichment } from "../core/enrichment.js";
 import type { AssignmentPageRow } from "../core/enrichment.js";
+import type { AssignmentLink } from "../core/types.js";
 import { runSync } from "../core/syncRunner.js";
 import type { PhoneAccessInfo } from "./render.js";
 import {
@@ -26,7 +27,7 @@ async function pickConnector() {
 }
 
 /** Reads and caps a request body — this endpoint is reachable by anyone who can reach the deployment, not just the bookmarklet, so never trust size or shape. */
-async function readBody(req: IncomingMessage, maxBytes = 256 * 1024): Promise<string> {
+async function readBody(req: IncomingMessage, maxBytes = 2 * 1024 * 1024): Promise<string> {
   const chunks: Buffer[] = [];
   let total = 0;
   for await (const chunk of req) {
@@ -75,6 +76,29 @@ function validateDiscoveredCourses(raw: unknown): DiscoveredCourse[] {
 }
 
 const MAX_IMPORTED_ROWS = 300;
+const MAX_DESCRIPTION_LEN = 2000;
+const MAX_LINKS_PER_ROW = 10;
+const MAX_LINK_TEXT_LEN = 100;
+const MAX_LINK_URL_LEN = 500;
+
+function validateLinks(raw: unknown): AssignmentLink[] {
+  if (!Array.isArray(raw)) return [];
+  const links: AssignmentLink[] = [];
+  for (const item of raw.slice(0, MAX_LINKS_PER_ROW)) {
+    if (typeof item !== "object" || item === null) continue;
+    const l = item as Record<string, unknown>;
+    if (typeof l.url !== "string" || !/^https?:\/\//.test(l.url)) continue;
+    // Defense in depth: the bookmarklet already excludes learningsuite.byu.edu links
+    // (session-scoped path prefix, not worth capturing) — enforce that server-side too,
+    // since this route accepts input from any page's JS, not just the real bookmarklet.
+    if (/learningsuite\.byu\.edu/i.test(l.url)) continue;
+    links.push({
+      text: typeof l.text === "string" ? l.text.slice(0, MAX_LINK_TEXT_LEN) : "",
+      url: l.url.slice(0, MAX_LINK_URL_LEN),
+    });
+  }
+  return links;
+}
 
 function validateAssignmentRows(raw: unknown): AssignmentPageRow[] {
   if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_IMPORTED_ROWS) {
@@ -86,7 +110,14 @@ function validateAssignmentRows(raw: unknown): AssignmentPageRow[] {
     if (!isNonEmptyShortString(r.title) || typeof r.due !== "string" || typeof r.score !== "string") {
       throw new Error(`Row #${i + 1} is missing required fields`);
     }
-    return { title: r.title, due: r.due.slice(0, MAX_FIELD_LEN), score: r.score.slice(0, 40) };
+    return {
+      title: r.title,
+      due: r.due.slice(0, MAX_FIELD_LEN),
+      score: r.score.slice(0, 40),
+      category: typeof r.category === "string" && r.category.length > 0 ? r.category.slice(0, MAX_FIELD_LEN) : undefined,
+      description: typeof r.description === "string" && r.description.length > 0 ? r.description.slice(0, MAX_DESCRIPTION_LEN) : undefined,
+      links: validateLinks(r.links),
+    };
   });
 }
 

@@ -92,6 +92,12 @@ export class IcsConnector implements LearningPlatformConnector {
       // Derived, not real: the ICS feed doesn't tag a type at all — this is a title-keyword
       // guess, useful for effort estimation but never to be shown as LearningSuite fact.
       type: derivedField(inferAssignmentType(ev.summary), "title-keyword-heuristic", capturedAt),
+      // Derived: the ICS feed mixes real coursework with pure calendar markers (holidays,
+      // "Start of Classes") in one stream — see docs/ARCHITECTURE.md §12 for why this
+      // matters to the dashboard. Enrichment (src/core/enrichment.ts) can later upgrade
+      // this to a confirmed "assignment" once the item is actually seen on a real
+      // Assignments page — this is only the ICS-only best guess.
+      kind: derivedField(inferEventKind(ev.summary), "title-keyword-heuristic", capturedAt),
       dueDate: (ev.startDate ?? ev.startDateTime?.slice(0, 10))
         ? realField((ev.startDate ?? ev.startDateTime!.slice(0, 10))!, "learningsuite-ics", capturedAt)
         : undefined,
@@ -116,6 +122,45 @@ export class IcsConnector implements LearningPlatformConnector {
  * math, engineering, dance, and religion — deliberately broad, not tuned to
  * one department.
  */
+/**
+ * Deliberately conservative title-keyword match for "this is a pure
+ * calendar/schedule marker, not something to actually do" — holidays and
+ * semester-boundary markers observed live in a real schedule feed (e.g.
+ * "Labor Day", "Start of Classes"). Defaults to "assignment" whenever
+ * unsure: a false "this is real work" is harmless noise, a false "this is
+ * just a calendar marker" would hide something the student actually needs
+ * to do — see docs/ARCHITECTURE.md §7 "stale is better than wrong,"
+ * applied here as "shown is better than hidden."
+ */
+export function inferEventKind(title: string): "assignment" | "calendar_event" {
+  const t = title.toLowerCase();
+  const markers = [
+    "labor day",
+    "memorial day",
+    "thanksgiving",
+    "christmas",
+    "new year",
+    "independence day",
+    "veterans day",
+    "presidents day",
+    "martin luther king",
+    "mlk",
+    "start of classes",
+    "end of classes",
+    "last day",
+    "final exam period",
+    "no class",
+    "no classes",
+    "fall break",
+    "spring break",
+    "study day",
+    "reading day",
+    "university closed",
+    "byu closed",
+  ];
+  return markers.some((m) => t.includes(m)) ? "calendar_event" : "assignment";
+}
+
 function inferAssignmentType(title: string): string {
   const t = title.toLowerCase();
   if (t.includes("exam") || t.includes("test") || t.includes("midterm") || t.includes("final")) return "exam";

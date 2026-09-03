@@ -110,3 +110,48 @@ test("enrichment for one course never touches another course's assignments", () 
   const c2Assignment = snapshot.assignments.find((a) => a.courseId === "c2")!;
   assert.equal(c2Assignment.pointsEarned, undefined);
 });
+
+test("merges real category, description, and external links from the detail panel", () => {
+  const a = makeAssignment("c1", "1", "Bomb Programming Assignment");
+  const snapshot = baseSnapshot([a]);
+
+  const outcome = applySessionEnrichment(snapshot, "c1", [
+    {
+      title: "Bomb Programming Assignment",
+      due: "Nov 20 11:59 pm MST",
+      score: "/70.0",
+      category: "Programming Assignments",
+      description: "Due: Nov 20 11:59 pm MST (right before midnight) Download bomb View scoreboard To turn in this assignment...",
+      links: [
+        { text: "Download bomb", url: "http://ecen224.byu.edu:5100" },
+        { text: "View scoreboard", url: "http://ecen224.byu.edu:5100/scoreboard" },
+      ],
+    },
+  ]);
+
+  const updated = snapshot.assignments[0]!;
+  assert.equal(outcome.matched, 1);
+  assert.equal(updated.category?.value, "Programming Assignments");
+  assert.equal(updated.category?.provenance, "real");
+  assert.ok(updated.description?.value.startsWith("Due: Nov 20"));
+  assert.equal(updated.description?.provenance, "real");
+  assert.deepEqual(updated.links?.value, [
+    { text: "Download bomb", url: "http://ecen224.byu.edu:5100" },
+    { text: "View scoreboard", url: "http://ecen224.byu.edu:5100/scoreboard" },
+  ]);
+  // A title actually found on the real Assignments page is confirmed coursework,
+  // never a calendar marker — see docs/ARCHITECTURE.md §13.
+  assert.equal(updated.kind?.value, "assignment");
+  assert.equal(updated.kind?.provenance, "derived");
+});
+
+test("re-enriching with unchanged category/description/links is still a no-op (no phantom changes)", () => {
+  const a = makeAssignment("c1", "1", "Game 1");
+  const snapshot = baseSnapshot([a]);
+  const row = { title: "Game 1", due: "Oct 16 9:00 pm MDT", score: "/100", category: "Games", description: "Open: Oct 12 Close: Oct 16" };
+
+  applySessionEnrichment(snapshot, "c1", [row]);
+  const outcome2 = applySessionEnrichment(snapshot, "c1", [row]);
+
+  assert.equal(outcome2.changeCount, 0);
+});

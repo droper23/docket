@@ -38,7 +38,7 @@ async function tailscaleAddress(): Promise<string | undefined> {
 /**
  * Every non-internal IPv4 address this machine has, split into "ordinary
  * Wi-Fi/Ethernet LAN" vs. Tailscale's virtual address. Only meaningful for
- * the local dev server — a deployed instance (docs/ARCHITECTURE.md §12)
+ * the local dev server — a deployed instance (docs/ARCHITECTURE.md §9)
  * doesn't need any of this, it's already reachable from anywhere.
  */
 async function detectedAddresses(): Promise<{ lan: string[]; tailscale: string[] }> {
@@ -67,7 +67,7 @@ const server = createServer((req, res) => {
 
 // Bind to all interfaces (not just localhost) so a phone on the same Wi-Fi can reach
 // this — see docs/ARCHITECTURE.md §9. For reachability from anywhere, without this
-// machine needing to be on at all, deploy instead (docs/ARCHITECTURE.md §12,
+// machine needing to be on at all, deploy instead (docs/ARCHITECTURE.md §9,
 // `npm run deploy`).
 server.listen(PORT, "0.0.0.0", async () => {
   console.log(`Docket dashboard running at http://localhost:${PORT}`);
@@ -81,5 +81,5 @@ server.listen(PORT, "0.0.0.0", async () => {
   if (lan.length === 0 && tailscale.length === 0) {
     console.log(`No network interface detected for phone access — see docs/ARCHITECTURE.md §9.`);
   }
-  console.log(`For access from anywhere without this computer needing to be on, deploy: see docs/ARCHITECTURE.md §12.`);
+  console.log(`For access from anywhere without this computer needing to be on, deploy: see docs/ARCHITECTURE.md §9.`);
 });

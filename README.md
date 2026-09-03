@@ -20,13 +20,20 @@ integration are not built yet — see [`docs/ROADMAP.md`](docs/ROADMAP.md).
 - Fetches your courses' schedules from LearningSuite's own per-course iCalendar feed —
   **confirmed to need zero authentication** (see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
   for why). No password, no browser automation, no login flow of any kind for this part.
-- Optionally pulls in real due *times* and grades too (the ICS feed only has dates), via a
-  one-click bookmarklet that reads a page you're already looking at.
+- Optionally pulls in real due *times*, grades, each course's own grading **category**,
+  and the full **description + external links** LearningSuite only shows once you click
+  into an assignment (an autograder URL, a scoreboard, submission instructions) — the ICS
+  feed alone has none of that. One click, reads a page you're already looking at.
+- Tells real coursework apart from pure calendar markers (holidays, "Start of Classes")
+  that ride along in the same schedule feed — Today/Upcoming only ever show you things
+  you actually need to do, never a federal holiday.
 - Normalizes everything into one local data store on your machine — nothing leaves your
   device except read-only requests to LearningSuite's own feed.
 - Shows a **Today** view (what's due now), **Upcoming** (next two weeks), **Courses**
   (estimated workload per class), **What Changed** (since your last check), and
-  **Diagnostics** (is the connection healthy).
+  **Diagnostics** (is the connection healthy) — each assignment card expands to show its
+  real category, full description, and any linked resources, so you rarely need to open
+  LearningSuite at all.
 - Deployable to a free Vercel URL that works on your phone from anywhere — no laptop
   needs to be on, ever (see **Deploying so it works from anywhere**). A local-only mode
   also exists for development/demo, reachable over the same Wi-Fi.
