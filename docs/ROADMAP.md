@@ -90,10 +90,26 @@ points, completion status, announcements — see Phase 2, part of which is now d
   `docs/ARCHITECTURE.md` §12.
 
 **Not done yet** — needs a live session to safely capture, same constraint as before:
-- Completion status and announcements. `LearningSuiteSessionConnector` is still an
-  interface-conformant skeleton for these specifically — every method returns
-  `not_implemented` rather than a guessed parser. The Prioritizer page is the likely next
-  place to look (per the original research), not yet captured.
+- **Completion status** — closer than previously thought, but still genuinely unverified,
+  not guessed at. LearningSuite's Combined Schedule page (`student/top/schedule` — the
+  closest thing it has to a "Today" view, and the more relevant page to check than the
+  Prioritizer this doc previously pointed at) renders a real per-item completion
+  `<input type="checkbox">` next to every assignment, confirmed live to differ item-by-item
+  (not a rendering artifact) once correctly isolated from a separate, same-DOM filters
+  panel that also contains checkboxes — `.closest()`-walking up from an item's title to
+  the nearest ancestor containing *exactly one* checkbox reliably isolates the right one.
+  The open question is only *how to capture it in one click covering a whole course*
+  without live-toggling anything: the Assignments page's own detail panel has a "Check
+  off" button whose label plausibly flips to "Uncheck" once something is actually
+  completed (the code already strips both from `description` — see
+  `stripActionChrome()` in `src/connectors/bookmarklet.ts` — anticipating exactly this),
+  which would mean completion status is readable from the *same* panel already being
+  captured, no second bookmarklet needed. **Unverified because nothing in the live account
+  was actually completed yet to test it against** (Fall 2026 had just started at the time
+  this was investigated) — do not implement this from the untested guess; check again once
+  something real is marked done, or ask the user to point at a specific completed item.
+- Announcements. `LearningSuiteSessionConnector` is still an interface-conformant skeleton
+  for this — every method returns `not_implemented` rather than a guessed parser.
 - The underlying `ajax.php` RPC surface remains mostly unexplored beyond the one
   `funcName` (a completion-toggle) confirmed during the original research — no other
   actions or response shapes have been captured. DOM extraction via bookmarklet has

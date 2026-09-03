@@ -54,7 +54,21 @@ function layout(activePath: string, title: string, body: string): string {
   h1 { font-size: 22px; margin: 0 0 4px; }
   .subtitle { opacity: 0.6; font-size: 13px; margin: 0 0 24px; }
   .section-label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.55; margin: 28px 0 10px; }
-  .card { background: rgba(120,110,90,0.08); border: 1px solid rgba(120,110,90,0.16); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
+  .day-header { font-size: 13px; font-weight: 700; padding: 7px 12px; margin: 18px 0 8px; background: rgba(120,110,90,0.14); border-radius: 8px; }
+  .day-header:first-child { margin-top: 4px; }
+  .card { background: rgba(120,110,90,0.08); border: 1px solid rgba(120,110,90,0.16); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; overflow: hidden; }
+  /* Cancels the parent .card's own padding so this fills the full tile — then re-applies
+     matching padding on .card-summary/.card-body below. Only affects cards that opt into
+     the expandable structure (agendaCard); every other plain .card usage elsewhere on the
+     site is untouched, since they have no .card-expand child to trigger this rule. */
+  .card-expand { margin: -14px -16px; }
+  .card-summary { cursor: pointer; list-style: none; position: relative; padding: 14px 40px 14px 16px; }
+  .card-summary::-webkit-details-marker { display: none; }
+  .card-summary::marker { content: ""; }
+  .card-summary::after { content: "›"; position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-size: 20px; opacity: 0.4; transition: transform 0.15s ease; }
+  .card-expand[open] .card-summary::after { transform: translateY(-50%) rotate(90deg); }
+  .card-summary:hover { background: rgba(120,110,90,0.07); }
+  .card-summary:focus-visible { outline: 2px solid #8a6d3b; outline-offset: -2px; }
   .card-title { font-weight: 600; font-size: 14.5px; margin: 0 0 2px; }
   .card-meta { font-size: 12.5px; opacity: 0.65; display: flex; gap: 10px; flex-wrap: wrap; }
   .badge { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 999px; font-weight: 600; }
@@ -63,10 +77,9 @@ function layout(activePath: string, title: string, body: string): string {
   .badge-estimate { background: rgba(120,110,90,0.18); }
   .badge-category { background: #d9e6d0; color: #33511f; }
   @media (prefers-color-scheme: dark) { .badge-category { background: #2b3a20; color: #c3dcae; } }
-  .card-details { margin-top: 8px; font-size: 12.5px; }
-  .card-details summary { cursor: pointer; opacity: 0.6; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; }
-  .card-details summary:hover { opacity: 0.9; }
-  .card-description { opacity: 0.85; line-height: 1.5; margin: 8px 0; white-space: pre-wrap; }
+  .card-body { padding: 0 16px 14px; font-size: 12.5px; border-top: 1px solid rgba(120,110,90,0.14); padding-top: 10px; }
+  .card-description { opacity: 0.85; line-height: 1.5; margin: 0 0 10px; white-space: pre-wrap; }
+  .card-hint { opacity: 0.55; line-height: 1.5; margin: 0; font-style: italic; }
   .link-chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .link-chip { display: inline-block; font-size: 11.5px; padding: 4px 9px; border-radius: 8px; background: rgba(120,110,90,0.12); border: 1px solid rgba(120,110,90,0.25); text-decoration: none; }
   .empty { opacity: 0.55; font-size: 14px; padding: 20px 0; }
@@ -108,10 +121,57 @@ ${body}
 </html>`;
 }
 
+/** "Due in 3 days" / "Due today" / "Overdue by 2 days" — the countdown itself, not just a due-date string, is what makes it obvious what needs doing now vs. later. */
+function dueCountdown(daysUntilDue: number | undefined): string | undefined {
+  if (daysUntilDue === undefined) return undefined;
+  if (daysUntilDue < 0) {
+    const n = Math.abs(daysUntilDue);
+    return `Overdue by ${n} day${n === 1 ? "" : "s"}`;
+  }
+  if (daysUntilDue === 0) return "Due today";
+  if (daysUntilDue === 1) return "Due tomorrow";
+  return `Due in ${daysUntilDue} days`;
+}
+
+/** "Today" / "Tomorrow" / "Wednesday, September 3" — mirrors LearningSuite's own Combined Schedule day headers. */
+function dayLabel(dateStr: string): string {
+  const date = new Date(`${dateStr}T00:00:00`);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Tomorrow";
+  if (diffDays === -1) return "Yesterday";
+  return date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+}
+
+/**
+ * Groups already-sorted agenda items by due date so the page can show day
+ * headers — see docs/ARCHITECTURE.md §8: LearningSuite's own Combined
+ * Schedule (the closest thing it has to a "Today" view) always groups by
+ * day, and a flat list made it hard to tell "due today" apart from "due
+ * later" at a glance. Items are assumed pre-sorted chronologically
+ * (academicViews.ts already does this) — this only groups, never re-sorts.
+ */
+function groupByDueDate(items: AgendaItem[]): { date: string; items: AgendaItem[] }[] {
+  const groups: { date: string; items: AgendaItem[] }[] = [];
+  for (const item of items) {
+    const date = item.assignment.dueDate?.value ?? "unknown";
+    const last = groups[groups.length - 1];
+    if (last && last.date === date) {
+      last.items.push(item);
+    } else {
+      groups.push({ date, items: [item] });
+    }
+  }
+  return groups;
+}
+
 function agendaCard(item: AgendaItem, urgent: boolean): string {
   const a = item.assignment;
   const due = a.dueDate?.value ?? "no due date";
   const time = a.dueTime?.value;
+  const countdown = dueCountdown(item.daysUntilDue);
   // Prefer the real, course-specific category (from the Assignments page) over the
   // generic derived type guess — see docs/ARCHITECTURE.md §12.
   const categoryLabel = a.category?.value ?? a.type?.value;
@@ -121,32 +181,47 @@ function agendaCard(item: AgendaItem, urgent: boolean): string {
     .map((l) => `<a class="link-chip" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.text || "Link")} ↗</a>`)
     .join("");
   const description = a.description?.value;
-  const details =
+  // The whole tile is the click target — the title/meta live inside <summary> itself,
+  // not a separate "Details" link, so this behaves like clicking an assignment in
+  // LearningSuite rather than requiring you to find a small secondary link. Every card
+  // expands, even with nothing captured yet: silently showing nothing when a click does
+  // nothing reads as broken, not as "no data" — see docs/ARCHITECTURE.md §8 for how this
+  // detail gets captured (a one-click bookmarklet, run per course) and why most
+  // assignments won't have it until that's been run for their course.
+  const body =
     description || linkChips
-      ? `<details class="card-details">
-  <summary>Details</summary>
-  ${description ? `<p class="card-description">${esc(description)}</p>` : ""}
-  ${linkChips ? `<div class="link-chips">${linkChips}</div>` : ""}
-</details>`
-      : "";
+      ? `${description ? `<p class="card-description">${esc(description)}</p>` : ""}${linkChips ? `<div class="link-chips">${linkChips}</div>` : ""}`
+      : `<p class="card-hint">No extra detail synced yet for this item. On <a href="/connect">Connect</a>, run "Sync Grades &amp; Due Times" on ${esc(item.course?.code.value ?? a.courseId)}'s Assignments page to pull in its real description and links.</p>`;
 
   return `<div class="card">
-  <div class="card-title">${esc(a.title.value)}</div>
-  <div class="card-meta">
-    <span>${esc(item.course?.code.value ?? a.courseId)}</span>
-    <span>Due ${esc(due)}${time ? " " + esc(time) : ""}</span>
-    ${categoryLabel ? `<span class="badge ${categoryReal ? "badge-category" : "badge-estimate"}">${esc(categoryLabel)}</span>` : ""}
-    <span class="badge badge-estimate">~${item.estimatedMinutes} min (estimate)</span>
-    ${urgent ? '<span class="badge badge-urgent">Due soon</span>' : ""}
-  </div>
-  ${details}
+  <details class="card-expand">
+    <summary class="card-summary">
+      <div class="card-title">${esc(a.title.value)}</div>
+      <div class="card-meta">
+        <span>${esc(item.course?.code.value ?? a.courseId)}</span>
+        <span>Due ${esc(due)}${time ? " " + esc(time) : ""}</span>
+        ${categoryLabel ? `<span class="badge ${categoryReal ? "badge-category" : "badge-estimate"}">${esc(categoryLabel)}</span>` : ""}
+        <span class="badge badge-estimate">~${item.estimatedMinutes} min (estimate)</span>
+        ${countdown ? `<span class="badge ${urgent ? "badge-urgent" : "badge-estimate"}">${esc(countdown)}</span>` : ""}
+      </div>
+    </summary>
+    <div class="card-body">${body}</div>
+  </details>
 </div>`;
 }
 
+/** Renders items grouped into day sections with headers, matching LearningSuite's own Combined Schedule layout. */
+function renderDayGroups(items: AgendaItem[]): string {
+  return groupByDueDate(items)
+    .map(
+      (group) => `<div class="day-header">${esc(dayLabel(group.date))}</div>
+${group.items.map((i) => agendaCard(i, (i.daysUntilDue ?? 99) <= 1)).join("")}`,
+    )
+    .join("");
+}
+
 export function renderToday(items: AgendaItem[]): string {
-  const list = items.length
-    ? items.map((i) => agendaCard(i, (i.daysUntilDue ?? 99) <= 1)).join("")
-    : `<div class="empty">Nothing urgent. Nice.</div>`;
+  const list = items.length ? renderDayGroups(items) : `<div class="empty">Nothing urgent. Nice.</div>`;
   return layout(
     "/",
     "Today",
@@ -160,9 +235,7 @@ ${list}
 }
 
 export function renderUpcoming(items: AgendaItem[]): string {
-  const list = items.length
-    ? items.map((i) => agendaCard(i, false)).join("")
-    : `<div class="empty">Nothing in the next two weeks.</div>`;
+  const list = items.length ? renderDayGroups(items) : `<div class="empty">Nothing in the next two weeks.</div>`;
   return layout("/upcoming", "Upcoming", `<h1>Upcoming</h1><p class="subtitle">Next 14 days</p>${list}`);
 }
 
