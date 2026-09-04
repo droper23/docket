@@ -1,5 +1,130 @@
 # LearningSuite Reskin — Roadmap
 
+## Fifth live pass: Apple-HIG fidelity fixes — color discipline, active nav, readability (Sep 2026)
+
+A fresh, skeptical re-audit of the fourth pass's build (real authenticated account, both
+themes, real CDP mouse/keyboard events rather than synthetic `dispatchEvent`) confirmed its
+four specific claims (header dropdown material, Preferences sheet chrome, font-metro remap,
+menu-row hover) hold up, but surfaced 12 new problems — several correctness/accessibility
+bugs, not just taste. This pass fixed the ones with the widest reach: two systemic issues
+visible on nearly every page (color-tint discipline, active-nav-item matching), rather than
+more one-off per-page CSS. Most fixes are global-selector changes every already-touched
+**and** every still-unaudited page inherits for free, with no new adapter.
+
+1. **Instructor-authored rich text could render invisible.** `.instructorText.font-nunito`
+   only ever remapped `font-family`. Confirmed live instructor WYSIWYG content carries inline
+   `style="color:#000000"` (authored assuming a light page) — on the near-black dark canvas
+   that's pure-black-on-near-black, not a cosmetic miss. Fixed by rendering it as an inset
+   light "paper" card (white background, `#1d1d1f` text, own shadow) in both app themes —
+   the same way Apple Mail/Notes handle pasted rich content, rather than chasing every
+   possible inline color an instructor might set. Confirmed live post-fix: the same black
+   inline text now sits on a white card, fully legible.
+2. **Sidebar/top-tab active-item highlight silently failed on every section's landing
+   route.** The one-directional `location.pathname.startsWith(href)` check only worked when
+   the current URL was equal-or-longer than the link's href — confirmed live it missed the
+   common case of landing on a shorter index route (`/student/home`) while the matching link
+   points at a longer default child (`/student/home/dashboard`). Replaced with a bidirectional,
+   `/`-boundary-safe scoring function (`pathMatchScore`, now exported and unit-tested in
+   `test/shell.test.ts`) that picks the single most specific match among all candidates.
+   Confirmed live: landing on `/student/home` now highlights exactly "Home"; landing on
+   `/student/gradebook` highlights exactly "Grades" — one match, not zero or two.
+3. **"One canvas" light-mode leak: the sidebar's own wrapper div.** `<nav>` is sibling-wrapped
+   in its own `<div class="bg-left-nav flex flex-col">`; both carry `.bg-left-nav`, which the
+   canvas rule skipped entirely so the real `<nav>` could keep its own sidebar material. That
+   same skip let the plain wrapper div fall through to native fill — barely visible in dark
+   mode but a clear warm tan cast in light mode (`rgb(230,219,206)` vs. canvas
+   `rgb(242,242,247)`). Fixed by narrowing the exclusion to `:not(.docket-nav-enhanced)`
+   instead of dropping it: confirmed live in both themes afterward — every `.bg-left-nav`
+   element now computes the flat canvas color except the mounted `<nav>`, which keeps
+   `rgba(255,255,255,0.06)`/`rgba(246,246,246,0.78)`.
+4. **Theme could flip to light with zero LearningSuite signal at all.** `applyTheme()` fell
+   back to a hardcoded `light` whenever `<html>` carried no `dark` class — correct for real
+   light mode, but also wrongly fired on a genuine native error page (`<html class="">`, no
+   signal either way), flipping a Dark-mode account's whole reskin outside the SPA's own
+   state. Fixed by checking for `.h-full` (confirmed present on every real LearningSuite
+   render, dark or light) as the actual "the site gave a signal" test, and persisting the
+   last real reading via `getSetting`/`setSetting` (`src/lib/storage.ts`) as the fallback
+   instead of a hardcoded value. Verified live in both directions: toggled the real account
+   to Light, hit a nonexistent URL, confirmed `data-docket-theme="light"`; toggled back to
+   Dark (the account's original setting, restored), hit the same nonexistent URL again,
+   confirmed `data-docket-theme="dark"`.
+5. **Color-tint discipline — the single biggest fidelity gap.** `.text-primary`/
+   `.text-primary-alt`/`.text-action`/`.text-highlight` were one blanket
+   `color: var(--docket-blue)` rule. Confirmed live these classes wrap entire static native
+   panels — Preferences' plain field labels, Grade Scale's every table cell, empty-state
+   strings — none of it tappable, violating Apple's own tint-means-interactive rule
+   everywhere at once. Meanwhile the genuinely clickable assignment-name row
+   (`div.clicky` inside each `.bg-base.text-highlight` row) carried none of these classes and
+   kept LearningSuite's own separate, un-remapped native blue (`rgb(115,175,211)`). Fixed
+   both with one split: a default neutral-label rule, overridden only for real interactive
+   tags/classes (`a`, `button.text-primary`, `.clicky`) via a more-specific tag-qualified
+   selector — deterministic regardless of source order. Confirmed live: Preferences labels
+   and Grade Scale cells are now neutral; assignment-row titles are now the correct app blue
+   (`rgb(10,132,255)`) instead of the old native pale blue; non-title cells in the same row
+   (due date, score) inherit neutral correctly.
+6. **`.bg-primary` "today" marker** (the Schedule mini-calendar) was a third, un-remapped
+   native blue with hardcoded near-black text. Remapped to a solid app-blue chip with white
+   text, matching how Apple Calendar marks "today". Confirmed live.
+7. **Type scale.** Native `h1`/`h2`/`h3` got font-family/weight/color in earlier passes but no
+   controlled size — native headings varied 24–28px per page with no real hierarchy. Added
+   explicit sizes/tracking (28/22/17px) to the same already-owned selector. Confirmed live
+   (28px on a checked `h1`).
+8. **Native `<table>` (Grade Scale, etc.) had zero elevation** — raw grid borders, 0 radius,
+   one tab away from the Assignments view's card-row treatment. Live-checked eight page types
+   (Grade Scale, What-If Calculator, Content, Syllabus, Announcements, Email, Schedule,
+   Groups) for any table used purely for layout before adding a bare `table` selector — none
+   found, only genuine tabular data — so this is a safe bare-tag rule the way `<button>`/
+   `<select>` deliberately aren't. Confirmed live: Grade Scale now has card radius/shadow.
+9. **Bare `input[type=text/number]` had zero styling** and, worse, a *third* focus-ring
+   language (the raw browser default) next to the correct one radios/checkboxes already had.
+   Live-census across Email, What-If Calculator, Groups, Schedule, Announcements, Syllabus,
+   Content found only `text` and `number` inputs sitewide (no `email`/`search` — not
+   guessed beyond what was observed) — both now get the same bg/border/radius treatment plus
+   a matching `:focus-visible` ring. Confirmed live on a real click (a scripted `.focus()`
+   doesn't reliably trigger Chrome's `:focus-visible` heuristic — a real click does): 2px
+   solid app-blue, 2px offset.
+10. **Preferences dialog had three different button shapes in one sheet.** Save was a full
+    pill; Cancel (confirmed live: `button.bg-base.border-info.text-info.font-metro`) stayed
+    fully native — 0 radius, near-invisible border. Gave Cancel the same radius as Save with a
+    lighter tinted fill, dialog-scoped (never bare `.bg-base`) like the existing accordion-
+    header exception. Confirmed live: both now compute `8px` radius. A "Reset" button
+    mentioned in the prior review could not be reproduced live this session (checked General/
+    Communication/Email accordion tabs) — not styled; re-check if one turns up elsewhere.
+11. **`<iframe>` (Library Resources, confirmed live to embed cross-origin
+    `apps.lib.byu.edu`) can't be restyled inside** — no `@match`/`@grant` reaches it, and this
+    pass isn't adding a second match block for an unaudited third-party origin. Framed it from
+    the parent-page side instead (rounded, clipped, shadowed) so the boundary is consistent
+    with every other elevated surface even though the interior stays native. Confirmed live.
+12. **`.bg-attention` (native instructor-view banner)** — flagged in the prior review as the
+    highest-visibility untouched native color, a solid saturated yellow under the header. A
+    remap to a translucent system-yellow token (new `--docket-yellow-banner-bg`, light/dark)
+    plus a link-color fix was added in `tokens.css`/`global.css`, but the banner could **not
+    be reproduced live this session** across every course in the account (checked all four
+    enrolled courses' Home/Class Info/Announcements/Content/Syllabus pages) — it may be tied
+    to a role/notice state that's no longer active. The rule is a narrow, safe addition
+    targeting a real previously-observed class; it's just functionally unverified this pass.
+
+`npm run build && npm run typecheck && npm test` all pass (18/18, including five new
+`pathMatchScore` regression cases covering the exact index-route bug plus a
+`/home`-must-not-match-`/homework` boundary check). As always: this covers adapter/detection
+logic only — the CSS-only fixes (items 1, 3, 5–9, 11–12) have no automated coverage and were
+verified live, via computed styles and screenshots (`tools/shots/`, gitignored).
+
+**Explicitly deferred, not attempted this pass:** restructuring Announcements/Groups/Class
+Info/Email into card layouts (still arbitrary native div/table soup — items 5, 7, 8, 9 above
+reach these pages for free without a new adapter, which is the safe ceiling here); Library
+Resources' iframe *interior* (cross-origin, item 11 covers only the frame); a live re-check of
+`.bg-attention` on whatever course/role state originally showed it (item 12).
+
+**Still open after this pass:** the never-audited page types from the fourth pass (Exams,
+Copyright Resources, Prioritizer, Grade Summary, Schedule's Table/Calendar view and its Vue
+mini-calendar widget); the Grades "Course Progress" stat panel (still no non-generic hook);
+the sitewide `.hover\:bg-accent` question; a low-priority tooling fix (some of this project's
+own `tools/audit/*.mjs` scripts verify `:hover` via a synthetic `element.dispatchEvent(new
+MouseEvent(...))`, which never actually triggers CSS `:hover` — switch them to real CDP
+`Input.dispatchMouseEvent`, as this pass's own live checks did, so a future pass doesn't get a
+false "confirmed"); and the real Safari Userscripts install flow (unchanged, see below).
+
 ## Fourth live pass: top-bar dropdowns, modal chrome, and the real font story (Sep 2026)
 
 This pass targeted the seams the third pass explicitly left behind: the top bar's own

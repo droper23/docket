@@ -171,6 +171,31 @@
 }
 
 /**
+ * Bare text-entry inputs — confirmed live (Sep 2026) the only `input` types anywhere on
+ * the site are `text` (Email's "Select from Contacts"/"Add additional email addresses"
+ * fields) and `number` (What-If Calculator's score fields; also checked Groups, Schedule,
+ * Announcements, Syllabus, Content — no other input type turned up, so only these two are
+ * targeted, not a guessed broader list). Both were fully native: sharp corners, native
+ * fill, and — worse — the raw browser default focus outline, a THIRD focus-ring language
+ * next to the correct one radios/checkboxes get above. Given the matching treatment here.
+ */
+[data-docket-reskin] input[type="text"],
+[data-docket-reskin] input[type="number"] {
+  font-family: var(--docket-font) !important;
+  background-color: var(--docket-bg-elevated) !important;
+  border: 1px solid var(--docket-separator) !important;
+  border-radius: var(--docket-radius-sm) !important;
+  color: var(--docket-label) !important;
+  padding: 6px 10px;
+}
+[data-docket-reskin] input[type="text"]:focus-visible,
+[data-docket-reskin] input[type="number"]:focus-visible {
+  outline: 2px solid var(--docket-blue);
+  outline-offset: 2px;
+  border-color: transparent !important;
+}
+
+/**
  * Floating menu chrome — the top bar's own dropdown panels, confirmed live (Sep 2026,
  * dark theme, reskin un-injected) on the Combined Schedule page:
  *

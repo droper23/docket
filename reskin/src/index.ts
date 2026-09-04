@@ -13,6 +13,7 @@ import type { ReskinSettings, Appearance } from "./core/settings.js";
 import { diagnostics, resetDiagnostics } from "./core/diagnostics.js";
 import { observeMutations } from "./lib/observe.js";
 import type { Adapter } from "./adapters/types.js";
+import { getSetting, setSetting } from "./lib/storage.js";
 
 function injectStyles(): void {
   if (document.getElementById("docket-reskin-styles")) return;
@@ -38,13 +39,25 @@ function injectStyles(): void {
  * signal is always available, so there is nothing for it to be a fallback
  * for. Always sets an explicit dark/light attribute — see tokens.css, which
  * has no bare `prefers-color-scheme` fallback path of its own.
+ *
+ * `html.classList.contains("h-full")` (confirmed live present on every real
+ * LearningSuite-rendered page regardless of dark/light) is the actual "site gave a signal"
+ * check, not just "dark is absent" — confirmed live a genuine native error page renders
+ * `<html class="">`, neither `h-full` nor `dark`. Without this, that case fell through to
+ * a hardcoded `light`, flipping a Dark-mode account's whole reskin to light outside the
+ * SPA's own state (Sep 2026 fix). The last real (non-fallback) reading is persisted via
+ * getSetting/setSetting (src/lib/storage.ts) and reused instead, so a stray error page
+ * inherits whatever the user was just actually looking at.
  */
 function applyTheme(appearance: Appearance): void {
   let dark: boolean;
   if (appearance === "dark" || appearance === "light") {
     dark = appearance === "dark";
-  } else {
+  } else if (document.documentElement.classList.contains("h-full")) {
     dark = document.documentElement.classList.contains("dark");
+    setSetting("lastKnownDark", dark);
+  } else {
+    dark = getSetting("lastKnownDark", true);
   }
   document.documentElement.setAttribute("data-docket-theme", dark ? "dark" : "light");
 }

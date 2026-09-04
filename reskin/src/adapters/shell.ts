@@ -9,6 +9,23 @@ let topTabsEl: Element | null = null;
 let fabBar: HTMLElement | null = null;
 
 /**
+ * Boundary-safe path comparison: `current` is considered "on" `link` if they're equal, or
+ * one is a `/`-delimited ancestor of the other — never a raw substring match (so `/home`
+ * never matches `/homework`). Returns a specificity score (higher = more specific match) or
+ * -1 for no match at all, so callers can pick the single best match among several
+ * candidates rather than the first one-directional hit. Exported for direct unit testing
+ * (see test/shell.test.ts) — the exact bidirectional-boundary logic is the part worth
+ * regression-testing in isolation from the rest of restyleNav()'s DOM work.
+ */
+export function pathMatchScore(current: string, link: string): number {
+  const c = current.replace(/\/+$/, "");
+  const l = link.replace(/\/+$/, "");
+  if (c === l) return l.length + 1000; // exact match always wins
+  if (c.startsWith(l + "/") || l.startsWith(c + "/")) return l.length;
+  return -1;
+}
+
+/**
  * Restyles LearningSuite's OWN existing top-level `<nav>` (the left sidebar
  * — Course List / To Do List / Announcements / etc.) in place — never a
  * fabricated replacement with guessed routes (spec §10/§48: clicking a nav
@@ -23,6 +40,31 @@ function restyleNav(): Element | null {
   const links = Array.from(nav.querySelectorAll("a"));
   if (links.length < 2) return null;
   nav.classList.add("docket-nav-enhanced", "docket-scope");
+  // Confirmed live (Sep 2026): landing on a section's shorter index route (e.g.
+  // `/student/home`) with the matching sidebar link pointing at a longer default child
+  // (`/student/home/dashboard`) is the common case, not the exception — a one-directional
+  // `location.pathname.startsWith(href)` check misses it entirely (no row highlighted at
+  // all). Score every link bidirectionally first, then mark only the single best
+  // (most-specific) match active, so a shorter or longer real match can win, but two
+  // links can never both light up for one path.
+  let bestLink: Element | null = null;
+  let bestScore = -1;
+  for (const a of links) {
+    const href = a.getAttribute("href");
+    if (!href) continue;
+    // Confirmed live (Sep 2026): every page carries `<base href="/">`, so these hrefs
+    // (e.g. ".Ska5/cid-.../student/home/dashboard", no leading slash) resolve against the
+    // SITE ROOT, not against the current page path — resolving against `location.href`
+    // instead (as this used to) silently produced a nonsensical doubled-up path that never
+    // matched `location.pathname`, so no sidebar row was EVER marked active, on any page.
+    // `document.baseURI` is exactly the resolved <base>, so this now matches what the
+    // browser itself would actually navigate to on click.
+    const score = pathMatchScore(location.pathname, new URL(href, document.baseURI).pathname);
+    if (score > bestScore) {
+      bestScore = score;
+      bestLink = a;
+    }
+  }
   for (const a of links) {
     a.classList.add("docket-nav-item");
     // Matched purely on the link's own real, already-rendered label text — confirmed live
@@ -36,15 +78,7 @@ function restyleNav(): Element | null {
       icon.classList.add("docket-nav-icon");
       a.insertBefore(icon, a.firstChild);
     }
-    const href = a.getAttribute("href");
-    // Confirmed live (Sep 2026): every page carries `<base href="/">`, so these hrefs
-    // (e.g. ".Ska5/cid-.../student/home/dashboard", no leading slash) resolve against the
-    // SITE ROOT, not against the current page path — resolving against `location.href`
-    // instead (as this used to) silently produced a nonsensical doubled-up path that never
-    // matched `location.pathname`, so no sidebar row was EVER marked active, on any page.
-    // `document.baseURI` is exactly the resolved <base>, so this now matches what the
-    // browser itself would actually navigate to on click.
-    if (href && location.pathname.startsWith(new URL(href, document.baseURI).pathname)) {
+    if (a === bestLink) {
       a.classList.add("docket-nav-item-active");
     }
   }

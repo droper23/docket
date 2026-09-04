@@ -46,6 +46,10 @@
   --docket-yellow-text: #9a6300;
   --docket-purple: #af52de;
   --docket-gray: #8e8e93;
+  /* A tinted-alert fill, not a solid block — matches Apple's own system-yellow banner
+     convention (e.g. Mail/Calendar's "low storage"/permission banners), used for
+     LearningSuite's own native instructor-view banner (.bg-attention in global.css). */
+  --docket-yellow-banner-bg: rgba(255, 204, 0, 0.15);
 
   /* The unified page canvas — applied globally (global.css) to LearningSuite's own chrome
      containers (header, both nav bars, body) so the whole page shares one background instead
@@ -80,6 +84,7 @@
   --docket-yellow-text: #ffd60a;
   --docket-purple: #bf5af2;
   --docket-gray: #8e8e93;
+  --docket-yellow-banner-bg: rgba(255, 214, 10, 0.16);
 
   --docket-canvas: #000000;
   --docket-bg-elevated: rgba(255, 255, 255, 0.08);
