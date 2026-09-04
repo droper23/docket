@@ -1,0 +1,79 @@
+/**
+ * Embedded directly into each panel's own Shadow DOM (see components/settingsPanel.ts
+ * and diagnosticsPanel.ts) — a Shadow root's styles can't leak into LearningSuite's page
+ * and LearningSuite's styles can't leak in either, so this file intentionally repeats a
+ * few tokens from tokens.css rather than depending on it being in scope.
+ *
+ * Dark/light is resolved ONLY from the `data-docket-theme` attribute the host element
+ * carries (set explicitly at mount time in settingsPanel.ts/diagnosticsPanel.ts from the
+ * exact same value src/index.ts's applyTheme() just computed) — never from this file's own
+ * `prefers-color-scheme` query, which could disagree with what the page around the panel is
+ * actually showing (defect: the panel rendering light while the page is dark, or vice
+ * versa). Same pattern for `data-docket-reduced-motion`.
+ */
+:host { all: initial; }
+* { box-sizing: border-box; }
+.backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.32);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 2147483000;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+}
+.sheet {
+  width: min(420px, 92vw);
+  max-height: 86vh;
+  overflow-y: auto;
+  background: var(--sheet-bg, rgba(242,242,247,0.82));
+  backdrop-filter: saturate(180%) blur(24px);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  color: var(--sheet-label, rgba(0,0,0,0.92));
+  border: 0.5px solid var(--sheet-border, rgba(0,0,0,0.06));
+  border-radius: 18px;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.32), 0 2px 8px rgba(0,0,0,0.12);
+}
+:host([data-docket-theme="dark"]) .sheet {
+  --sheet-bg: rgba(28,28,30,0.78);
+  --sheet-label: rgba(255,255,255,0.92);
+  --sheet-border: rgba(255,255,255,0.08);
+}
+.sheet-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 18px 10px; font-size: 17px; font-weight: 700;
+}
+.sheet-close {
+  border: none; background: rgba(120,120,128,0.16); color: inherit;
+  width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 15px;
+}
+.group { margin: 10px 14px 16px; background: rgba(120,120,128,0.08); border-radius: 12px; overflow: hidden; box-shadow: inset 0 0 0 0.5px rgba(120,120,128,0.14); }
+.row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 14px; font-size: 14px; border-bottom: 0.5px solid rgba(120,120,128,0.25);
+  min-height: 44px;
+}
+.row:last-child { border-bottom: none; }
+.row-label { font-weight: 500; }
+.row-detail { font-size: 12px; opacity: 0.55; margin-top: 2px; }
+select, button.seg {
+  font: inherit; border-radius: 8px; border: none; background: rgba(120,120,128,0.16);
+  color: inherit; padding: 5px 9px; cursor: pointer;
+}
+.switch {
+  width: 42px; height: 26px; border-radius: 999px; border: none; cursor: pointer;
+  background: rgba(120,120,128,0.32); position: relative; flex-shrink: 0;
+  transition: background-color 0.15s ease;
+}
+.switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px;
+  border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  transition: transform 0.15s ease;
+}
+.switch[data-on="true"] { background: #34c759; }
+.switch[data-on="true"]::after { transform: translateX(16px); }
+:host([data-docket-reduced-motion="true"]) .switch,
+:host([data-docket-reduced-motion="true"]) .switch::after {
+  transition-duration: 0.001ms;
+}
+.diag-ok { color: #34c759; }
+.diag-warn { color: #ff9500; }
+.footer-note { padding: 4px 18px 16px; font-size: 11px; opacity: 0.5; }

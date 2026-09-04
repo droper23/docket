@@ -1,0 +1,12 @@
+@media (max-width: 480px) {
+  .docket-page { padding: 18px 14px 60px; }
+  .docket-large-title { font-size: 28px; }
+  .docket-course-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .docket-nav-enhanced { font-size: 12px; }
+}
+
+/* Touch targets stay >=44px regardless of viewport per Apple HIG, spec §18/§30. */
+@media (pointer: coarse) {
+  .docket-row { min-height: 48px; }
+  .docket-checkbox { width: 24px; height: 24px; }
+}

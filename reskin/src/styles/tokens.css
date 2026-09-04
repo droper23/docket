@@ -1,0 +1,116 @@
+/**
+ * Apple Human Interface Guidelines system colors/materials/type scale —
+ * chosen per the project brief's closing line: "LearningSuite, if someone at
+ * Apple had designed it," not a copy of Docket's own amber palette.
+ *
+ * Dark/light is resolved by src/index.ts, which always sets an explicit
+ * data-docket-theme="dark"|"light" on <html> — never left to a bare
+ * `prefers-color-scheme` media query. That's deliberate, not an
+ * oversight: confirmed live that LearningSuite has its OWN independent
+ * dark-mode toggle (`html.dark`, a manual per-site setting, not tied to the
+ * OS setting at all) — trusting `prefers-color-scheme` alone meant this
+ * reskin's colors could silently mismatch whatever LearningSuite itself was
+ * actually displaying (e.g. this reskin painting a light theme while
+ * LearningSuite's own page was dark, or vice versa). src/index.ts reads
+ * that real signal first and only falls back to `prefers-color-scheme` when
+ * the setting is "system" and LearningSuite gives no signal either way.
+ *
+ * `--docket-bg-elevated` (used for cards/groups) is a translucent overlay,
+ * not a hardcoded hex, so a card reads as "slightly raised" against
+ * whatever LearningSuite's own surrounding background actually is (also
+ * confirmed live to be neither pure black/white nor Apple's own system
+ * colors — LearningSuite uses its own dark grays, e.g. rgb(53,53,53) for
+ * its page background) instead of imposing a competing, mismatched block
+ * of solid color next to it. Everything is scoped under [data-docket-reskin]
+ * plus a .docket-scope root class on every element this reskin actually
+ * renders, so nothing here can ever apply to LearningSuite's own unrelated
+ * markup — see spec §39 (no bare `*` rule, CSS isolation).
+ */
+[data-docket-reskin] {
+  --docket-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+  --docket-font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+
+  --docket-radius-sm: 8px;
+  --docket-radius-md: 12px;
+  --docket-radius-lg: 20px;
+
+  --docket-blue: #007aff;
+  --docket-red: #ff3b30;
+  --docket-red-orange: #ff5c33;
+  --docket-orange: #ff9500;
+  --docket-green: #34c759;
+  --docket-yellow: #ffcc00;
+  /* Yellow itself is too low-contrast to read as badge TEXT on a light canvas (Apple never
+     uses raw systemYellow as small text either) — this is the readable-as-text variant of
+     the same hue, used only for .docket-badge-yellow's foreground color. */
+  --docket-yellow-text: #9a6300;
+  --docket-purple: #af52de;
+  --docket-gray: #8e8e93;
+
+  /* The unified page canvas — applied globally (global.css) to LearningSuite's own chrome
+     containers (header, both nav bars, body) so the whole page shares one background instead
+     of each panel keeping its own slightly-different native gray. */
+  --docket-canvas: #f2f2f7;
+  /* An overlay tint, not a solid color — cards read as "slightly raised" against whatever
+     --docket-canvas resolves to, without needing a second hardcoded shade to keep in sync. */
+  --docket-bg-elevated: rgba(0, 0, 0, 0.045);
+  --docket-sidebar-bg: rgba(246, 246, 246, 0.78); /* macOS sidebar material */
+  --docket-label: rgba(0, 0, 0, 0.92);
+  --docket-label-secondary: rgba(60, 60, 67, 0.6);
+  --docket-label-tertiary: rgba(60, 60, 67, 0.3);
+  --docket-separator: rgba(60, 60, 67, 0.29);
+  --docket-fill: rgba(120, 120, 128, 0.12);
+  /* Real elevation, not one flat blur: a tight contact shadow (surface meets canvas) layered
+     under a soft, wider ambient shadow (surface floats above canvas) — the single soft blur
+     this used to be read as a flat tinted box, not a raised one. */
+  --docket-shadow: 0 1px 1px rgba(0, 0, 0, 0.04), 0 2px 6px rgba(0, 0, 0, 0.06), 0 10px 26px rgba(0, 0, 0, 0.08);
+  /* A hairline "glass edge" highlight along a surface's top, the way Apple's own translucent
+     materials catch light — combined with --docket-shadow via box-shadow's multi-value list. */
+  --docket-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  color-scheme: light dark;
+}
+
+[data-docket-reskin][data-docket-theme="dark"] {
+  --docket-blue: #0a84ff;
+  --docket-red: #ff453a;
+  --docket-red-orange: #ff6a4d;
+  --docket-orange: #ff9f0a;
+  --docket-green: #30d158;
+  --docket-yellow: #ffd60a;
+  --docket-yellow-text: #ffd60a;
+  --docket-purple: #bf5af2;
+  --docket-gray: #8e8e93;
+
+  --docket-canvas: #000000;
+  --docket-bg-elevated: rgba(255, 255, 255, 0.08);
+  --docket-sidebar-bg: rgba(255, 255, 255, 0.06);
+  --docket-label: rgba(255, 255, 255, 0.92);
+  --docket-label-secondary: rgba(235, 235, 245, 0.6);
+  --docket-label-tertiary: rgba(235, 235, 245, 0.3);
+  --docket-separator: rgba(255, 255, 255, 0.14);
+  --docket-fill: rgba(255, 255, 255, 0.1);
+  /* A dark shadow barely reads against the near-black canvas dark mode uses, so the
+     highlight below (not this shadow) carries most of the actual depth cue here — the
+     shadow stays for surfaces that end up elevated over something lighter than canvas
+     (e.g. a card inside a card) and for parity with the light-mode token shape. */
+  --docket-shadow: 0 1px 1px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.4), 0 16px 40px rgba(0, 0, 0, 0.35);
+  --docket-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .docket-scope * {
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+  }
+}
+/**
+ * The explicit user-facing "Reduce Motion" switch in Settings (settings.ts's
+ * `reducedMotion`, threaded onto <html> as this attribute by
+ * src/index.ts's runAdapters()) — distinct from the OS-level media query above, which
+ * only reflects the system setting, not this reskin's own control. Both apply; either one
+ * suppresses motion.
+ */
+[data-docket-reskin][data-docket-reduced-motion="true"] .docket-scope * {
+  transition-duration: 0.001ms !important;
+  animation-duration: 0.001ms !important;
+}

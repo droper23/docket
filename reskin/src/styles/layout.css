@@ -1,0 +1,44 @@
+.docket-scope { box-sizing: border-box; }
+.docket-scope *, .docket-scope *::before, .docket-scope *::after { box-sizing: inherit; }
+
+.docket-page {
+  /* Deliberately no background here — confirmed live that painting one made this read as a
+     mismatched box sitting inside LearningSuite's own page rather than blending with it.
+     Individual cards/groups carry their own subtle elevated surface instead. */
+  padding: 28px 22px 60px;
+  max-width: 760px;
+  margin: 0 auto;
+}
+.docket-header { margin-bottom: 20px; }
+.docket-section { margin: 26px 0 10px; }
+.docket-day-header {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 4px 4px 8px;
+}
+.docket-day-count {
+  font-size: 12px; color: var(--docket-label-tertiary); font-weight: 600;
+}
+
+.docket-course-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+.docket-course-card {
+  background: var(--docket-bg-elevated);
+  border-radius: var(--docket-radius-md);
+  box-shadow: var(--docket-shadow), var(--docket-highlight);
+  padding: 16px;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  transition: background-color 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.docket-course-card:hover { background: var(--docket-fill); }
+.docket-course-card .docket-dot { margin-bottom: 10px; }
+
+.docket-toggle-original {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; color: var(--docket-blue);
+  background: none; border: none; cursor: pointer; padding: 6px 2px; margin-top: 4px;
+}

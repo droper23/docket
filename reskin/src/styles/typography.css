@@ -1,0 +1,13 @@
+/* Apple's type scale (Large Title / Title / Headline / Body / Subhead / Footnote / Caption). */
+.docket-scope {
+  font-family: var(--docket-font);
+  color: var(--docket-label);
+  -webkit-font-smoothing: antialiased;
+}
+.docket-large-title { font-size: 34px; font-weight: 700; letter-spacing: 0.01em; margin: 0 0 4px; }
+.docket-title { font-size: 22px; font-weight: 700; margin: 0 0 2px; }
+.docket-headline { font-size: 17px; font-weight: 600; margin: 0; }
+.docket-body { font-size: 15px; font-weight: 400; line-height: 1.45; margin: 0; }
+.docket-subhead { font-size: 13px; color: var(--docket-label-secondary); margin: 0; }
+.docket-footnote { font-size: 12px; color: var(--docket-label-secondary); margin: 0; }
+.docket-caption { font-size: 11px; color: var(--docket-label-tertiary); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }

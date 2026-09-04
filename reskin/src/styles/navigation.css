@@ -1,0 +1,224 @@
+/**
+ * Applied to LearningSuite's OWN existing top-level nav element in place
+ * (see adapters/shell.ts) — never a fabricated replacement nav with guessed
+ * routes. Styled like macOS's sidebar material / Reminders' list switcher:
+ * a translucent bar, pill-shaped active state, no invented icons on links
+ * whose destination we can't independently verify.
+ *
+ * `background-color` (not the `background` shorthand) with `!important`:
+ * confirmed live this element also carries LearningSuite's own
+ * `.bg-left-nav` utility class, which global.css deliberately leaves alone
+ * for every OTHER `.bg-left-nav` element (body) so the plain sitewide
+ * canvas rule doesn't apply here — but without `!important` here too, any
+ * equal-or-higher-specificity native rule on the same element could still
+ * win by source order. Both column layout (`nav`'s own native `flex-col`)
+ * and this vertical sidebar's row treatment below (`padding`/`gap` reused
+ * as vertical spacing, since `.docket-nav-enhanced` never overrides
+ * `flex-direction`) were confirmed live to already compose correctly —
+ * only the fill color was ever actually broken.
+ */
+.docket-nav-enhanced {
+  display: flex !important;
+  gap: 2px;
+  padding: 6px;
+  background-color: var(--docket-sidebar-bg) !important;
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-radius: var(--docket-radius-md);
+  box-shadow: var(--docket-shadow), var(--docket-highlight);
+  font-family: var(--docket-font);
+  overflow-x: auto;
+}
+.docket-nav-enhanced .docket-nav-item {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px;
+  font-family: var(--docket-font) !important;
+  font-size: 13px !important;
+  font-weight: 590 !important;
+  color: var(--docket-label) !important;
+  text-decoration: none !important;
+  padding: 8px 12px !important;
+  border-radius: var(--docket-radius-sm) !important;
+  white-space: nowrap;
+  background-color: transparent !important;
+  transition: background-color 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.docket-nav-enhanced .docket-nav-item:hover { background-color: var(--docket-fill) !important; }
+.docket-nav-enhanced .docket-nav-item-active {
+  background-color: var(--docket-blue) !important;
+  color: #fff !important;
+}
+/* Matched by real label text in shell.ts's restyleNav() — see icons.ts's navIconByLabel.
+   Secondary/muted at rest so the label text stays the primary read, full label color when
+   the row is active (inherits currentColor, so both states come free from .docket-icon's
+   own `stroke: currentColor`). */
+.docket-nav-enhanced .docket-nav-icon {
+  width: 16px !important;
+  height: 16px !important;
+  flex-shrink: 0;
+  color: var(--docket-label-secondary);
+}
+.docket-nav-enhanced .docket-nav-item-active .docket-nav-icon {
+  color: #fff;
+}
+
+/**
+ * The course-level top tab strip (Home/Content/Exams/Grades/Schedule/
+ * Syllabus, see adapters/shell.ts's restyleTopTabs()). LearningSuite fills
+ * the active tab with a solid highlight color by default; this swaps that
+ * for an Apple-tab-bar-style underline instead, on top of LearningSuite's
+ * own real tabs/hrefs — never a replacement bar.
+ */
+.docket-top-tabs .docket-top-tab {
+  font-family: var(--docket-font) !important;
+  font-size: 13px !important;
+  font-weight: 590 !important;
+  color: var(--docket-label-secondary) !important;
+  text-decoration: none !important;
+  background: transparent !important;
+  border-bottom: 2px solid transparent !important;
+  transition: color 0.16s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.docket-top-tabs .docket-top-tab:hover {
+  color: var(--docket-label) !important;
+}
+.docket-top-tabs .docket-top-tab-active {
+  color: var(--docket-blue) !important;
+  border-bottom-color: var(--docket-blue) !important;
+}
+
+.docket-floating-bar {
+  position: fixed;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  right: 18px;
+  z-index: 2147483000;
+  display: flex;
+  gap: 8px;
+}
+.docket-fab {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: var(--docket-sidebar-bg);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  box-shadow: var(--docket-shadow), var(--docket-highlight);
+  border: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  color: var(--docket-label);
+  transition: background-color 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.docket-fab:hover { background: var(--docket-fill); }
+.docket-icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+/**
+ * Real native form controls, not this reskin's own inserted markup — confirmed live the
+ * only `appearance: auto` native controls anywhere on the site are `<input type="radio">`
+ * in LearningSuite's own Preferences dialog (Display: Light/Dark/Attempt-to-detect/Classic
+ * Mode) and, by the same tag, any native checkbox. This is a safe, bounded, unambiguous tag
+ * selector — unlike bare `<button>`/`<select>` (deliberately never touched, see global.css's
+ * own file comment), a radio/checkbox input only ever means "choose an option," never
+ * "open a menu," so there's no risk of silently breaking an unrelated control.
+ *
+ * `appearance: none` also strips the browser's native focus ring, so a `:focus-visible`
+ * replacement below is not optional — without one this would ship a real keyboard-
+ * accessibility regression on the one native form control on the whole site.
+ */
+[data-docket-reskin] input[type="radio"],
+[data-docket-reskin] input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  flex-shrink: 0;
+  position: relative;
+  border: 1.5px solid var(--docket-label-tertiary);
+  background-color: var(--docket-bg-elevated);
+  cursor: pointer;
+  transition: background-color 0.16s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+[data-docket-reskin] input[type="radio"] { border-radius: 50%; }
+[data-docket-reskin] input[type="checkbox"] { border-radius: 5px; }
+[data-docket-reskin] input[type="radio"]:checked,
+[data-docket-reskin] input[type="checkbox"]:checked {
+  border-color: var(--docket-blue);
+  background-color: var(--docket-blue);
+}
+[data-docket-reskin] input[type="radio"]:checked::after {
+  content: "";
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #fff;
+  transform: translate(-50%, -50%);
+}
+[data-docket-reskin] input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  top: 2px; left: 6px;
+  width: 5px; height: 10px;
+  border-right: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  transform: rotate(45deg);
+}
+[data-docket-reskin] input[type="radio"]:focus-visible,
+[data-docket-reskin] input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--docket-blue);
+  outline-offset: 2px;
+}
+
+/**
+ * Floating menu chrome — the top bar's own dropdown panels, confirmed live (Sep 2026,
+ * dark theme, reskin un-injected) on the Combined Schedule page:
+ *
+ * - Account menu (Messages/Preferences/Help/Logout): container
+ *   `div.header-userdropdown-dropdown` wrapping `ul ... bg-base border-info lg:rounded`
+ *   (right-anchored at `lg:right-0 lg:mr-6`).
+ * - Course/term switcher ("All courses" at top level; the identical component also serves
+ *   the course-scoped term switcher — same container class, one fix covers both):
+ *   container `div.header-coursedropdown-dropdown` wrapping `ul ... bg-base border-info
+ *   sm:rounded`.
+ *
+ * Both panels rendered natively as a solid rgb(36,36,36) box, 4px radius, NO shadow and
+ * NO backdrop blur sitting on top of an otherwise-redesigned page — the seam this pass
+ * was opened to eliminate. The containers themselves stay untouched (zero-height
+ * position-only wrappers; the `ul` does all the visual work). LearningSuite's own
+ * `transition-all duration-100 origin-top` open/close animation on the `ul` is confirmed
+ * live and deliberately NOT overridden — only fill/radius/shadow change here.
+ *
+ * Material: same translucent recipe as `.docket-nav-enhanced` above but more opaque
+ * (menus float over arbitrary page content, not a sidebar's quiet edge), so text stays
+ * readable in both themes. The first `background-color` declaration is a deliberate
+ * fallback for engines without `color-mix` — such engines keep the previous opaque
+ * canvas fill instead of an unreadably transparent menu. The glass-edge highlight rides
+ * along in the same box-shadow list as everywhere else (--docket-highlight).
+ */
+[data-docket-reskin] .header-userdropdown-dropdown > ul,
+[data-docket-reskin] .header-coursedropdown-dropdown > ul {
+  background-color: var(--docket-canvas) !important;
+  background-color: color-mix(in srgb, var(--docket-canvas) 85%, transparent) !important;
+  border-radius: var(--docket-radius-md) !important;
+  box-shadow: var(--docket-shadow), var(--docket-highlight);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+}
+
+/**
+ * Menu-row hover, scoped to the two confirmed surfaces (never sitewide): the header
+ * dropdown rows are `li.pt-1.pb-1.hover:bg-accent` / `li.py-1.px-3.hover:bg-accent`, and
+ * inside the Preferences sheet the timezone-picker options are
+ * `div.cursor-pointer.text-primary.hover\:bg-accent`. Natively the hover fill is
+ * LearningSuite's accent color (var(--ac)); here it becomes the same neutral fill every
+ * other hoverable row in the redesign uses. A sitewide `.hover\:bg-accent` remap was
+ * considered and deliberately deferred — it is a Tailwind-style utility that could sit on
+ * unconfirmed non-menu elements; extend only after re-auditing wherever it next appears
+ * (noted in ROADMAP.md).
+ */
+[data-docket-reskin] .header-userdropdown-dropdown li.hover\:bg-accent:hover,
+[data-docket-reskin] .header-coursedropdown-dropdown li.hover\:bg-accent:hover,
+[data-docket-reskin] .popupWrapper .hover\:bg-accent:hover {
+  background-color: var(--docket-fill) !important;
+}

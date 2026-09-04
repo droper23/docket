@@ -1,0 +1,7 @@
+node_modules/
+dist-test/
+tools/.chrome-audit-profile/
+# Live-audit screenshots contain the real authenticated account's name and courses —
+# referenced by ROADMAP.md as local artifacts, never committed (public repo).
+tools/shots/
+.DS_Store

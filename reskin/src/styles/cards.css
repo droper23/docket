@@ -1,0 +1,74 @@
+/* Apple "grouped list" idiom (Reminders/Settings/Mail): a rounded card containing
+   hairline-divided rows, not Docket's individually-bordered tile cards. */
+.docket-group {
+  background: var(--docket-bg-elevated);
+  border-radius: var(--docket-radius-md);
+  box-shadow: var(--docket-shadow), var(--docket-highlight);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.docket-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 0.5px solid var(--docket-separator);
+  min-height: 44px; /* Apple's minimum touch target */
+  transition: background-color 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.docket-group .docket-row:last-child { border-bottom: none; }
+.docket-row-tappable { cursor: pointer; }
+.docket-row-tappable:hover { background: var(--docket-fill); }
+.docket-row-tappable:active { background: var(--docket-fill); }
+
+.docket-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+.docket-row-main { flex: 1; min-width: 0; }
+.docket-row-title { font-size: 15px; font-weight: 600; color: var(--docket-label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.docket-row-subtitle { font-size: 13px; color: var(--docket-label-secondary); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.docket-row-trailing { flex-shrink: 0; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--docket-label-secondary); }
+.docket-chevron { width: 8px; height: 8px; border-top: 1.6px solid var(--docket-label-tertiary); border-right: 1.6px solid var(--docket-label-tertiary); transform: rotate(45deg); flex-shrink: 0; }
+
+.docket-row-body { padding: 0 16px 14px 38px; font-size: 13px; color: var(--docket-label-secondary); line-height: 1.5; }
+.docket-row-body p { margin: 0 0 8px; white-space: pre-wrap; }
+
+.docket-link-chip {
+  display: inline-block;
+  font-size: 12px;
+  padding: 4px 10px;
+  margin: 0 6px 6px 0;
+  border-radius: 999px;
+  background: var(--docket-fill);
+  color: var(--docket-blue);
+  text-decoration: none;
+}
+
+.docket-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 999px;
+}
+.docket-badge-red { background: color-mix(in srgb, var(--docket-red) 16%, transparent); color: var(--docket-red); }
+.docket-badge-red-orange { background: color-mix(in srgb, var(--docket-red-orange) 18%, transparent); color: var(--docket-red-orange); }
+.docket-badge-orange { background: color-mix(in srgb, var(--docket-orange) 16%, transparent); color: var(--docket-orange); }
+.docket-badge-yellow { background: color-mix(in srgb, var(--docket-yellow) 22%, transparent); color: var(--docket-yellow-text); }
+.docket-badge-gray { background: var(--docket-fill); color: var(--docket-label-secondary); }
+.docket-badge-blue { background: color-mix(in srgb, var(--docket-blue) 16%, transparent); color: var(--docket-blue); }
+.docket-badge-green { background: color-mix(in srgb, var(--docket-green) 16%, transparent); color: var(--docket-green); }
+
+.docket-empty { text-align: center; padding: 40px 20px; color: var(--docket-label-secondary); font-size: 14px; }
+
+.docket-checkbox {
+  width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
+  border: 1.6px solid var(--docket-label-tertiary);
+  display: flex; align-items: center; justify-content: center;
+}
+.docket-checkbox-done { border-color: var(--docket-green); background: var(--docket-green); }
+.docket-checkbox-done::after {
+  content: ""; width: 5px; height: 9px;
+  border-right: 1.8px solid #fff; border-bottom: 1.8px solid #fff;
+  transform: rotate(45deg) translate(-1px, -1px);
+}
