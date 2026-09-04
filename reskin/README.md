@@ -37,6 +37,17 @@ platform — only the userscript manager that runs it differs.
 3. In Safari, open this script's install URL:
    `https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js`
    Userscripts recognizes the `.user.js` extension and offers to install it.
+
+   **If nothing happens:** this almost always means the extension doesn't have permission to
+   run on `raw.githubusercontent.com` — narrowly scoping it to only `learningsuite.byu.edu`
+   (step 2 above) means it has no way to see the file to offer an install prompt.
+   [Userscripts' own docs](https://github.com/quoid/userscripts) recommend broader site access
+   for exactly this reason. The reliable fix that sidesteps the permission question entirely:
+   open the **Userscripts extension itself** (its popup/sidebar, not a webpage), tap **"+"** →
+   **"New Remote,"** and paste the install URL above — it fetches and installs the script
+   directly, without Safari needing to detect anything on the page. (Alternative: grant the
+   extension access to `raw.githubusercontent.com`, or temporarily "Always Allow," reopen the
+   URL, then re-narrow permission back to `learningsuite.byu.edu` afterward.)
 4. Visit `learningsuite.byu.edu` and sign in normally (your regular BYU/Duo login — this
    script never sees or asks for your password).
 
@@ -70,6 +81,11 @@ is the only real path** on Apple's mobile OS. The app is free on the
 3. In Safari, open this script's install URL:
    `https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js`
    Userscripts recognizes the `.user.js` extension and offers to install it.
+
+   **If nothing happens:** same cause and fix as the macOS section above — the extension
+   most likely can't see `raw.githubusercontent.com` because step 2 scoped it to only
+   `learningsuite.byu.edu`. Open the Userscripts app itself, use its **"+" → "New Remote"**
+   option, and paste the install URL there instead of relying on Safari to detect it.
 4. Visit `learningsuite.byu.edu` and sign in normally with your BYU NetID + Duo.
 
 **Updating** works the same as on the Mac (re-open the same install URL). **Turning it
