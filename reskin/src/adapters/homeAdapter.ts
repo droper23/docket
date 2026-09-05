@@ -3,6 +3,7 @@ import { looksLikeScheduleListView } from "../core/pageDetector.js";
 import { overlayContent, markProcessed, isProcessed, h } from "../lib/dom.js";
 import type { Overlay } from "../lib/dom.js";
 import { assignmentCard } from "../components/assignmentCard.js";
+import { icons } from "../components/icons.js";
 import { parseSlashDate, formatIsoDate } from "../lib/parseDueText.js";
 import { dayLabel } from "../../../src/core/agendaFormatting.js";
 import { daysUntilInSchoolTimeZone } from "../../../src/core/schoolTime.js";
@@ -54,6 +55,23 @@ function extractItems(main: Element): ScheduleItem[] {
   return results;
 }
 
+/**
+ * Accumulates items across mount() calls, keyed by the anchor element.
+ * mount()'s second pass extracts only NEWLY-appeared anchors (every real
+ * anchor is already marked processed), so re-rendering from just that batch
+ * wiped everything previously rendered (confirmed live Sep 2026: 65 rendered
+ * rows → 0 after one trivial DOM mutation). Every mount() call now merges
+ * its batch into this accumulator and re-renders from the merged map, so a
+ * later pass can only ever ADD rows, never drop them.
+ */
+const accumulated = new Map<HTMLElement, ScheduleItem>();
+
+function mergedItemsSorted(): ScheduleItem[] {
+  const items = [...accumulated.values()];
+  items.sort((x, y) => x.dateIso.localeCompare(y.dateIso));
+  return items;
+}
+
 function groupByDate(items: ScheduleItem[]): { dateIso: string; items: ScheduleItem[] }[] {
   const groups: { dateIso: string; items: ScheduleItem[] }[] = [];
   for (const item of items) {
@@ -77,10 +95,14 @@ export const homeAdapter: Adapter = {
     const items = extractItems(main);
     if (!items.length && !overlay) return;
 
-    for (const i of items) markProcessed(i.anchor, "scheduleitem");
+    for (const i of items) {
+      markProcessed(i.anchor, "scheduleitem");
+      accumulated.set(i.anchor, i);
+    }
     processedAnchors.push(...items.map((i) => i.anchor));
 
-    const groups = groupByDate(items).map((g) =>
+    // Always re-render from the FULL accumulated set (see accumulated's doc).
+    const groups = groupByDate(mergedItemsSorted()).map((g) =>
       h("div", { class: "docket-section" }, [
         h("div", { class: "docket-day-header" }, [
           h("div", { class: "docket-headline" }, [dayLabel(g.dateIso)]),
@@ -106,7 +128,13 @@ export const homeAdapter: Adapter = {
     if (overlay && dayList) {
       dayList.replaceChildren(...groups);
     } else {
-      dayList = h("div", {}, groups.length ? groups : [h("div", { class: "docket-empty" }, ["Nothing in the next two weeks."])]);
+      dayList = h(
+        "div",
+        {},
+        groups.length
+          ? groups
+          : [h("div", { class: "docket-empty" }, [icons.checklist(), h("span", {}, ["Nothing in the next two weeks."])])],
+      );
       const backToCards = h("button", { class: "docket-toggle-original" }, ["← Back to card view"]);
       backToCards.addEventListener("click", () => overlay?.setOriginalHidden(true));
       const view = h("div", { class: "docket-scope docket-page" }, [
@@ -122,7 +150,10 @@ export const homeAdapter: Adapter = {
     overlay?.remove();
     overlay = null;
     dayList = null;
-    for (const a of processedAnchors) a.removeAttribute("data-docket-scheduleitem");
+    for (const a of processedAnchors) {
+      a.removeAttribute("data-docket-scheduleitem");
+      accumulated.delete(a);
+    }
     processedAnchors = [];
   },
 };

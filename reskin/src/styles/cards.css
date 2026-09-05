@@ -20,6 +20,12 @@
 .docket-row-tappable { cursor: pointer; }
 .docket-row-tappable:hover { background: var(--docket-fill); }
 .docket-row-tappable:active { background: var(--docket-fill); }
+/* Real keyboard-focusable widget (tabindex="0" + role="button", see assignmentCard.ts) —
+   without this it was reachable by keyboard but gave zero visual signal when focused. */
+.docket-row-tappable:focus-visible {
+  outline: 2px solid var(--docket-blue);
+  outline-offset: -2px;
+}
 
 .docket-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 
@@ -59,7 +65,23 @@
 .docket-badge-blue { background: color-mix(in srgb, var(--docket-blue) 16%, transparent); color: var(--docket-blue); }
 .docket-badge-green { background: color-mix(in srgb, var(--docket-green) 16%, transparent); color: var(--docket-green); }
 
-.docket-empty { text-align: center; padding: 40px 20px; color: var(--docket-label-secondary); font-size: 14px; }
+/* Apple empty-state idiom (Reminders' "No Reminders", Mail's "No Unread Mail"): a large
+   muted glyph over a short, calm line of text, not a bare sentence sitting in whitespace. */
+.docket-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--docket-label-secondary);
+  font-size: 14px;
+}
+.docket-empty svg {
+  width: 34px;
+  height: 34px;
+  color: var(--docket-label-tertiary);
+}
 
 .docket-checkbox {
   width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;

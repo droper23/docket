@@ -18,7 +18,9 @@
   background: rgba(0, 0, 0, 0.32);
   display: flex; align-items: center; justify-content: center;
   z-index: 2147483000;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  /* Inter first — the bundled face (registered document-wide by the reskin's main <style>;  
+   * @font-face registrations reach into shadow roots) so panels match the page on every OS. */
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
 }
 .sheet {
   width: min(420px, 92vw);
@@ -45,6 +47,18 @@
   border: none; background: rgba(120,120,128,0.16); color: inherit;
   width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 15px;
 }
+/* A Shadow DOM root inherits none of the page's own focus styling (or global.css's own
+   :focus-visible rules — those can't cross the boundary either), so every real button/select
+   in this panel needs its own ring defined right here, matching the same recipe used
+   everywhere else in the reskin. */
+.sheet-close:focus-visible,
+.swatch:focus-visible,
+.switch:focus-visible,
+select:focus-visible,
+button.seg:focus-visible {
+  outline: 2px solid #007aff;
+  outline-offset: 2px;
+}
 .group { margin: 10px 14px 16px; background: rgba(120,120,128,0.08); border-radius: 12px; overflow: hidden; box-shadow: inset 0 0 0 0.5px rgba(120,120,128,0.14); }
 .row {
   display: flex; align-items: center; justify-content: space-between;
@@ -52,7 +66,24 @@
   min-height: 44px;
 }
 .row:last-child { border-bottom: none; }
+.row-col { flex-direction: column; align-items: stretch; gap: 10px; }
 .row-label { font-weight: 500; }
+/* Settings > Background: macOS-System-Settings-style swatch strip (see
+   settingsPanel.ts backgroundRow()). Selection ring uses the system accent —
+   the same affordance the Appearance pane's highlight-color row uses. */
+.swatch-row { display: flex; gap: 8px; }
+.swatch {
+  width: 34px; height: 34px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--swatch, #f2f2f7);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.12);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.swatch:hover { transform: scale(1.06); }
+.swatch:active { transform: scale(0.96); }
+.swatch[data-selected="true"] {
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08), 0 0 0 2.5px var(--sheet-bg, rgba(242,242,247,0.82)), 0 0 0 4.5px #007aff;
+}
+:host([data-docket-reduced-motion="true"]) .swatch { transition-duration: 0.001ms; }
 .row-detail { font-size: 12px; opacity: 0.55; margin-top: 2px; }
 select, button.seg {
   font: inherit; border-radius: 8px; border: none; background: rgba(120,120,128,0.16);

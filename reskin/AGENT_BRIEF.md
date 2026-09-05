@@ -1,270 +1,258 @@
-# Brief: finish the Apple-HIG reskin + write a cross-browser/mobile install README
+# Agent brief: real-usage UX/performance issues (Sep 2026)
 
-Copy this whole file as your prompt. You are a fresh agent with no memory of prior
-sessions — everything you need is either in this file or in the repo files it points to.
-Read them before writing any code.
+## Mission
 
-## What this project is
+This is a Safari/Chrome/Firefox userscript (`reskin/`) that restyles BYU LearningSuite
+(`learningsuite.byu.edu`) in place to look like an Apple-designed app, without replacing any
+of LearningSuite's own functionality. It has been through several live-audited design passes
+(see `ROADMAP.md` — read it in full before touching anything, especially the two most recent
+entries) that fixed a long list of styling/color-discipline/accessibility bugs. This next pass
+is different in kind: it's feedback from someone actually **using** the redesigned site
+day-to-day, not a design critique. Several of these are real functional bugs, not taste, and
+this brief includes concrete, code-grounded leads for most of them — verify each one live
+before writing a fix, per this project's own established discipline (no guessed selectors,
+everything traced to real DOM confirmed against a real authenticated account).
 
-`reskin/` inside `/Users/derek/Code/School/learningsuite-project` is a userscript that
-visually re-skins BYU LearningSuite (`learningsuite.byu.edu`) to look like an app Apple
-designed — system colors, grouped lists, translucent materials, real dark mode — while
-LearningSuite itself keeps doing everything it already does (sign-in, submitting
-assignments, grades, everything). This is a CSS/DOM overlay only, never a reimplementation.
+**The user's own instruction on method:** *"The agent should be actively taking lots of
+screenshots to get an accurate idea of how the page looks and take inspiration from websites
+like Apple's home page and the About Google page for UI/UX design."* Take that literally —
+screenshot liberally at every stop (before and after each fix), and hold the result up against
+the restraint, whitespace, and typographic confidence of `apple.com` and Google's "About"
+pages, not just "does it have rounded corners and a blue accent now."
 
-**Read these in full before touching anything:**
-- `reskin/README.md` — architecture, install/dev loop, current (incomplete) install docs
-- `reskin/ROADMAP.md` — three prior "confirmed live" passes, each documenting exactly what
-  was verified against the real site and why. Read all three; they explain *why* the code
-  looks the way it does, and repeat their own reasoning rather than re-deriving it
-- `docs/THREAT_MODEL.md` (repo root) — the non-negotiable security posture, see below
-- Every file under `reskin/src/` — it's a small codebase (~15 files), read all of it, not
-  just the ones you think you'll touch
+## Required reading before starting
 
-## Two deliverables
+- `ROADMAP.md` — full history of what's been tried, confirmed, and deferred. Do not
+  re-investigate something already documented as a confirmed dead end without new evidence.
+- `docs/THREAT_MODEL.md` and this project's own `PRIVACY.md` — hard constraints, not
+  suggestions: no `innerHTML` on LearningSuite content, no network contact except
+  `learningsuite.byu.edu` itself, no guessed CSS selectors, no bare `<button>`/`<select>`
+  rules (LearningSuite reuses bare `<button>` for dropdown triggers with no styling — see
+  `global.css`'s own file comment for why a blanket rule there is unsafe).
+- `src/adapters/*.ts`, `src/core/pageDetector.ts`, `src/lib/observe.ts`, `src/index.ts` — the
+  actual mount/detect/re-render architecture; several issues below trace into this loop, not
+  just CSS.
+- The live-injection testing technique already established in this project: `tools/cdp.mjs` +
+  the pattern in `tools/audit/*.mjs` — build (`npm run build`), strip the `==UserScript==`
+  metadata header off `dist/learningsuite-reskin.user.js`, inject the rest into a real
+  authenticated tab, re-inject after every full navigation (LearningSuite reloads the whole
+  page between sections, which wipes injected JS).
 
-1. **Extend the reskin to the LearningSuite surfaces that still aren't touched** — the top
-   bar's own dropdown panels, remaining font coverage, and every page type nobody has
-   audited yet (Email, Exams, Syllabus, Announcements, Schedule/Calendar, Groups, Library
-   Resources, Class Info, Copyright Resources, Prioritizer, Grade Summary, What If
-   Calculator). See "What's not done yet" below for specifics and suggested strategy.
-2. **Write a real README section covering install on every browser and on mobile** —
-   desktop Safari (partially documented already), desktop Chrome/Firefox/Edge (briefly
-   documented already), iOS/iPadOS, and Android. See "The README" below for what's
-   confirmed vs. what you need to verify yourself before writing it down.
+## Issues to investigate and fix
 
-Do both. Neither is optional. If you only have time for one, do #1 first — the README is
-useless if the thing it's installing doesn't work.
+### 1. Content flashes in, then disappears — "especially the Combined Schedule"
 
-## Non-negotiable constraints (violating any of these is a regression, not a improvement)
+**This one has a concrete, code-confirmed lead — start here.**
+`src/adapters/homeAdapter.ts`'s `mount()` (lines ~74-120): `extractItems()` skips any anchor
+already marked `isProcessed(a, "scheduleitem")` (line 41), so a second call only returns
+**newly appeared** items, not the full set. But `mount()`'s render branch does:
+```ts
+if (overlay && dayList) {
+  dayList.replaceChildren(...groups);   // groups can be EMPTY on a re-run
+}
+```
+On the very next debounced re-render (any DOM mutation anywhere in `document.body` triggers
+this via `observeMutations` in `src/index.ts`, 150ms debounce), `groups` is very likely `[]`
+(all real anchors already marked processed) — `dayList.replaceChildren()` with no arguments
+**wipes every previously-rendered day out to nothing**. This matches the reported symptom
+exactly, and also explains the follow-up detail from the user ("Today did end up loading
+after initially disappearing, but only after a long time"): if LearningSuite's own Vue
+component renders the 300+-item schedule progressively, each later debounced pass only
+recaptures whatever *new* anchors just appeared, and `replaceChildren` wipes out the prior
+groups instead of merging — so the final state may also be an incomplete schedule, not just
+delayed. Fix direction: don't wholesale-replace `dayList`'s children with only this pass's
+incremental batch — accumulate/merge groups across calls (e.g., keep a persistent
+date-keyed map of rendered items across the adapter's lifetime, append newly-extracted items
+into it, and only re-render from the merged accumulator), or re-extract the full item set
+every time instead of skipping already-processed anchors. Confirm live with a version that
+logs each `mount()` call's `items.length` / `groups.length` to the console while watching the
+Combined Schedule page load, to nail the exact sequence before picking a fix.
 
-From `docs/THREAT_MODEL.md`, and from this project's own established discipline (read
-`global.css`'s file-header comment — it explains this in its own words):
+Also check whether this same class of bug exists elsewhere ("when going to different sites" —
+plural) — `src/adapters/courseListAdapter.ts` looks safer (it has an
+`isProcessed(main, "courselist")` early-return guard that skips *all* re-render work once
+mounted, not just extraction), but confirm live rather than assuming.
 
-- Never `innerHTML` any LearningSuite-derived string (a course name, a link, anything read
-  off the page). `src/lib/dom.ts`'s `h()`/`svgIcon()` + `textContent` only.
-- Never contact any host but `learningsuite.byu.edu`. No analytics, no backend, no CDN.
-- **Every CSS selector in `global.css`/`navigation.css` must target a class name you have
-  personally confirmed live against the real site.** Never guess. Never use a bare `*`
-  selector. Never write a bare `<button>` or `<select>` rule — LearningSuite reuses `button`
-  for unstyled dropdown triggers (turning all of them into filled pills breaks menus), and
-  no confirmed-safe `<select>` has been found yet anywhere on the site. If you can't confirm
-  a selector live, don't ship a rule for it — leave it and note the gap in ROADMAP.md instead.
-- Every adapter (`src/adapters/*.ts`) must fail soft: if `mount()` throws, the registry in
-  `src/index.ts` unmounts it and leaves LearningSuite's native UI completely untouched.
-  Never let a broken adapter partially wreck a page.
-- Compatibility Mode (the Settings-panel toggle) must keep working as a full escape hatch
-  back to native LearningSuite layout, on every page you touch.
-- `@match` in `build.mjs` stays scoped to `https://learningsuite.byu.edu/*` only.
-- Never reimplement a real LearningSuite action (submit, grade calc, navigation) — UI
-  polish only; the actual behavior always stays LearningSuite's own code path.
+Secondary, lower-confidence lead worth checking while you're in `src/lib/observe.ts`: the
+`applying` flag is set/cleared synchronously inside `run()` (itself invoked via
+`setTimeout`), but `MutationObserver` callbacks fire as a microtask **after** the current
+task (including `run()`'s `finally` block) has already completed — meaning `applying` may
+already be back to `false` by the time the observer callback that was triggered by our own
+DOM writes actually runs, so `if (applying) return;` may not be preventing self-triggered
+re-scheduling the way the file's own comment claims it does. This could explain repeated
+unnecessary re-render passes contributing to issue #8 (slowness) even outside the
+Schedule-specific bug above. Verify with real logging (call counts over time on a page with
+heavy DOM activity), don't just reason about it statically — timing here is subtle and worth
+confirming empirically.
 
-## What's already done (don't redo, don't contradict)
+### 2. Settings (gear) button should be on the left, not the right
 
-Confirmed live, current as of the last pass:
+Trivial CSS fix — `src/styles/navigation.css`, `.docket-floating-bar` (~line 91):
+`right: 18px` → `left: 18px`. No `responsive.css` override currently touches this rule, but
+check live at a narrow/mobile viewport width that a left-anchored FAB doesn't collide with
+the sidebar or any mobile nav toggle before shipping it.
 
-- **Adapters** (`src/adapters/registry.ts`): `courseListAdapter` (Course List → card grid),
-  `assignmentsAdapter` (Assignments page + the Grades page's identical-markup table both
-  now correctly get the right treatment — see `src/core/pageDetector.ts`'s
-  `looksLikeAssignmentsPage()`, which explicitly excludes Grades via LearningSuite's own
-  active-top-tab signal, `.bg-top-nav-highlight`), `homeAdapter` (Combined Schedule List
-  view → day-grouped agenda). No other page has a JS adapter, and that's deliberate — see
-  "strategy" below for why before you consider adding one.
-- **Sitewide CSS remap** (`src/styles/global.css`) covers, on every page, not just adapted
-  ones: canvas unification (`body`, `header`, `.bg-top-nav`, `.bg-header`), the sidebar
-  `<nav>`'s per-row native fill (`.navItem`), `h1`–`h3`, LearningSuite's real text-color
-  utility classes (`.text-primary`/`-primary-alt`/`-action`/`-highlight`/`-info`),
-  `.bg-accent`/`.bg-gray1` (category header bars), `.goBtn`/`.bg-action` (real action
-  buttons, with a `:focus-visible` ring), the border-color family
-  (`border-gray*`/`.border-light`/`.border-info`/bare `.border`), the
-  `.bg-base.text-highlight` highlighted-row combo (rounded + hover fill — this is what
-  makes the native Grades AND Assignments tables both look like a grouped list), and
-  instructor-authored rich text (`.instructorText.font-nunito` → the Apple font).
-- **Native form controls**: `input[type=radio]`/`input[type=checkbox]` are fully re-skinned
-  (`src/styles/navigation.css`) with a `:focus-visible` replacement ring — this was, as of
-  the last pass, the *only* confirmed native `appearance:auto` control anywhere on the site.
-- **A real icon system**: `src/components/icons.ts` has 21 stroke icons + a
-  `navIconByLabel` lookup table, matched against a nav link's own real `textContent` in
-  `src/adapters/shell.ts`'s `restyleNav()` (decorative only, never a fabricated
-  destination, graceful no-icon fallback). Covers every sidebar/sub-nav/top-tab label
-  confirmed live so far (Dashboard, Announcements, Assignments, Learning Outcomes, Email,
-  Library Resources, Groups, Class Info, Course List, All Courses, Combined Schedule,
-  Schedule, Prioritizer, Grade Summary, Grades, Grade Scale, What If Calculator, Copyright
-  Resources, Content, Exams, Syllabus, Home).
-- **Real material depth**: `tokens.css`'s `--docket-shadow` is a two-layer shadow (tight
-  contact + soft ambient) plus a `--docket-highlight` glass-edge inset border, applied to
-  every card/group/nav/fab surface, with spring-ish `cubic-bezier(0.16,1,0.3,1)` transitions
-  replacing flat `ease`.
-- **Theme correctness**: `src/index.ts`'s `applyTheme()` trusts *only* LearningSuite's own
-  `html.dark` class (never `prefers-color-scheme` — that was a confirmed live bug, now
-  fixed), with a `MutationObserver` on `<html>`'s `class` attribute so toggling
-  LearningSuite's own Dark Mode switch is caught instantly. Settings/Diagnostics panels
-  (Shadow DOM) thread that same resolved theme explicitly rather than using their own
-  `prefers-color-scheme` query.
-- **Settings**: `appearance`, `useCompanionNav`, `compatibilityMode`, `showUpcomingOnHome`,
-  `reducedMotion` — all wired end-to-end (the switch, the storage, and a real CSS effect).
+### 3. Customizable background — new feature, not a bug
 
-## What's NOT done yet
+There is currently no way to customize the app's background at all —
+`src/core/settings.ts`'s `ReskinSettings` has `appearance`/`useCompanionNav`/
+`compatibilityMode`/`showUpcomingOnHome`/`reducedMotion`, nothing background-related, and
+`--docket-canvas` in `tokens.css` is a fixed value per theme. Design and build a real setting
+for this, following the existing settings-panel pattern (`src/components/settingsPanel.ts`,
+persisted via `src/lib/storage.ts`'s `getSetting`/`setSetting`, applied via a
+`data-docket-*` attribute or a CSS custom property override the way `data-docket-theme`/
+`data-docket-reduced-motion` already work). At minimum: a custom accent/canvas color picker,
+consistent with how macOS System Settings' Appearance pane and iOS's wallpaper picker feel —
+a curated palette of a few HIG-appropriate options is likely more "Apple-designed" than a
+raw color-picker input, but use your judgment and check what actually looks good live.
 
-Everything below was either explicitly flagged as out-of-scope in the last pass (because no
-confirmed-safe selector existed yet) or was simply never visited. None of it has been
-live-audited with the specificity this project requires — that audit is your first step for
-each item, not something you can skip by reading this brief.
+### 4. "All the fonts should be the same, and should look good. This looks generic."
 
-**Top bar (explicitly named as a gap by the person who requested this pass):**
-- The course/term switcher dropdown panel (the popup that opens from "FALL 2026 · EC EN
-  224 – Introduction to Computer Sys ▾" in the header) — confirmed last pass to have a real
-  `.border-info` class (already remapped to the separator color), but its *background*,
-  *shadow*, and *border-radius* were never confirmed or styled. Right now it's very likely
-  rendering as an unstyled native dropdown sitting on top of an otherwise-reskinned page —
-  exactly the kind of visible seam this project has spent three passes eliminating
-  elsewhere. Audit its real DOM (`document.querySelector` from the live page, not a guess)
-  and give it the same translucent-material treatment `.docket-nav-enhanced` already gets.
-- The account/avatar dropdown menu (Messages / Preferences / Help / Logout, opened from
-  the user's name top-right) — same treatment needed; audit first.
-- The "ALL COURSES ▾" dropdown on the top-level Course List page (a different page context
-  from the course-scoped term switcher above — confirm whether it's the same component or
-  a different one before assuming one fix covers both).
+Read `tokens.css`'s `--docket-font` stack first:
+`-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial,
+sans-serif`. **This is very likely the actual root cause, and it depends entirely on what
+platform/browser this is being tested on** — confirm that first, don't guess:
+- `-apple-system`/`BlinkMacSystemFont` only resolve to real San Francisco on macOS (in Safari
+  or Chrome) and iOS/iPadOS Safari.
+- On Windows, Android, or Linux — including Chrome or Firefox on those platforms — none of
+  those keywords are recognized, "SF Pro Text"/"SF Pro Display" aren't installed fonts there
+  either, and the stack falls all the way through to **plain Arial** — which would look
+  exactly as "generic" as reported.
+- If earlier passes' live verification was done on a platform where the fallback silently
+  succeeded (e.g. macOS Chrome), this generic-Arial failure mode could have gone completely
+  unnoticed until now.
 
-**Fonts:** only `body`, `h1`–`h3`, `.bg-action`/`.goBtn`, and `.instructorText.font-nunito`
-have confirmed font-family overrides. A live census on the Grades page found LearningSuite's
-own branded font-family class (`.font-metro`) only appears on 4 elements sitewide (all
-already covered) — but that census was done on exactly one page (Grades). It has not been
-repeated on any of the untouched page types below. Do that census on each new page you
-touch: `document.querySelectorAll('[class*="font-"]')`, check what's rendering in a
-non-Apple font, find its real class, remap it in `global.css` next to the existing font
-rules (don't invent a new file section for this — extend the existing pattern).
+If that's confirmed as the cause, the real fix is to stop depending on an OS-provided font
+existing at all: bundle an actual open-license font (e.g. **Inter**, SIL OFL-licensed, widely
+regarded as the closest well-supported alternative to San Francisco's proportions and a
+common choice for exactly this "looks native everywhere" problem) as a `@font-face` with the
+font file embedded as a base64 `data:` URI directly inside the built CSS. This is the only
+way to add a real font **without violating this project's own privacy promise** (`PRIVACY.md`,
+`THREAT_MODEL.md` — no network contact besides `learningsuite.byu.edu` itself; a `data:` URI
+makes zero network requests, unlike pulling from Google Fonts or any other CDN, which is not
+an option here). Budget for the bundle-size increase (a couple of font weights as base64 will
+add real KB to the single-file script — check the resulting `dist/` file size stays
+reasonable) and confirm live, on whatever platform reproduces the "generic" complaint, that
+text now renders the bundled font instead of falling back.
 
-**Page types never live-audited at all:** Email, Exams, Syllabus, Announcements (the real
-one — not the Dashboard's schedule-derived agenda), Schedule in Table/Calendar view (the
-mini-calendar-with-dots sidebar widget + the day-by-day table — confirmed last pass to be
-custom Vue components with no confirmed stable class names; this is real, not laziness —
-verify selectors before writing any CSS for it), Groups, Library Resources, Class Info,
-Copyright Resources, Prioritizer, Grade Summary, What If Calculator (this one almost
-certainly has real `<input type="number">` or similar grade-simulation fields — a good,
-bounded, safe target once confirmed, same reasoning as the radio/checkbox work).
+Separately: re-confirm there isn't *also* a residual inconsistency between adapter-inserted
+UI (which uses `--docket-font` via `typography.css`'s classes) and native LearningSuite text
+that some selector still misses — take screenshots of a few different page types side by side
+and look for any visibly different typeface within the same page, not just theoretical gaps.
 
-**The native "Course Progress" stat panel** on Grades (Current Progress / Total Course
-Progress numbers) — confirmed last pass to have no distinctive class
-(`py-3 flex justify-between border-b text-lg gap-2 px-4`, pure generic Tailwind utilities).
-It improves incidentally from the border/font work but has no bespoke "big stat number"
-treatment. Only add one if you find a real, confirmed, non-generic hook — don't invent a
-structural selector (like `nth-child`) that could silently break if LearningSuite reorders
-its own markup.
+### 5. Grade Summary page defaults to the Courses (Course List) card grid
 
-**The Preferences dialog's own outer chrome** (the modal itself, not the radios inside it,
-which are already done) — flagged as a good idea last pass but never confirmed live. Find
-its real wrapper class before giving it sheet-style rounding/shadow.
+**This one also has a concrete, code-confirmed lead.** `src/core/pageDetector.ts`'s
+`looksLikeCourseListPage()`:
+```ts
+const hasClickableRowShape = doc.querySelectorAll("main p.cursor-pointer").length > 1;
+return hasAnchorShape || hasClickableRowShape;
+```
+`main p.cursor-pointer` is a very loose, generic shape (any page with 2+ clickable `<p>`
+elements inside `<main>`, no other confirming signal). If Grade Summary renders each course's
+grade as a `<p class="cursor-pointer">` row (plausible: a per-course breakdown list, each row
+clickable through to that course), it would satisfy this exact same shape and get matched by
+`courseListAdapter` — which is checked first in `src/adapters/registry.ts`'s array — instead
+of being left alone (there is no Grade Summary adapter). This is the same class of bug as the
+already-fixed Assignments/Grades collision documented in this file's own comment on
+`looksLikeAssignmentsPage()` a few lines below: a DOM-shape-only check with no real
+disambiguating signal. Confirm live (open Grade Summary, inspect its actual DOM — is it really
+`p.cursor-pointer` rows? how many?), then add the same kind of real disambiguator the
+Assignments fix used (LearningSuite's own active-tab/section signal, e.g.
+`.bg-top-nav-highlight` or whatever the live DOM actually shows on Grade Summary vs. real
+Course List) rather than guessing a path segment.
 
-## Strategy (what actually worked in prior passes — follow this, don't reinvent it)
+### 6. Course page's Schedule view "looks super ugly"
 
-1. **Live-audit before you write a single selector.** This project has browser automation
-   tooling available (in Claude Code, the `claude-in-chrome` MCP tools — `tabs_context_mcp`,
-   `navigate`, `javascript_tool`, `computer` for screenshots). Log into a real
-   `learningsuite.byu.edu` account, navigate to the page you're working on, and run small
-   `javascript_tool` snippets to dump real class names, computed styles, and DOM structure —
-   exactly like `document.querySelectorAll('.font-metro')` or checking `el.className` on
-   the specific element you're about to target. Never write a CSS rule for a class name you
-   haven't seen in a real query result this session.
-2. **To test the built bundle live**, since Safari's Userscripts app can't itself be
-   automated: run `npm run build`, read the resulting `dist/learningsuite-reskin.user.js`,
-   strip the `// ==UserScript==` metadata block (everything before the `"use strict";`
-   line), and `javascript_tool`-eval the rest directly into a live authenticated tab. This
-   is exactly how every prior pass validated its work — it's not a hack, it's the
-   established loop. Re-inject after every full-page navigation (LearningSuite reloads
-   between top-level sections, which wipes injected JS).
-3. **Prefer CSS-only fixes over new JS adapters.** A new adapter (restructuring a page into
-   cards) is only appropriate when the DOM shape is confirmed stable *and* not
-   instructor-authored freeform content. Content/Announcements/Syllabus were confirmed last
-   pass to be arbitrary instructor-authored rich text (`.instructorText` blocks with
-   unpredictable nested structure) — not safe to restructure, CSS-only font/color/spacing
-   harmonization is the ceiling there. The Schedule Calendar widget is a custom Vue
-   component with unconfirmed internals — audit thoroughly before deciding whether a CSS
-   pass is even safe, let alone an adapter.
-4. **When you extend `global.css`, match its existing voice**: a comment explaining what
-   you confirmed live and why the selector is scoped the way it is, cross-referencing other
-   files the way the file already does (e.g. its own comment about why `.bg-base` alone is
-   deliberately never touched). A reviewer with zero context should be able to read your
-   comment and know it's not a guess.
-5. **Any new page-detection logic** (a new adapter, or a change to when the sidebar/top-tab
-   restyling applies) needs a fixture-based regression test in `test/pageDetector.test.ts`
-   or `test/adapters.test.ts`, following the existing pattern (see the Grades/Assignments
-   collision test already there as a template).
-6. **Update `ROADMAP.md`** with a new "Nth live pass" section in the same style as the
-   three that already exist — what you found, what you fixed, what's still a known gap
-   after your pass. This is how the project accumulates trustworthy history instead of
-   each pass re-litigating the last one's claims.
+**Prime suspect, added in the immediately prior pass** — `src/styles/global.css`'s bare
+`[data-docket-reskin] table` rule (search for the comment starting "Native `<table>`..."):
+```css
+[data-docket-reskin] table {
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: var(--docket-radius-md);
+  overflow: hidden;
+  box-shadow: var(--docket-shadow), var(--docket-highlight);
+  background-color: var(--docket-bg-elevated);
+}
+```
+This was added and live-verified against **Grade Scale only**. If the course-scoped
+Schedule's Table view (or the mini-calendar widget's day grid) also uses a real `<table>`
+underneath — contradicting an earlier pass's note that it was "a custom Vue component with
+no stable class names" — this rule would now apply there too, and would visibly break a dense
+calendar-style grid: `border-collapse: separate` with `border-spacing: 0` turns shared
+hairlines between adjacent cells into doubled/thicker borders (a classic "instant ugly grid"
+regression), and `overflow: hidden` would clip anything that's meant to overflow the table's
+bounds (a popover, a sticky header, a tooltip). Confirm live whether Schedule's ugliness
+traces to this rule first — it's the highest-probability, fastest thing to check — before
+investigating anything else. If confirmed, scope the rule away from Schedule specifically
+(e.g. exclude via `:not()` on a real confirmed class, or narrow the selector to only the
+actual Grade Scale table's confirmed class) rather than reverting the Grade Scale
+improvement entirely.
 
-## Verification (definition of done)
+If it's not the table rule, then this needs the real live audit the earlier "out of scope"
+note admitted was never done properly — screenshot it, find whatever real, stable selectors
+actually exist this time, and give it genuine card/spacing/elevation treatment consistent
+with the rest of the redesign.
 
-1. `cd reskin && npm run build && npm run typecheck && npm test` — all passing. Note in
-   your final report that this covers adapter/detection *logic* only; CSS-only changes have
-   zero automated coverage in this repo, so say so explicitly rather than implying test
-   passage proves the visual work.
-2. Live screenshots (both LearningSuite native themes — toggle via the real Preferences
-   dialog, not simulated) of every page you touched, before and after.
-3. If you touched the top bar dropdowns specifically: screenshot them *open*, not just the
-   trigger, in both themes.
+### 7. Clicking a sidebar link: font visibly gets bigger, looks disjointed, before the next page loads
 
----
+Check `build.mjs`'s userscript metadata block first: `@run-at document-idle` — this is the
+**latest possible** injection point (after the entire page, including images, has finished
+loading). On every full-page navigation (LearningSuite reloads the whole page between
+sections — there's no client router), this guarantees a real window where the raw native
+LearningSuite page is fully visible with its own native font sizing before this script does
+anything at all. The most recent pass added explicit type-scale sizes to native headings
+(`h1: 28px`, etc., in `global.css`) — if LearningSuite's native size is smaller, that exact
+jump (small → suddenly 28px) at an unpredictable, possibly-late moment would look precisely
+like what's being reported. Fix direction: change `@run-at` to inject the `<style>` block as
+early as possible (`document-start`, with the CSS/style-injection part specifically not
+gated on `DOMContentLoaded` the way adapter mounting still needs to be — a `<style>` tag can
+usually be appended even before `document.head` exists by falling back to
+`document.documentElement`, or by polling for `document.head` at `document-start`). Confirm
+live with screen recordings of an actual sidebar-click navigation, before and after, since
+"before loading the next page" is a bit ambiguous as reported — pin down the exact visual
+sequence first.
 
-## The README: install on every browser and on mobile
+### 8. Overall: poor UX, slow, still looks ugly
 
-`reskin/README.md` currently documents desktop Safari (via the Userscripts app — this is
-solid, keep it) and has a brief, likely-thin section on desktop Chrome/Firefox/Edge via
-Tampermonkey/Violentmonkey. Neither iOS/iPadOS nor Android is documented at all. Write that
-now, as a new section (or restructured section — use your judgment on the best structure,
-but don't bury mobile as an afterthought; a lot of BYU students' primary device for this is
-their phone).
+This is likely the cumulative effect of #1 (re-render churn/flashing), #6 (a real visual
+regression), and #7 (late injection causing FOUC on every navigation) rather than one
+separate thing — fix those first, then re-assess with fresh eyes and fresh screenshots
+whether a distinct performance problem remains. If it does, profile actual navigation/render
+timing live (Chrome DevTools Performance panel via the CDP tooling, or simple
+`performance.now()` logging around `boot()`/`runAdapters()`) rather than guessing at causes —
+candidates worth checking with real numbers, not assumptions: the debounced
+`MutationObserver` re-running `runAdapters()` (and therefore every adapter's `matches()`
+check plus a full DOM query pass) more often than necessary given #1's finding above; the
+`overlayContent()` pattern hiding rather than removing original content, roughly doubling
+live DOM node count on large pages (300+-item schedules, big course lists) with no
+virtualization; and `backdrop-filter: blur(20px)` now applied fairly widely (nav, dropdowns,
+tables) — expensive to paint/composite, worth checking whether it's actually janky on a real
+device rather than just "sounds expensive."
 
-**What's already confirmed for you (verified via web search near this brief's writing —
-re-verify anything time-sensitive like store links or version numbers before publishing,
-since this can drift):**
+## Constraints (non-negotiable, same as every prior pass)
 
-- **iOS/iPadOS: Safari + the Userscripts app remains the only real path.** Apple requires
-  every iOS browser to use its WebKit engine and its own extension APIs — a non-Safari iOS
-  browser cannot run a Safari userscript-manager extension. Orion (Kagi's browser) has
-  *preliminary* Chrome/Firefox extension support on iOS/iPadOS and reportedly lists some
-  form of userscript manager among its extensions, but this is new and less established
-  than Safari + Userscripts — worth a "if you want to try something newer" footnote, not
-  the primary recommendation, unless you personally verify it works well for this script.
-- **Android has two real, current options, not one:**
-  - **Firefox for Android (v110+)** now supports Tampermonkey *and* Violentmonkey as real
-    extensions, installed straight from `addons.mozilla.org` (the same add-on store as
-    desktop Firefox, just filtered to Android-compatible extensions) — no sideloading, no
-    special build. This is probably the simplest Android path to document as primary.
-  - **Kiwi Browser** (a Chromium fork that supports real Chrome extensions on Android,
-    unlike stock Chrome for Android) + Tampermonkey installed as an actual extension (not
-    the separate, much more limited "Tampermonkey for Android" standalone app, which only
-    runs scripts inside its own isolated WebView and cannot inject into any other browser —
-    do not recommend that one).
-  - Do **not** recommend the standalone "Tampermonkey" app from the Play Store by itself —
-    confirm this distinction yourself before writing the README, since getting this wrong
-    sends a student down a dead end.
+- No third-party network requests beyond `learningsuite.byu.edu` itself (a bundled font as a
+  `data:` URI is fine; loading one from a CDN is not).
+- No `innerHTML` on any LearningSuite-originated content; DOM builders / `textContent` only.
+- No guessed CSS selectors or URL path segments — everything traced to real, live-confirmed
+  DOM, the same discipline `pageDetector.ts`'s own comments demonstrate throughout.
+- No bare `<button>`/`<select>` rules (see `global.css`'s file comment for why).
+- A broken adapter must never take down the page — the existing try/catch/unmount fallback
+  in `src/index.ts`'s `runAdapters()` already guarantees this; don't weaken it.
 
-**What you need to verify yourself, live, before publishing:**
-- The exact current install steps for each path above (menu labels, button text, and
-  screenshots if you're able to capture them change across app updates — describe the
-  *flow*, don't just assert it works).
-- Whether granting narrowest-permission ("only learningsuite.byu.edu", never "all sites")
-  is expressible the same way in Kiwi/Firefox-Android's extension permission UI as it is in
-  desktop Safari's — if the mobile UI doesn't offer per-site scoping the same way, say so
-  plainly rather than implying parity with the desktop instructions already in the README.
-- Whether `GM_getValue`/`GM_setValue` (which `src/lib/storage.ts` already falls back to
-  `localStorage` for) behaves the same across these managers — the existing code should
-  just work, but confirm you're not introducing a false claim either way.
+## Deliverables
 
-**Strategy for writing this well:**
-- Match the existing README's tone and structure — it already has good precedent (see the
-  "Chrome, Firefox, Edge" section for the voice to extend, and the numbered desktop-Safari
-  steps for the level of concreteness expected).
-- Lead each platform section with the single recommended path, then a secondary option only
-  if genuinely useful (don't list five options with no guidance — that's worse than one good
-  one).
-- Keep the "Turning it off" and "Compatibility Mode" guidance's spirit consistent across
-  every platform section — a mobile user needs to know how to bail out just as much as a
-  desktop one.
-- If you cannot verify something live (e.g. you don't have access to an actual Android
-  device/emulator), say so in your final report rather than writing confident-sounding
-  install steps you didn't actually walk through. A wrong "confirmed" install guide is worse
-  than an honest "untested, here's the documented flow" one.
+1. Fixes for as many of #1–#8 as get confirmed and resolved, each grounded in a live check,
+   not assumption — say plainly in your final report which ones you fixed vs. which turned
+   out to need more investigation than this pass could close out.
+2. `npm run build && npm run typecheck && npm test` passing.
+3. A new entry in `ROADMAP.md` in the established style (check the file's current latest
+   dated entry and number this one accordingly — don't hardcode an assumed number here).
+   Include real before/after screenshots' worth of description even though the images
+   themselves aren't committed (see `tools/shots/`'s existing `.gitignore` entry and why).
+4. Do **not** commit or push — stop after implementation and live verification, and report
+   back a concise summary (what was confirmed live vs. assumed correctly by this brief, what
+   changed per file, test/build results, and the outcome of each live-verification
+   checkpoint) so the diff can be reviewed before it ships.

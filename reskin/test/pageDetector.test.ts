@@ -20,6 +20,17 @@ test("looksLikeCourseListPage: false once the URL itself is course-scoped", () =
   assert.equal(looksLikeCourseListPage(), false);
 });
 
+test("looksLikeCourseListPage: false on Grade Summary, whose per-course cid- anchors previously triggered a full card-grid takeover (regression, Sep 2026)", () => {
+  const gradeSummaryHtml = `<main>
+    <h1>Course Grade Summary</h1>
+    <div><a href=".ORi6/cid-9R_ouvfPP1_r/student/home">DANCE 280 (003) - Social Dance, Technique 1</a></div>
+    <div><a href=".ORi6/cid-Kkcc7zi3RXcJ/student/home">EC EN 224 (001) - Introduction to Computer Systems</a></div>
+    <div><a href=".ORi6/cid-meOTckV8t7qV/student/home">EC EN 225 (001) - Computer System Design</a></div>
+  </main>`;
+  setupDom(gradeSummaryHtml, "https://learningsuite.byu.edu/.ORi6/student/top/summary");
+  assert.equal(looksLikeCourseListPage(), false);
+});
+
 test("looksLikeAssignmentsPage: true on a course-scoped URL with real assignment rows present", () => {
   setupDom(assignmentsHtml, "https://learningsuite.byu.edu/cid-abc123/student/assignments");
   assert.equal(looksLikeAssignmentsPage(), true);

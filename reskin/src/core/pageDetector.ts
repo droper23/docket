@@ -24,17 +24,29 @@ export function isScheduleUrl(pathname: string = location.pathname): boolean {
 /**
  * Course List page detection. `src/connectors/bookmarklet.ts`'s
  * courseListExtractorSource() relies on several `cid-...` course links
- * inside `<main>` — that shape is checked first, but confirmed LIVE against
- * a real account (Sep 2026) to no longer be how this page actually renders:
- * each row is now a Vue `<p class="cursor-pointer">` with a click handler
- * and no static href anywhere (the courseID only appears in the resulting
- * URL after the handler runs — see adapters/courseListAdapter.ts). Checking
- * for that shape too is what makes detection work again on the current
- * page; either way, a course-scoped URL (`cid-` already in the URL itself)
- * is never a Course List page.
+ * inside `<main>` — that shape is checked first. Re-confirmed live Sep 2026:
+ * the current Course List renders real `<a href="cid-...">` rows again (the
+ * click-handler-only `<p class="cursor-pointer">` shape an earlier pass
+ * documented appears per-term; both shapes are kept as OR'd signals for
+ * exactly that reason, and the clickable-shape fixture stays as its test);
+ * either way, a course-scoped URL (`cid-` already in the URL itself) is
+ * never a Course List page, and Grade Summary is excluded explicitly — see
+ * the comment inside.
  */
 export function looksLikeCourseListPage(doc: Document = document): boolean {
   if (courseIdFromUrl()) return false;
+  // Grade Summary false positive (confirmed live Sep 2026,
+  // tools/audit/34..41): /top/summary renders "Course Grade Summary" with one
+  // `cid-` anchor per course inside its per-course summary panels — the same
+  // hasAnchorShape below — so courseListAdapter mounted over it and replaced
+  // the whole page with a card grid. Neither URL shape nor top-tab signal
+  // disambiguates (the summary page has no distinct .bg-top-nav-highlight —
+  // both it and the real Course List read "Home"), but each page's own <h1>
+  // is stable and distinct ("Course List" vs "Course Grade Summary"), so the
+  // page's own title is the real disambiguator here, exactly like the
+  // Assignments/Grades fix below used the top-tab title.
+  const mainTitle = doc.querySelector("main h1")?.textContent?.trim() ?? "";
+  if (/grade/i.test(mainTitle)) return false;
   const hasAnchorShape = doc.querySelectorAll("main a[href*='cid-']").length > 1;
   const hasClickableRowShape = doc.querySelectorAll("main p.cursor-pointer").length > 1;
   return hasAnchorShape || hasClickableRowShape;

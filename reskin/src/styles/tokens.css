@@ -27,7 +27,14 @@
  * markup — see spec §39 (no bare `*` rule, CSS isolation).
  */
 [data-docket-reskin] {
-  --docket-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+  /* Inter first (Sep 2026 pass, issue #4): the previous stack only resolved to real
+   * San Francisco on Apple platforms — on Windows/Android/Linux every keyword missed and
+   * text fell through to plain Arial, which is exactly the "generic" look reported. The
+   * bundled Inter (font-inter.css, base64 data: URI, zero network requests) guarantees the
+   * SAME well-drawn typeface on every platform/browser, and being SF-proportioned it keeps
+   * the Apple-designed feel on macOS too. The OS keywords stay after it as a fallback if
+   * the @font-face ever fails to parse, then Helvetica/Arial, then sans-serif. */
+  --docket-font: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
   --docket-font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 
   --docket-radius-sm: 8px;
@@ -75,6 +82,13 @@
 }
 
 [data-docket-reskin][data-docket-theme="dark"] {
+  /* Background tint overrides (Settings > Background, Sep 2026 pass): same six curated
+   * choices in both themes, each with a light + dark value. Tints sit close to the theme's
+   * own canvas so LearningSuite's near-black/near-white text stays readable on every one
+   * (see settings.ts BACKGROUND_CHOICES). Applied to <html> as `data-docket-background` by
+   * src/index.ts; "default" simply never writes the attribute, so these rules don't fire.
+   * Each rule below carries the full [data-docket-reskin][data-docket-theme][data-docket-background]
+   * attribute chain so it out-specifies (not just out-orders) the base dark canvas above. */
   --docket-blue: #0a84ff;
   --docket-red: #ff453a;
   --docket-red-orange: #ff6a4d;
@@ -100,6 +114,43 @@
      (e.g. a card inside a card) and for parity with the light-mode token shape. */
   --docket-shadow: 0 1px 1px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.4), 0 16px 40px rgba(0, 0, 0, 0.35);
   --docket-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* Dark-theme background tints — see the comment inside the dark block above.
+   Graphite intentionally keeps the pure-black canvas ("darker than default" is its whole
+   point, matching macOS's Graphite accent being the neutral option). */
+[data-docket-reskin][data-docket-theme="dark"][data-docket-background="graphite"] {
+  --docket-canvas: #000000;
+}
+[data-docket-reskin][data-docket-theme="dark"][data-docket-background="blue"] {
+  --docket-canvas: #0b1220;
+}
+[data-docket-reskin][data-docket-theme="dark"][data-docket-background="purple"] {
+  --docket-canvas: #150b20;
+}
+[data-docket-reskin][data-docket-theme="dark"][data-docket-background="rose"] {
+  --docket-canvas: #1c0a10;
+}
+[data-docket-reskin][data-docket-theme="dark"][data-docket-background="sand"] {
+  --docket-canvas: #16120a;
+}
+
+/* Light-theme background tints — same six choices as dark; each stays close enough to
+   LearningSuite's own light canvas that near-black labels keep their contrast. */
+[data-docket-reskin][data-docket-theme="light"][data-docket-background="graphite"] {
+  --docket-canvas: #e8e8ed;
+}
+[data-docket-reskin][data-docket-theme="light"][data-docket-background="blue"] {
+  --docket-canvas: #e4edf8;
+}
+[data-docket-reskin][data-docket-theme="light"][data-docket-background="purple"] {
+  --docket-canvas: #eee7f8;
+}
+[data-docket-reskin][data-docket-theme="light"][data-docket-background="rose"] {
+  --docket-canvas: #f8e7ea;
+}
+[data-docket-reskin][data-docket-theme="light"][data-docket-background="sand"] {
+  --docket-canvas: #f7f1e5;
 }
 
 @media (prefers-reduced-motion: reduce) {

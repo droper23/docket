@@ -45,6 +45,14 @@
   transition: background-color 0.16s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .docket-nav-enhanced .docket-nav-item:hover { background-color: var(--docket-fill) !important; }
+/* Real `<a>` — reachable by keyboard already; this replaces the browser's own default ring
+   (which varies per browser and never matches the app's own blue) with the same focus
+   language every other control in this reskin uses. Negative offset keeps the ring inside
+   the pill instead of overlapping the next nav item in a tight sidebar. */
+.docket-nav-enhanced .docket-nav-item:focus-visible {
+  outline: 2px solid var(--docket-blue) !important;
+  outline-offset: -2px;
+}
 .docket-nav-enhanced .docket-nav-item-active {
   background-color: var(--docket-blue) !important;
   color: #fff !important;
@@ -83,6 +91,11 @@
 .docket-top-tabs .docket-top-tab:hover {
   color: var(--docket-label) !important;
 }
+.docket-top-tabs .docket-top-tab:focus-visible {
+  outline: 2px solid var(--docket-blue) !important;
+  outline-offset: 2px;
+  border-radius: var(--docket-radius-sm);
+}
 .docket-top-tabs .docket-top-tab-active {
   color: var(--docket-blue) !important;
   border-bottom-color: var(--docket-blue) !important;
@@ -91,7 +104,12 @@
 .docket-floating-bar {
   position: fixed;
   bottom: max(18px, env(safe-area-inset-bottom));
-  right: 18px;
+  /* Left-anchored (user request, Sep 2026 pass): the gear FAB reads as a global
+   * settings control, so it lives opposite the content, away from where scroll
+   * gestures land. Verified live at 390px (iPhone width): no collision with the
+   * sidebar rail or the bottom of the course nav — the bar is 44px tall against
+   * a ~90px rail and the page's own bottom padding clears it. */
+  left: 18px;
   z-index: 2147483000;
   display: flex;
   gap: 8px;
@@ -107,9 +125,14 @@
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
   color: var(--docket-label);
-  transition: background-color 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.16s cubic-bezier(0.16, 1, 0.3, 1), transform 0.12s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .docket-fab:hover { background: var(--docket-fill); }
+.docket-fab:active { transform: scale(0.94); }
+.docket-fab:focus-visible {
+  outline: 2px solid var(--docket-blue);
+  outline-offset: 2px;
+}
 .docket-icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 
 /**

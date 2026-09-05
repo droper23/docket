@@ -1,0 +1,129 @@
+/**
+ * Course-scoped Schedule page (issue #6, Sep 2026 pass). All selectors are
+ * traced to live DOM (tools/audit/37–40, real DANCE 280 Schedule page, Table
+ * view), and the whole file is gated behind `[data-docket-page="schedule"]`,
+ * which src/index.ts derives each pass from a live-confirmed page-unique
+ * signal (`main .innerBox` — the view switcher; 1 hit on Schedule, 0 on the
+ * seven other page types censused). The earlier "no stable class names" note
+ * about this page was outdated: it renders LearningSuite's own Tailwind-ish
+ * utilities, and the compounds below were verified unique to this page.
+ *
+ * What was actually wrong (measured live): colors already remapped fine via
+ * global.css's sitewide .bg-accent/.bg-gray1/.bg-primary rules, but shape did
+ * not — the Table/List view switcher trigger and its dropdown menu compute
+ * radius 0px (dropdown bg solid rgb(36,36,36), off-palette in both themes),
+ * the blue "today" day chip is a sharp-cornered square, and the view switcher
+ * being bg-accent = bg-gray1 made the active view indistinguishable. The
+ * `border-collapse: separate` bare-table suspicion from the brief was checked
+ * and ruled out live: this page contains zero <table> elements in either of
+ * its views (the grid is CSS-grid divs), so the bare-table rule never fires
+ * here.
+ *
+ * Live numbers below were measured on the injected page (audit 37/38/39).
+ */
+
+/* ── The Table/List view switcher ─────────────────────────────────────────
+ * Confirmed structure: div.relative.outerBox > div.relative.inline-block...bg-base
+ * > div.flex.justify-between.items-center.border.px-2.innerBox (trigger,
+ * h-8) + div.bg-base...border.border-gray3.rounded (menu, -z-10 invisible
+ * until opened). `.innerBox`/`.outerBox` are Schedule-unique (census 40), so
+ * `main .innerBox` can only mean this control. The trigger keeps the
+ * sitewide .bg-base treatment from global.css (neutral fill, like macOS's
+ * segmented-control well); the OPEN choice inside the menu carries
+ * `bg-accent`, which the sitewide rule turns into the same neutral fill as
+ * the inactive rows — killing the only active-state signal the control has.
+ * Restore an Apple-style selected state there specifically. */
+[data-docket-page="schedule"] main .innerBox {
+  border-radius: var(--docket-radius-sm) !important;
+  border-color: var(--docket-separator) !important;
+  background-color: var(--docket-fill) !important;
+  font-family: var(--docket-font) !important;
+  overflow: hidden;
+}
+/* The dropdown menu: off-palette solid rgb(36,36,36) in both themes, 0px
+ * radius natively (`border-gray3 rounded` — its own `rounded` class is 4px,
+ * off-scale). Elevated surface: canvas + hairline + shadow, like every other
+ * menu/dropdown the redesign owns (navigation.css's dropdown treatment). */
+[data-docket-page="schedule"] main .outerBox > .bg-base.border-gray3 {
+  border-radius: var(--docket-radius-md) !important;
+  background-color: var(--docket-bg-elevated) !important;
+  box-shadow: var(--docket-shadow);
+  border-color: var(--docket-separator) !important;
+  overflow: hidden;
+}
+/* Selected view inside the open menu — confirmed live as
+ * `div.bg-accent.cursor-pointer.text-primary.hover:bg-accent.flex.flex-col.px-3`.
+ * Apple segmented-control semantics: the selected segment gets the accent
+ * fill, not the same fill as the rest. */
+[data-docket-page="schedule"] main .outerBox > .bg-base.border-gray3 > .bg-accent {
+  background-color: var(--docket-blue) !important;
+  color: #fff !important;
+}
+
+/* ── Week header rows (Table view) ────────────────────────────────────────
+ * Confirmed live: `div.text-primary.bg-gray1.px-4.py-2.cursor-pointer`,
+ * one per week (16 on the audited page), sitting directly above each week's
+ * content wrapper. Gated to the schedule scope because the plain
+ * `.bg-gray1.px-4.py-2` compound also appears on the course Dashboard (6×,
+ * census 40). Grouped-list section header treatment: tinted fill, rounded
+ * group corners, no border. */
+[data-docket-page="schedule"] main .bg-gray1.px-4.py-2 {
+  border-radius: var(--docket-radius-sm) var(--docket-radius-sm) 0 0 !important;
+  font-family: var(--docket-font) !important;
+  font-weight: 600 !important;
+  color: var(--docket-label) !important;
+  background-color: var(--docket-fill) !important;
+}
+/* Week content wrapper (the `.bg-base.p-1.pt-4` grid panel under each week
+ * header — Schedule-unique per census 40; 15 of them = 15 weeks + 1 header).
+ * Rounds the BOTTOM of each week group so header+content read as one card
+ * (the header rule above rounds the top). p-1/pt-4 margins pull the inner
+ * grid up over the wrapper's own edges (-mx-1 -mt-4), so clip the wrapper's
+ * corners: without overflow hidden the grid's cell borders poke past the
+ * rounded corners as sharp pixels. */
+[data-docket-page="schedule"] main .bg-base.p-1.pt-4 {
+  border-radius: 0 0 var(--docket-radius-sm) var(--docket-radius-sm) !important;
+  overflow: hidden;
+  box-shadow: var(--docket-shadow);
+  margin-bottom: 10px;
+}
+/* ── Grid cells (day rows inside each week) ───────────────────────────────
+ * Confirmed live: rows are `div.grid.-mx-1.-mt-4` of cells
+ * `div.pb-2.border-gray2.border-b[.border-r]` — hairline shared edges. The
+ * gray-cell borders get the token treatment; the underlying panel (rule
+ * above) is what reads as the card. */
+[data-docket-page="schedule"] main .bg-base.p-1.pt-4 .border-b {
+  border-color: var(--docket-separator) !important;
+}
+/* Day/date label cells (first cell of each row) — secondary label weight so
+ * the entry text reads as the primary content. */
+[data-docket-page="schedule"] main .bg-base.p-1.pt-4 .border-b:first-child {
+  color: var(--docket-label-secondary) !important;
+}
+
+/* ── "Today" markers ──────────────────────────────────────────────────────
+ * Two confirmed live shapes, both native accent-blue with sharp corners:
+ * 1. The Table view's blue day chip `div.bg-primary.hover:border-primary-alt`
+ *    (global.css already remaps .bg-primary to --docket-blue + white text —
+ *    this adds the missing shape/typography).
+ * 2. The mini-calendar's today cell (same `.bg-primary` utility).
+ * Apple Calendar's today treatment: accent pill, white text, no visible
+ * border. */
+[data-docket-page="schedule"] main .bg-primary.hover\:border-primary-alt {
+  border-radius: var(--docket-radius-sm) !important;
+  border: none !important;
+  font-family: var(--docket-font) !important;
+  font-weight: 600 !important;
+  box-shadow: none !important;
+}
+
+/* ── "Go to Combined Schedule" button ─────────────────────────────────────
+ * Confirmed live: `button.bg-action...` (the only one on the page), already
+ * filled/remapped by global.css's .bg-action rule — but its computed radius
+ * was 0px natively on this page (census 37) because that rule doesn't reach
+ * it (see note there); this guarantees the token radius and font. */
+[data-docket-page="schedule"] main button.bg-action {
+  border-radius: var(--docket-radius-sm) !important;
+  font-family: var(--docket-font) !important;
+  font-weight: 600 !important;
+}

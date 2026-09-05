@@ -36,9 +36,21 @@
 }
 .docket-course-card:hover { background: var(--docket-fill); }
 .docket-course-card .docket-dot { margin-bottom: 10px; }
+/* Real link (real href) or a `role="link" tabindex="0"` div standing in for one when
+   LearningSuite gives no static href (see courseCard.ts) — both are keyboard-reachable and
+   need the same visible focus signal every other control in this reskin carries. */
+.docket-course-card:focus-visible {
+  outline: 2px solid var(--docket-blue);
+  outline-offset: 2px;
+}
 
 .docket-toggle-original {
   display: inline-flex; align-items: center; gap: 6px;
   font-size: 13px; color: var(--docket-blue);
   background: none; border: none; cursor: pointer; padding: 6px 2px; margin-top: 4px;
+  border-radius: var(--docket-radius-sm);
+}
+.docket-toggle-original:focus-visible {
+  outline: 2px solid var(--docket-blue);
+  outline-offset: 2px;
 }

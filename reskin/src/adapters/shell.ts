@@ -111,6 +111,11 @@ export function mountShell(settings: ReskinSettings, onSettingsSaved: (s: Reskin
   topTabsEl = settings.useCompanionNav ? restyleTopTabs() : null;
   diagnostics.shellMounted = !!navEl || !!topTabsEl;
 
+  // Idempotency guard: boot() runs once per page load, but any other re-entry
+  // (e.g. the project's CDP re-injection loop, or a future programmatic remount)
+  // would otherwise stack duplicate settings FABs — observed live this pass when
+  // three accumulated over an audit session. One bar, ever.
+  for (const stale of document.querySelectorAll(".docket-floating-bar")) stale.remove();
   fabBar = h("div", { class: "docket-floating-bar docket-scope" });
   const settingsBtn = h("button", { class: "docket-fab", "aria-label": "Docket reskin settings" }, [icons.gear()]);
   settingsBtn.addEventListener("click", () => openSettingsPanel(onSettingsSaved));

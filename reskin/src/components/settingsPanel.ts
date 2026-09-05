@@ -1,6 +1,6 @@
 import panelCss from "../styles/panel.css";
-import { loadSettings, saveSettings } from "../core/settings.js";
-import type { Appearance, ReskinSettings } from "../core/settings.js";
+import { loadSettings, saveSettings, BACKGROUND_CHOICES } from "../core/settings.js";
+import type { Appearance, BackgroundChoice, ReskinSettings } from "../core/settings.js";
 import { openDiagnosticsPanel } from "./diagnosticsPanel.js";
 
 let host: HTMLElement | null = null;
@@ -52,6 +52,56 @@ function appearanceRow(initial: Appearance, onChange: (v: Appearance) => void): 
   }
   select.addEventListener("change", () => onChange(select.value as Appearance));
   row.append(text, select);
+  return row;
+}
+
+/**
+ * Settings > Background (Sep 2026 pass, issue #3): a macOS-System-Settings-
+ * style row of canvas swatches — the curated-palette model the brief asked
+ * for, not a raw color picker. Each swatch shows the light-theme tint of its
+ * choice (mirroring the Apple wallpaper picker's appearance-agnostic
+ * thumbnails); the actual per-theme values live in tokens.css. Built with
+ * DOM builders + textContent only, like the rest of this panel.
+ */
+const BACKGROUND_SWATCH_COLORS: Record<BackgroundChoice, string> = {
+  default: "#f2f2f7",
+  graphite: "#e8e8ed",
+  blue: "#e4edf8",
+  purple: "#eee7f8",
+  rose: "#f8e7ea",
+  sand: "#f7f1e5",
+};
+
+function backgroundRow(initial: BackgroundChoice, onChange: (v: BackgroundChoice) => void): HTMLElement {
+  const row = document.createElement("div");
+  row.className = "row row-col";
+  const text = document.createElement("span");
+  text.className = "row-label";
+  text.textContent = "Background";
+  row.append(text);
+  const swatches = document.createElement("div");
+  swatches.className = "swatch-row";
+  swatches.setAttribute("role", "radiogroup");
+  swatches.setAttribute("aria-label", "Background color");
+  for (const choice of BACKGROUND_CHOICES) {
+    const sw = document.createElement("button");
+    sw.className = "swatch";
+    sw.dataset["choice"] = choice;
+    sw.dataset["selected"] = String(choice === initial);
+    sw.style.setProperty("--swatch", BACKGROUND_SWATCH_COLORS[choice]);
+    sw.setAttribute("role", "radio");
+    sw.setAttribute("aria-checked", String(choice === initial));
+    sw.setAttribute("aria-label", choice === "default" ? "Default" : choice.charAt(0).toUpperCase() + choice.slice(1));
+    sw.addEventListener("click", () => {
+      for (const other of Array.from(swatches.children) as HTMLElement[]) {
+        other.dataset["selected"] = String(other === sw);
+        other.setAttribute("aria-checked", String(other === sw));
+      }
+      onChange(choice);
+    });
+    swatches.appendChild(sw);
+  }
+  row.appendChild(swatches);
   return row;
 }
 
@@ -133,7 +183,7 @@ export function openSettingsPanel(onSave: (settings: ReskinSettings) => void): v
 
   sheet.append(
     header,
-    group([appearanceRow(settings.appearance, (v) => persist({ appearance: v }))]),
+    group([appearanceRow(settings.appearance, (v) => persist({ appearance: v })), backgroundRow(settings.background, (v) => persist({ background: v }))]),
     group([
       switchRow(shadow, "Use Companion navigation", settings.useCompanionNav, (v) => persist({ useCompanionNav: v })),
       switchRow(shadow, "Show upcoming on Home", settings.showUpcomingOnHome, (v) => persist({ showUpcomingOnHome: v })),

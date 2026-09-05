@@ -1,5 +1,5 @@
 node_modules/
-dist/
+/dist/
 data/*.json
 data/*.jsonl
 !data/.gitkeep

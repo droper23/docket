@@ -1,3 +1,4 @@
+import fontInterCss from "./styles/font-inter.css";
 import tokensCss from "./styles/tokens.css";
 import globalCss from "./styles/global.css";
 import typographyCss from "./styles/typography.css";
@@ -5,11 +6,13 @@ import layoutCss from "./styles/layout.css";
 import navigationCss from "./styles/navigation.css";
 import cardsCss from "./styles/cards.css";
 import responsiveCss from "./styles/responsive.css";
+import scheduleCss from "./styles/schedule.css";
 
 import { adapters } from "./adapters/registry.js";
 import { mountShell } from "./adapters/shell.js";
 import { loadSettings } from "./core/settings.js";
 import type { ReskinSettings, Appearance } from "./core/settings.js";
+import { BACKGROUND_CHOICES } from "./core/settings.js";
 import { diagnostics, resetDiagnostics } from "./core/diagnostics.js";
 import { observeMutations } from "./lib/observe.js";
 import type { Adapter } from "./adapters/types.js";
@@ -19,7 +22,28 @@ function injectStyles(): void {
   if (document.getElementById("docket-reskin-styles")) return;
   const style = document.createElement("style");
   style.id = "docket-reskin-styles";
-  style.textContent = [tokensCss, globalCss, typographyCss, layoutCss, navigationCss, cardsCss, responsiveCss].join("\n");
+  // The @font-face block goes first: its data: URI carries the bundled Inter face
+  // (zero network requests) that tokens.css's --docket-font stack leads with.
+  style.textContent = [fontInterCss, tokensCss, globalCss, typographyCss, layoutCss, navigationCss, cardsCss, responsiveCss, scheduleCss].join("\n");
+  // At @run-at document-start (issue #7 fix) <head> may not exist yet — a <style>
+  // appended to <html> still applies (CSS doesn't care where it lives), which is the
+  // whole point: kill the native-typeface flash BEFORE first paint instead of after it.
+  (document.head ?? document.documentElement).appendChild(style);
+}
+
+/**
+ * Companion to injectStyles() for the document-start path: a style tag injected
+ * before <head> exists ends up on <html>, i.e. EARLIER in document order than
+ * LearningSuite's own <link>/<style> elements — and equal-specificity,
+ * equal-importance rules are won by whichever comes last. boot() re-parents our
+ * style to the end of <head> once it exists, restoring the cascade position the
+ * document-idle injection used to get, while the early copy already covered first
+ * paint. (Moving a <style> node re-evaluates it; once per page load, not a hot path.)
+ */
+function ensureStylesLast(): void {
+  const style = document.getElementById("docket-reskin-styles");
+  if (!style || !document.head) return;
+  if (style.parentElement === document.head && document.head.lastElementChild === style) return;
   document.head.appendChild(style);
 }
 
@@ -62,6 +86,21 @@ function applyTheme(appearance: Appearance): void {
   document.documentElement.setAttribute("data-docket-theme", dark ? "dark" : "light");
 }
 
+/**
+ * Settings > Background (Sep 2026 pass): threads the curated canvas choice onto
+ * <html> as `data-docket-background`, which tokens.css keys per-theme canvas
+ * overrides off. "default" (or any unknown/stale persisted value) removes the
+ * attribute entirely so the theme's own canvas applies — no-op for the default
+ * user, and self-healing if a saved value ever falls out of the curated set.
+ */
+function applyBackground(settings: ReskinSettings): void {
+  if (BACKGROUND_CHOICES.includes(settings.background)) {
+    document.documentElement.setAttribute("data-docket-background", settings.background);
+  } else {
+    document.documentElement.removeAttribute("data-docket-background");
+  }
+}
+
 let activeAdapter: Adapter | null = null;
 
 /**
@@ -78,6 +117,21 @@ function runAdapters(settings: ReskinSettings): void {
   // Re-checked on every pass, not just at boot: LearningSuite's own dark-mode toggle can
   // change without a full page reload, and this reskin should always track it.
   applyTheme(settings.appearance);
+  applyBackground(settings);
+  // Course-scoped Schedule page scope (Sep 2026 pass, issue #6): schedule.css's deeper
+  // restyle keys off this attribute instead of a CSS :has() so it also works on Safari 14
+  // (the build's own target — :has() only shipped in Safari 15.4). The probe is a
+  // live-confirmed DOM signal, not a guessed selector: `main .innerBox` is the page's view
+  // switcher trigger, present ONLY on the Schedule page across the eight page types
+  // censused this pass (tools/audit/40-compound-census.mjs: calendar 1, home/dashboard/
+  // announcements/assignments/gradebook/syllabus/pages 0). Re-checked every pass, so the
+  // attribute (and with it the scoped styles) self-corrects if LearningSuite ever changes
+  // that page's chrome.
+  if (document.querySelector("main .innerBox")) {
+    document.documentElement.setAttribute("data-docket-page", "schedule");
+  } else {
+    document.documentElement.removeAttribute("data-docket-page");
+  }
   // Threaded onto <html> so both the main page (tokens.css) and any shadow-DOM panel
   // (settingsPanel.ts/diagnosticsPanel.ts read this same attribute at open time) can
   // suppress motion from one explicit signal — see settings.ts's reducedMotion field.
@@ -125,6 +179,7 @@ function boot(): void {
 
   document.documentElement.setAttribute("data-docket-reskin", "true");
   injectStyles();
+  ensureStylesLast();
 
   const settings = loadSettings();
 
@@ -147,7 +202,38 @@ function boot(): void {
   observeMutations(document.documentElement, () => runAdapters(loadSettings()), { attributes: true, attributeFilter: ["class"] });
 }
 
-if (document.readyState === "loading") {
+/**
+ * The document-start half of the issue #7 fix. The bundle now runs before the
+ * parser has built the page (confirmed live via CDP
+ * addScriptToEvaluateOnNewDocument: readyState "loading", document.head null) —
+ * and in that same live check document.documentElement itself was still absent on
+ * the very first task, so an unconditional setAttribute here would throw and take
+ * the whole bundle (including boot()'s DOMContentLoaded registration) down with it.
+ * Poll until the root element appears — nothing can be painted before a root
+ * element exists, so even the first successful tick lands before first paint —
+ * then apply the reskin attribute + full CSS immediately. Everything that touches
+ * LearningSuite's markup (mountShell, adapters) stays in boot(), deferred to
+ * DOMContentLoaded exactly as before.
+ */
+function earlyInject(): void {
+  const tick = (): void => {
+    if (document.getElementById("docket-reskin-styles")) return; // already in
+    if (!document.documentElement) {
+      setTimeout(tick, 0);
+      return;
+    }
+    document.documentElement.setAttribute("data-docket-reskin", "true");
+    injectStyles();
+  };
+  if (document.documentElement) tick();
+  else setTimeout(tick, 0);
+}
+
+if (!/learningsuite\.byu\.edu$/.test(location.hostname)) {
+  // Not LearningSuite: do nothing at all (same guard boot() had — hoisted so even
+  // the style injection never happens on another origin).
+} else if (document.readyState === "loading") {
+  earlyInject();
   document.addEventListener("DOMContentLoaded", boot);
 } else {
   boot();

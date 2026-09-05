@@ -1,5 +1,183 @@
 # LearningSuite Reskin — Roadmap
 
+## Seventh pass: verifying the sixth pass's report + focus-ring/empty-state polish (Sep 2026)
+
+Re-verified the sixth pass's own written report against the actual working tree rather
+than taking it at face value: re-ran `npm run typecheck && npm test && npm run build`
+(20/20, clean, 168.5 KB before this pass's additions) and re-read every diff named in the
+report (`homeAdapter.ts`'s accumulator, `observe.ts`'s `takeRecords()` flush,
+`pageDetector.ts`'s `main h1` Grade Summary check, `index.ts`'s `earlyInject()`/
+`ensureStylesLast()`, `shell.ts`'s FAB dedup, `build.mjs`'s `document-start`). All of it
+checks out against the code as written — no discrepancies found. This was a code-level
+re-verification only, not a new live CDP session against a real account, so nothing here
+re-confirms the report's own live screenshots/measurements; take those on the report's
+own word as before.
+
+Then, code-review-only (no live session this pass), closed a real gap the sixth pass's own
+accessibility work didn't reach: every custom-styled interactive element that is a genuine
+`<a>`/`<button>`/`role="button"` widget — sidebar nav items, top tabs, the settings FAB,
+course cards (including the `tabindex="0"` div fallback in `courseCard.ts`), the
+keyboard-activatable assignment rows (`tabindex="0" role="button"` in `assignmentCard.ts`),
+"Back to card view", and every control inside the Shadow-DOM settings/diagnostics
+panels (`.sheet-close`, `.swatch`, `.switch`, `select`, `.seg`) — had no `:focus-visible`
+rule anywhere, unlike the native `<input>` elements the sixth pass explicitly covered. Each
+now gets the same `outline: 2px solid` accent-blue ring already established as this
+reskin's own convention (panel.css repeats the raw hex rather than the custom property, per
+its own file-header rule: a Shadow root shares no tokens with the page). Also added a
+`:active` press-scale on the FAB and the background swatches, matching the swatch's
+existing hover-scale idiom instead of a bare color change, and replaced the schedule
+overlay's plain-text empty state with an icon + text pairing (`icons.checklist()` for
+"Nothing in the next two weeks"), matching the Apple grouped-list empty-state idiom
+(Reminders'/Mail's own empty screens) instead of a floating sentence.
+
+`npm run build && npm run typecheck && npm test` all pass (20/20, unchanged — this pass
+touched no logic, only additive CSS + one icon in an existing empty-state branch). Bundle
+168.5 KB. **Not verified live this pass** (no authenticated-session audit was run): the new
+rings/press states should be spot-checked keyboard-only against a real account before
+calling this closed, the way every prior pass's CSS claims were.
+
+## Sixth live pass: real-usage fixes — the vanishing schedule, Grade Summary takeover, first-paint styling, bundled Inter, background setting (Sep 2026)
+
+Different in kind from every earlier pass: this one started from a real user's day-to-day
+complaints ("content flashes in then disappears, especially the Combined Schedule", "Grade
+Summary shows my Courses", "fonts look generic", "the sidebar link click flashes", "the
+Schedule view looks super ugly", "no way to change the background") rather than a design
+critique. Every complaint was first reproduced or ruled out live via the established CDP
+harness against a real authenticated account, then fixed, then re-verified live; audit
+scripts and screenshots are named inline below.
+
+1. **The Combined Schedule wiped itself clean after rendering — root cause found and
+   doubled.** Two independent bugs, both reproduced live before touching code:
+   (a) `homeAdapter.mount()` re-rendered from only the *newly extracted* batch — every real
+   anchor is already marked processed after the first pass, so any later pass extracted an
+   empty batch and `dayList.replaceChildren()` erased all previously rendered days. Live
+   repro: 65 rendered rows → **0** after one trivial `body.appendChild` (audit 31). Fix: a
+   module-level accumulator (`Map` keyed by anchor element) merged into on every pass;
+   re-render always draws the *merged* set, so a later pass can only ever add rows. Live
+   post-fix: 63 rows stable across a stray mutation (and the user's "Today eventually
+   loaded but only after a long time" follow-up is explained by the same mechanism — each
+   progressive batch previously replaced, not joined, the prior one).
+   (b) `observeMutations()`'s `applying` flag never actually suppressed self-triggered
+   passes: the flag is cleared in `run()`'s `finally`, but MutationObserver callbacks fire
+   as a microtask *after* the current task, so records queued by our own writes were
+   delivered with the flag already false. Live repro: exactly one redundant extra run per
+   adapter write (audit 32) — on the Combined Schedule, that extra run was the wipe. Fix:
+   `run()` flushes `observer.takeRecords()` in its `finally` — records queued *during* the
+   callback are by definition our own; records queued before the timer fired were already
+   consumed (microtasks drain before the next task), so the queue is provably empty at
+   `run()` start and takeRecords can only ever catch self-writes (pattern verified live in
+   audit 33 *before* editing the source). Post-fix live measurement: exactly one
+   re-render per external mutation, zero self-triggered passes — the per-mutation churn
+   behind the "slow, janky" complaint is gone.
+2. **Grade Summary was silently replaced by the Courses card grid.** The detector's
+   `main a[href*='cid-']` shape matched the summary page's five per-course anchors (live:
+   `.ORi6/student/top/summary`, h1 "Course Grade Summary"), so courseListAdapter mounted
+   over it. Neither URL shape (the `.XXXX` session prefix rotates every session — observed
+   twice live this pass) nor top-tab signal (both pages' active tab reads "Home")
+   disambiguates. Real disambiguator: each page's own `main h1` — "Course Grade Summary"
+   vs "Course List" — the same discipline as the earlier Assignments/Grades tab-title fix.
+   (The session prefix rotated three separate times during this session's audit alone —
+   `.KcSn` → `.ORi6` → `.6mo1` — reinforcing why path-segment guesses are off-limits.)
+   Also re-confirmed live: the current Course List renders real `<a href>` rows again (the
+   older "`p.cursor-pointer` only" note was per-term rendering); both shapes stay as OR'd
+   signals, and the clickable-shape fixture keeps covering the second one. Live post-fix:
+   zero `.docket-course-grid`/`.docket-course-card` elements on the summary page, native
+   main intact (screenshot `live-07-grade-summary-after.png`).
+3. **The course Schedule view's ugliness was shape, not color — and the bare-table
+   suspicion was ruled out live.** First finding: the page contains **zero `<table>`
+   elements** in both views (the grid is CSS-grid divs), so the fifth pass's bare-table
+   rule never fires here — the brief's prime suspect was innocent. Second: the earlier
+   "custom Vue component with no stable class names" note was outdated — the page renders
+   LearningSuite's own utility classes, and the compounds `.innerBox`/`.outerBox`/
+   `.bg-base.p-1.pt-4` are Schedule-unique across eight censused page types (audit 40);
+   `.bg-gray1.px-4.py-2` also appears on course Dashboard, so week-header rules needed a
+   page-level gate. Added `data-docket-page="schedule"` on `<html>` (derived each pass
+   from `main .innerBox`, a JS-computed scope that works on Safari 14 — no `:has()`), plus
+   new `schedule.css`: the Table/List view switcher gets 8px radius + tinted fill
+   (natively 0px); its dropdown menu gets the elevated-surface treatment (canvas fill,
+   hairline, shadow — natively solid off-palette rgb(36,36,36) in both themes, 0px
+   radius); the *open* view choice turns solid accent blue with white text (natively
+   indistinguishable from inactive rows because `.bg-accent` and `.bg-gray1` remap to the
+   same fill); week headers get 600-weight type and a rounded top; week panels round at
+   the bottom, clip, and carry elevation; grid hairlines take the separator token; the
+   blue "today" chip gets the Apple-Calendar pill treatment; the "Go to Combined
+   Schedule" button gets the token radius. All verified via computed styles live
+   (screenshot `live-06-schedule-after.png`).
+4. **The sidebar-click font flash: styles now land before first paint.** `@run-at
+   document-idle` is the latest possible injection — every full-page navigation painted
+   LearningSuite's native type first, then visibly re-styled. Metadata now requests
+   `document-start`; style injection no longer waits for DOMContentLoaded (adapters/shell
+   still do). Verified live via CDP `addScriptToEvaluateOnNewDocument` (the exact point a
+   manager's document-start injection runs): the script executed at readyState
+   `"loading"` with `document.head` null — and the first attempt exposed a real bug: even
+   `document.documentElement` is absent on the very first task, so an unconditional
+   `setAttribute` threw and killed the bundle before boot's listener registered. Fixed
+   with a 0-timeout poll for the root element — nothing can paint before a root exists,
+   so this still lands pre-first-paint. Post-load assertions live: attribute set, style
+   re-parented to the end of `<head>` (`ensureStylesLast()` restores the cascade position
+   a document-idle injection used to get), shell + adapters mount normally, body computes
+   Inter (audit 50).
+5. **"All the fonts should be the same": the stack fell through to Arial off-Apple, so
+   Inter is now bundled.** Live-confirmed the native pages run `-apple-system,
+   "system-ui", "SF Pro Text"...`; the reskin's identical-first-keywords stack resolved
+   SF only on Apple platforms — on Windows/Android/Linux every keyword misses and text
+   lands on plain Arial (the "generic" look). Fix: Inter variable (SIL OFL), Google
+   Fonts' latin subset woff2, 47.3 KB embedded as a base64 `data:` URI — zero network
+   requests, per PRIVACY.md (a CDN is not an option; a data: URI makes no request).
+   Generated by `tools/fetch-font.mjs` into `src/styles/font-inter.css` (committed, so
+   `npm run build` itself stays network-free); `--docket-font` now leads with Inter on
+   every platform, and the shadow-DOM panels match it. Verified live:
+   `document.fonts.check('16px Inter')` true, computed body/h1 families start with
+   Inter, and resource timing shows zero non-LearningSuite requests added (the site's
+   own GA/Dynatrace calls and its Metropolis/FontAwesome fetches are LearningSuite's).
+   Bundle cost: 85.3 → 165.9 KB (the font is ~80 KB of that).
+6. **New Settings row: Background.** Six curated canvas swatches (Default, Graphite,
+   Blue, Purple, Rose, Sand) in a macOS-System-Settings-style strip — a curated palette,
+   not a raw picker, so every value can promise HIG-legible contrast against
+   LearningSuite's near-black/near-white text in *both* themes. `BackgroundChoice` in
+   `settings.ts`; threaded to `<html data-docket-background>` by `applyBackground()`
+   (unknown/stale persisted values self-heal to absent); per-theme `--docket-canvas`
+   overrides in tokens.css (dark tints like #0b1220, light like #e4edf8). Verified
+   end-to-end live: swatch click → persisted → full reload → `attr=blue` → canvas
+   computes rgb(11,18,32) → default reset restores the stock canvas (screenshot
+   `live-05-background-blue.png`).
+7. **Settings FAB moved to the left edge** (user request) and checked live for collisions:
+   at 1440×813 the sidebar's links end at y≈313 while the FAB sits at y≈751 — no
+   interactive element overlaps; on narrow widths the enhanced nav is in-flow (not a
+   fixed rail), so there is no fixed-overlay conflict to clip against. `responsive.css`
+   needed no change.
+8. **Small correctness catch from the audit loop itself:** `mountShell()` appended its
+   FAB unconditionally, so CDP re-injections stacked duplicates (three were live in this
+   session's tab). It now removes any stale `.docket-floating-bar` (all of them — a
+   single-removal querySelector left two of three alive on the first try) before mounting
+   exactly one.
+
+`npm run build && npm run typecheck && npm test` all pass (20/20 — two new regression
+tests: homeAdapter must keep previously rendered rows on a second pass with no new items;
+`looksLikeCourseListPage` must reject the Grade Summary shape). As always, the CSS-side
+fixes (items 3, 5, 6, 7) have no automated coverage and were verified live via computed
+styles and screenshots (`tools/shots/`, gitignored: `live-04-schedule-reskin-before2.png`,
+`live-05-background-blue.png`, `live-06-schedule-after.png`,
+`live-07-grade-summary-after.png`).
+
+**Explicitly deferred, not attempted this pass:** any virtualization for the 300+-item
+schedule (post-fix DOM measures ~6.4k nodes with the overlay copy — acceptable, and the
+churn half of the "slow" complaint is fixed at the root); a second look at
+`backdrop-filter` breadth on low-end hardware (unmeasured; nothing observed janky in this
+session); LearningSuite's own loading skeletons/spinners during full-page navigations
+(document-start CSS now skins the typeface flash, but the site's own spinner phases are
+its markup and stay); the course Schedule's *List* view (only the Table view was audited
+live this pass; the scoped selectors are color/shape-only and low-risk, but it deserves
+its own live look); and the real Safari Userscripts install flow (unchanged, see below —
+this pass's document-start work was verified with CDP's equivalent timing, but the
+Userscripts app itself remains unexercised).
+
+**Still open after this pass:** the never-audited page types (Exams, Copyright Resources,
+Prioritizer, Groups, Email interior); the Grades "Course Progress" stat panel (still no
+non-generic hook); the sitewide `.hover\:bg-accent` question; the low-priority tooling fix
+noted by the fifth pass (synthetic-dispatch hover checks in older audit scripts);
+Regenerate `font-inter.css` with `node tools/fetch-font.mjs` when bumping Inter.
+
 ## Fifth live pass: Apple-HIG fidelity fixes — color discipline, active nav, readability (Sep 2026)
 
 A fresh, skeptical re-audit of the fourth pass's build (real authenticated account, both

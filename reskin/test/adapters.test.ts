@@ -101,6 +101,38 @@ test("assignmentsAdapter reads title, category, and real completion status off r
   }
 });
 
+test("homeAdapter keeps previously rendered rows on a second pass with no new items (Combined Schedule wipe regression, Sep 2026)", () => {
+  const tomorrow = new Date(Date.now() + 86_400_000);
+  const md = `${tomorrow.getMonth() + 1}/${tomorrow.getDate()}`;
+  const html = `<main>
+    <div class="listViewDay">
+      <div>${md} - Some Day</div>
+      <div class="flex-4"><a class="cursor-pointer block truncate">Reading: Chapter 3</a></div>
+      <div>CS 235</div>
+    </div>
+    <div class="listViewDay">
+      <div>${md} - Some Day</div>
+      <div class="flex-4"><a class="cursor-pointer block truncate">Lab 5 writeup</a></div>
+      <div>EC EN 224</div>
+    </div>
+  </main>`;
+  setupDom(html, "https://learningsuite.byu.edu/.sess1/student/top/schedule");
+  try {
+    homeAdapter.mount(false);
+    const before = document.querySelectorAll(".docket-row-title").length;
+    assert.equal(before, 2);
+    // Any stray DOM mutation schedules a second debounced mount() pass. Every real
+    // anchor is already marked processed, so that pass extracts nothing new — it must
+    // merge into (not replace) the already-rendered set. Confirmed live: the old
+    // code went 65 rendered rows → 0 here.
+    homeAdapter.mount(false);
+    const after = document.querySelectorAll(".docket-row-title").length;
+    assert.equal(after, 2, "second pass must not wipe previously rendered rows");
+  } finally {
+    homeAdapter.unmount();
+  }
+});
+
 test("homeAdapter reads Combined Schedule items within the lookahead window", () => {
   const tomorrow = new Date(Date.now() + 86_400_000);
   const md = `${tomorrow.getMonth() + 1}/${tomorrow.getDate()}`;
