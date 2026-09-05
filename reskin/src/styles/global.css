@@ -112,6 +112,24 @@ html[data-docket-reskin],
 }
 
 /**
+ * The same compound class, confirmed live (Sep 2026 comparison pass) to ALSO render inside
+ * a course Dashboard's per-day schedule cells — an instructor's own lesson-topic bullets for
+ * that day, wrapped in `p.text-sm` (confirmed: `p.mb-2.text-sm.break-words > .instructorText
+ * .font-nunito`; the whole-page version above is never nested in `.text-sm`). The full inset
+ * "paper card" above (16px padding, radius-md, drop shadow) was sized for a whole Content/
+ * Syllabus page, not a two-line entry inside an otherwise-compact dark list row — live it
+ * rendered as a jarring oversized white slab breaking the row rhythm. Same light-paper
+ * background (still needed: instructor content still carries inline `color:#000000`), but
+ * sized down to read as an inline note instead of a standalone page.
+ */
+[data-docket-reskin] .text-sm .instructorText.font-nunito {
+  border-radius: var(--docket-radius-sm);
+  padding: 8px 10px;
+  box-shadow: none;
+  display: inline-block;
+}
+
+/**
  * LearningSuite's own branded font class, `Metropolis`. An earlier census (Grades page
  * only) found just 4 sitewide elements carrying it — all already covered — so this rule
  * was deliberately absent. The Sep 2026 pass re-ran the census on Combined Schedule and
@@ -190,12 +208,17 @@ html[data-docket-reskin],
    (`a.bg-primary-dark.bg-top-nav-highlight`, owned by .docket-top-tabs' underline
    treatment in navigation.css) and the Preferences dialog's accordion headers (a <div>,
    styled with the modal chrome below) — a blanket class rule would have fought both.
-   Never bare `button` for dropdown triggers — see the file comment. */
+   Never bare `button` for dropdown triggers — see the file comment.
+   Full pill radius (Sep 2026 comparison pass), not the 8px rectangle every other rounded
+   surface in this reskin uses: apple.com/about.google's own primary CTAs are consistently
+   full pills, and unlike a card or row, a single free-floating action button reads as more
+   confidently "designed" at 999px than at the small-radius-rectangle scale meant for
+   surfaces containing other content. */
 [data-docket-reskin] .goBtn,
 [data-docket-reskin] .bg-action,
 [data-docket-reskin] button.bg-primary-dark {
   font-family: var(--docket-font) !important;
-  border-radius: var(--docket-radius-sm) !important;
+  border-radius: 999px !important;
   background-color: var(--docket-blue) !important;
   color: #fff !important;
   border: none !important;
@@ -265,6 +288,58 @@ html[data-docket-reskin],
 [data-docket-reskin] table td,
 [data-docket-reskin] table th {
   border-color: var(--docket-separator) !important;
+}
+
+/**
+ * The course Dashboard's per-day schedule (Sep 2026 comparison pass) — confirmed live this
+ * is the single most-visited page never given a real adapter: each day is a plain
+ * `div.mb-2 > div.bg-gray1.text-primary-alt.text-md.font-normal.px-4.py-2` (the date bar;
+ * `.text-primary-alt` + no `.cursor-pointer` distinguishes it from the Combined Schedule
+ * page's OWN `.bg-gray1.px-4.py-2` week header, which carries `.text-primary.cursor-pointer`
+ * instead and stays scoped to `[data-docket-page="schedule"]` in schedule.css — confirmed
+ * live these two never collide, `.bg-gray1.text-primary-alt` returns 0 matches on every other
+ * censused page) followed immediately by `div.pl-mobile` (the day's own item list; `.pl-mobile`
+ * itself is a generic sitewide utility reused everywhere, so it's targeted only via the
+ * adjacent-sibling combinator below, never bare). Already gets the sitewide tinted-fill color
+ * from the `.bg-gray1` rule above; this adds the same day-header-plus-card shape Combined
+ * Schedule's dedicated adapter already gives the identical data one level up.
+ */
+[data-docket-reskin] .bg-gray1.text-primary-alt.px-4.py-2 {
+  border-radius: var(--docket-radius-sm) var(--docket-radius-sm) 0 0 !important;
+  font-family: var(--docket-font) !important;
+  font-weight: 600 !important;
+}
+[data-docket-reskin] .bg-gray1.text-primary-alt.px-4.py-2 + .pl-mobile {
+  background-color: var(--docket-bg-elevated);
+  border-radius: 0 0 var(--docket-radius-sm) var(--docket-radius-sm);
+  box-shadow: var(--docket-shadow);
+  padding: 10px 16px 14px;
+  margin-bottom: 10px;
+}
+
+/**
+ * Grade Summary (Sep 2026 comparison pass) — confirmed live the whole page is one CSS grid,
+ * `div.grid.gridColsStyle` (zero `<table>` elements, so the sitewide `table` rule above never
+ * reaches it; confirmed unique to this page, 0 matches on Dashboard/Course List/Schedule/
+ * Announcements/course Schedule censused this pass), so it got zero elevation/structure —
+ * flat text sitting directly on canvas next to the Course List's own proper card treatment.
+ * Wrapped as one elevated card, matching every other data surface in the redesign; each
+ * course's percentage (native `div.text-lg.font-bold.clicky`, already tinted blue by the
+ * text-tint tier above) becomes a pill badge instead of bare bold text, matching this
+ * reskin's own `.docket-badge` idiom elsewhere.
+ */
+[data-docket-reskin] .gridColsStyle {
+  background-color: var(--docket-bg-elevated);
+  border-radius: var(--docket-radius-md) !important;
+  box-shadow: var(--docket-shadow), var(--docket-highlight);
+  padding: 8px 16px;
+  overflow: hidden;
+}
+[data-docket-reskin] .gridColsStyle .clicky {
+  display: inline-flex;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background-color: color-mix(in srgb, var(--docket-blue) 14%, transparent);
 }
 
 /**

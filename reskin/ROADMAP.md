@@ -1,5 +1,62 @@
 # LearningSuite Reskin — Roadmap
 
+## Eighth pass: live comparison against real LearningSuite, apple.com, and about.google (Sep 2026)
+
+Direct response to "it still has the foundation of the original site and you can tell":
+screenshotted every major page type both native and reskinned (real authenticated account,
+CDP against `tools/.chrome-audit-profile`, same methodology as every prior live pass) side
+by side with a full scroll of apple.com and about.google, then fixed what the comparison
+actually showed rather than guessing. All fixes are CSS-only against selectors confirmed
+live first — no new adapter/JS logic, deliberately: the first six passes' hard bugs were
+all in JS-based DOM extraction, and every gap found this pass was fixable without it.
+
+1. **Real regression found and fixed:** the fifth pass's `.instructorText.font-nunito`
+   "inset paper card" (sized for a whole Content/Syllabus page) also fires on the course
+   Dashboard's per-day schedule — an instructor's own lesson-topic bullets for that day.
+   Live: a jarring full-width white drop-shadowed slab breaking a compact dark list row.
+   Confirmed-live scoping fix: `.text-sm .instructorText.font-nunito` (the compact case is
+   always wrapped in `p.text-sm`; the whole-page case never is) gets a small inline chip
+   instead — same light "paper" background (still needed, instructor content still carries
+   inline `color:#000000`), no card padding/shadow.
+2. **The single most-visited page never had a real adapter.** The course Dashboard's
+   per-day schedule — the *same data shape* Combined Schedule's own adapter already
+   redesigns one page over — was still LearningSuite's raw date-bar-plus-list. Confirmed
+   live: `.bg-gray1.text-primary-alt.px-4.py-2` (the date bar) is a different compound from
+   Combined Schedule's own week header (`.text-primary.cursor-pointer` instead — the two
+   never collide, checked against 6 other page types this pass) and is followed immediately
+   by `.pl-mobile` (a generic sitewide utility, so targeted only via the adjacent-sibling
+   combinator, never bare). Now renders as one grouped card per day, matching the treatment
+   the identical data already gets on Combined Schedule.
+3. **Grade Summary had zero elevation.** Confirmed live it's a CSS grid
+   (`div.grid.gridColsStyle`, confirmed unique — 0 matches on 5 other censused page types),
+   not a `<table>`, so the sitewide `table` rule never reached it: flat text on bare canvas
+   next to the Course List's own proper cards. Now wrapped as one elevated card; each
+   course's percentage (`.clicky`, already tinted blue) becomes a pill badge.
+4. **The masthead was the one piece of chrome on every page that never got touched.**
+   Confirmed live real elements `button.header-coursedropdown-trigger` (course/term
+   switcher) and `button.header-userdropdown-trigger` (account menu) had no hover/focus
+   affordance at all — bare text next to a caret. Both get the same soft pill-hover fill
+   already used for nav items and menu rows; verified live via real CDP hover events on
+   both (no layout shift, no clipping against the truncated course-name text).
+5. **Primary buttons moved from an 8px rounded rectangle to a true pill (999px)** —
+   `.goBtn`/`.bg-action`/`button.bg-primary-dark` — matching apple.com's and
+   about.google's own consistent pill-CTA language. Verified live via computed style
+   (`border-radius: 999px`, no height/layout change).
+
+`npm run build && npm run typecheck && npm test` all pass (20/20, unchanged — every fix
+here is additive CSS against already-confirmed selectors). Bundle 174.1 KB. Live-verified
+this pass via fresh before/after screenshots on the course Dashboard, Grade Summary, and
+both masthead triggers (hover state).
+
+**Explicitly deferred:** color-coding Grade Summary's percentage badges by value (green/
+yellow/red) — real signal, but requires reading and classifying the displayed number in JS,
+which is adapter-shaped risk this pass deliberately avoided; a sitewide max-width/breathing-
+room pass on native page content (Apple/Google's biggest visible difference is generous
+whitespace) — deferred for lack of a low-risk confirmed wrapper common to every page shape
+this session; Announcements, Class Info, Groups, Prioritizer were not part of this pass's
+before/after comparison and likely have their own version of finding #2's "never got a real
+treatment" gap — worth the same before/after treatment next time.
+
 ## Seventh pass: verifying the sixth pass's report + focus-ring/empty-state polish (Sep 2026)
 
 Re-verified the sixth pass's own written report against the actual working tree rather

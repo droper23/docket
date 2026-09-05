@@ -219,6 +219,33 @@
 }
 
 /**
+ * The masthead's own two dropdown triggers (Sep 2026 comparison pass against apple.com/
+ * about.google) — confirmed live real elements: `button.header-coursedropdown-trigger`
+ * ("All courses" / the course name, top-left) and `button.header-userdropdown-trigger`
+ * (the account name, top-right). Both present on literally every page, and — unlike the
+ * sidebar and the dropdown panels they open — never given a hover/pill treatment: bare text
+ * next to a caret with no affordance at all that they're interactive. A soft pill-shaped
+ * hover fill (the same idiom already used for menu rows and nav items) is enough to make the
+ * one piece of chrome that's on every screen stop reading as unstyled Bootstrap.
+ */
+[data-docket-reskin] .header-coursedropdown-trigger,
+[data-docket-reskin] .header-userdropdown-trigger {
+  border-radius: 999px !important;
+  padding: 4px 12px !important;
+  margin: -4px -12px !important;
+  transition: background-color 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+[data-docket-reskin] .header-coursedropdown-trigger:hover,
+[data-docket-reskin] .header-userdropdown-trigger:hover {
+  background-color: var(--docket-fill) !important;
+}
+[data-docket-reskin] .header-coursedropdown-trigger:focus-visible,
+[data-docket-reskin] .header-userdropdown-trigger:focus-visible {
+  outline: 2px solid var(--docket-blue);
+  outline-offset: 2px;
+}
+
+/**
  * Floating menu chrome — the top bar's own dropdown panels, confirmed live (Sep 2026,
  * dark theme, reskin un-injected) on the Combined Schedule page:
  *
