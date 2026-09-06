@@ -2,15 +2,15 @@ import type { AcademicSnapshot } from "../core/types.js";
 import type { AgendaItem, CourseWorkload } from "../core/academicViews.js";
 import type { DiagnosticsReport } from "../core/diagnostics.js";
 import type { ChangeLogEntry } from "../core/types.js";
-import { daysBetween, todayInSchoolTimeZone } from "../core/schoolTime.js";
+import { todayInSchoolTimeZone } from "../core/schoolTime.js";
+import { dueCountdown, dayLabel, dueDateLabel, groupByDueDate } from "../core/agendaFormatting.js";
 
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 const NAV = [
-  ["/", "Today"],
-  ["/upcoming", "Upcoming"],
+  ["/", "Schedule"],
   ["/courses", "Courses"],
   ["/changes", "What Changed"],
   ["/diagnostics", "Diagnostics"],
@@ -137,60 +137,9 @@ ${body}
 </html>`;
 }
 
-/** "Due in 3 days" / "Due today" / "Overdue by 2 days" — the countdown itself, not just a due-date string, is what makes it obvious what needs doing now vs. later. */
-function dueCountdown(daysUntilDue: number | undefined): string | undefined {
-  if (daysUntilDue === undefined) return undefined;
-  if (daysUntilDue < 0) {
-    const n = Math.abs(daysUntilDue);
-    return `Overdue by ${n} day${n === 1 ? "" : "s"}`;
-  }
-  if (daysUntilDue === 0) return "Due today";
-  if (daysUntilDue === 1) return "Due tomorrow";
-  return `Due in ${daysUntilDue} days`;
-}
-
-/** "Today" / "Tomorrow" / "Wednesday, September 3" — mirrors LearningSuite's own Combined Schedule day headers. */
-function dayLabel(dateStr: string): string {
-  // daysBetween anchors "today" to BYU's own timezone (src/core/schoolTime.ts), not the
-  // server's — this is the same class of bug that made most assignments show up as "due
-  // today," now fixed in one shared place both the countdown and this label go through.
-  const diffDays = daysBetween(todayInSchoolTimeZone(), dateStr);
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "Tomorrow";
-  if (diffDays === -1) return "Yesterday";
-  // UTC here is deliberate, not a shortcut: dateStr is a bare calendar date with no
-  // time-of-day, so parsing/formatting it consistently in one fixed zone (rather than
-  // whichever zone the server happens to be running in) is what keeps "September 4"
-  // from ever silently becoming "September 3" or "September 5" depending on server TZ.
-  const date = new Date(`${dateStr}T00:00:00Z`);
-  return date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
-}
-
-/**
- * Groups already-sorted agenda items by due date so the page can show day
- * headers — see docs/ARCHITECTURE.md §8: LearningSuite's own Combined
- * Schedule (the closest thing it has to a "Today" view) always groups by
- * day, and a flat list made it hard to tell "due today" apart from "due
- * later" at a glance. Items are assumed pre-sorted chronologically
- * (academicViews.ts already does this) — this only groups, never re-sorts.
- */
-function groupByDueDate(items: AgendaItem[]): { date: string; items: AgendaItem[] }[] {
-  const groups: { date: string; items: AgendaItem[] }[] = [];
-  for (const item of items) {
-    const date = item.assignment.dueDate?.value ?? "unknown";
-    const last = groups[groups.length - 1];
-    if (last && last.date === date) {
-      last.items.push(item);
-    } else {
-      groups.push({ date, items: [item] });
-    }
-  }
-  return groups;
-}
-
 function agendaCard(item: AgendaItem, urgent: boolean): string {
   const a = item.assignment;
-  const due = a.dueDate?.value ?? "no due date";
+  const due = dueDateLabel(a.dueDate?.value);
   const time = a.dueTime?.value;
   const countdown = dueCountdown(item.daysUntilDue);
   // Prefer the real, course-specific category (from the Assignments page) over the
@@ -230,7 +179,6 @@ function agendaCard(item: AgendaItem, urgent: boolean): string {
         <span>${esc(item.course?.code.value ?? a.courseId)}</span>
         <span>Due ${esc(due)}${time ? " " + esc(time) : ""}</span>
         ${categoryLabel ? `<span class="badge ${categoryReal ? "badge-category" : "badge-estimate"}">${esc(categoryLabel)}</span>` : ""}
-        <span class="badge badge-estimate">~${item.estimatedMinutes} min (estimate)</span>
         ${countdown ? `<span class="badge ${urgent ? "badge-urgent" : "badge-estimate"}">${esc(countdown)}</span>` : ""}
       </div>
     </summary>
@@ -251,35 +199,29 @@ function renderDayGroups(items: AgendaItem[]): string {
     .join("");
 }
 
-export function renderToday(items: AgendaItem[]): string {
-  const list = items.length ? renderDayGroups(items) : `<div class="empty">Nothing urgent. Nice.</div>`;
+export function renderSchedule(items: AgendaItem[]): string {
+  const list = items.length ? renderDayGroups(items) : `<div class="empty">Nothing due in the next two weeks. Nice.</div>`;
   return layout(
     "/",
-    "Today",
-    `<h1>Today</h1>
-<p class="subtitle">${new Date(`${todayInSchoolTimeZone()}T00:00:00Z`).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })}</p>
+    "Schedule",
+    `<h1>Schedule</h1>
+<p class="subtitle">${new Date(`${todayInSchoolTimeZone()}T00:00:00Z`).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })} — next 14 days</p>
 <form class="sync-form" method="post" action="/sync"><button type="submit">Sync now</button></form>
-<div class="section-label">Needs attention</div>
 ${list}
-<p class="provenance-note">Due dates and titles: real, from LearningSuite. Time estimates: derived, Docket's guess — not fact.</p>`,
+<p class="provenance-note">Due dates and titles: real, from LearningSuite.</p>`,
   );
-}
-
-export function renderUpcoming(items: AgendaItem[]): string {
-  const list = items.length ? renderDayGroups(items) : `<div class="empty">Nothing in the next two weeks.</div>`;
-  return layout("/upcoming", "Upcoming", `<h1>Upcoming</h1><p class="subtitle">Next 14 days</p>${list}`);
 }
 
 export function renderCourses(snapshot: AcademicSnapshot, workload: CourseWorkload[]): string {
   const workloadRows = workload.length
     ? (() => {
-        const max = Math.max(...workload.map((w) => w.estimatedMinutes), 1);
+        const max = Math.max(...workload.map((w) => w.itemCount), 1);
         return workload
           .map(
             (w) => `<div class="workload-row">
   <div class="workload-course">${esc(w.course.code.value)}</div>
-  <div class="workload-bar-track"><div class="workload-bar-fill" style="width:${Math.round((w.estimatedMinutes / max) * 100)}%"></div></div>
-  <div>${w.itemCount} item${w.itemCount === 1 ? "" : "s"}, ~${Math.round(w.estimatedMinutes / 60)}h</div>
+  <div class="workload-bar-track"><div class="workload-bar-fill" style="width:${Math.round((w.itemCount / max) * 100)}%"></div></div>
+  <div>${w.itemCount} item${w.itemCount === 1 ? "" : "s"}</div>
 </div>`,
           )
           .join("")
@@ -299,7 +241,7 @@ export function renderCourses(snapshot: AcademicSnapshot, workload: CourseWorklo
     "/courses",
     "Courses",
     `<h1>Courses</h1>
-<div class="section-label">Estimated workload — this week</div>
+<div class="section-label">Items due — this week</div>
 ${workloadRows}
 <div class="section-label">Enrolled</div>
 ${courseCards || `<div class="empty">No courses yet. Run a sync, or add your real courses in data/courses.config.json.</div>`}`,
@@ -369,8 +311,10 @@ ${row("Changes in last 24h", `${report.recentChangeCount}`, true)}
 export function renderConnect(opts: {
   courseListHref: string;
   assignmentsHref: string;
+  scheduleHref: string;
   courseListSource: string;
   assignmentsSource: string;
+  scheduleSource: string;
   knownCourseCount: number;
   /** Only set on a multi-tenant hosted instance — the logged-in user's own identity, embedded in the scripts above so imports land on their account. */
   account?: { email: string };
@@ -433,6 +377,10 @@ ${status}
   <div class="section-label">Step 2 — Add real grades &amp; due times (optional, run per course)</div>
   <p class="connect-body">Open a course's <strong>Assignments</strong> tab, then click this to pull real due times and grades in too — safe to re-run any time, it only updates matching assignments, never creates duplicates.</p>
   <p><a class="bookmarklet-btn" href="${opts.assignmentsHref}" onclick="alert('Drag this to your bookmarks bar instead of clicking it.'); return false;">🎯 Sync Grades &amp; Due Times</a></p>
+
+  <div class="section-label">Step 3 — Add descriptions, links &amp; exam times (optional, run once for everything)</div>
+  <p class="connect-body">Open <strong>Combined Schedule</strong> in <strong>List</strong> view, then click this. It opens each upcoming item one at a time (like clicking it yourself) to pull in whatever LearningSuite only shows in that detail popup — a lecture's attached video link, an autograder URL, an exam's exact time. Covers every connected course in one run, but deliberately takes its time on every item (several minutes for a full course load isn't unusual — it double-checks each one is safe to read before moving on) and only looks ~30 days ahead — re-run it later for anything further out.</p>
+  <p><a class="bookmarklet-btn" href="${opts.scheduleHref}" onclick="alert('Drag this to your bookmarks bar instead of clicking it.'); return false;">🔗 Sync Descriptions &amp; Links</a></p>
 </div>
 
 <div class="section-label">What this does and doesn't do</div>

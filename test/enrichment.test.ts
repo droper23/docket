@@ -178,3 +178,82 @@ test("a row without completed: true leaves completion status untouched — never
   const updated = snapshot.assignments[0]!;
   assert.equal(updated.completionStatus?.value, "completed");
 });
+
+test(
+  "regression: title matching strips ALL whitespace, not just collapses it — confirmed live " +
+    "as a real mismatch, not a hypothetical: LearningSuite's own ICS export concatenates a " +
+    "multi-part schedule note's lines with no separator at all ('Intro to Linux " +
+    "ShellLinux Survival Tutorial', one run-together word), while the same item's live DOM " +
+    "naturally renders whitespace between the parts — a bookmarklet reading .textContent " +
+    "correctly reports that space, but collapsing-to-one-space still leaves the two forms " +
+    "unequal. This is what made a real production sync report 0 of 10 items matched.",
+  () => {
+    const a = makeAssignment("c1", "1", "Intro to Linux ShellLinux Survival Tutorial");
+    const snapshot = baseSnapshot([a]);
+
+    const outcome = applySessionEnrichment(snapshot, "c1", [
+      { title: "Intro to Linux Shell Linux Survival Tutorial", links: [{ text: "Linux Survival Tutorial", url: "https://linuxsurvival.com" }] },
+    ]);
+
+    assert.equal(outcome.matched, 1, "the space-containing DOM-scraped title must still match the space-free ICS-sourced title");
+    assert.equal(outcome.unmatched.length, 0);
+  },
+);
+
+test(
+  "title matching still refuses to guess when whitespace-stripping makes two different real " +
+    "titles collide — the broader match must never silently merge genuinely distinct " +
+    "assignments, only catch cases that really are the same title",
+  () => {
+    const a1 = makeAssignment("c1", "1", "Trig HW1");
+    const a2 = makeAssignment("c1", "2", "Trig H W1");
+    const snapshot = baseSnapshot([a1, a2]);
+
+    const outcome = applySessionEnrichment(snapshot, "c1", [{ title: "Trig HW1", description: "some detail" }]);
+
+    assert.equal(outcome.matched, 0, "an ambiguous whitespace-stripped match must still be refused, not guessed at");
+    assert.equal(outcome.unmatched.length, 1);
+  },
+);
+
+test(
+  "regression: a stored title that's a truncated prefix of the incoming row's title still " +
+    "matches — confirmed live as a real, not hypothetical, case: LearningSuite's own ICS " +
+    "export truncates a long SUMMARY field mid-word ('...Zoom Reco' instead of '...Zoom " +
+    "Recording (05/01/26)'), so the ICS-synced record Docket already has is shorter than " +
+    "what a live-DOM capture (the schedule bookmarklet) reports for the same real item",
+  () => {
+    const truncatedIcsTitle = "Chapter 2.104-Information Storage.pdf  Download (Updated on 04/28/2026)Zoom Reco";
+    const a = makeAssignment("c1", "1", truncatedIcsTitle);
+    const snapshot = baseSnapshot([a]);
+
+    const fullLiveTitle = "Chapter 2.1 04-Information Storage.pdf Download (Updated on 04/28/2026) Zoom Recording (05/01/26)";
+    const outcome = applySessionEnrichment(snapshot, "c1", [{ title: fullLiveTitle, links: [{ text: "Zoom Recording", url: "https://example.test/rec" }] }]);
+
+    assert.equal(outcome.matched, 1, "the fuller live-captured title must still match its truncated ICS-stored counterpart");
+  },
+);
+
+test(
+  "prefix matching only ever goes one direction (stored-is-prefix-of-incoming) and never " +
+    "fires for short titles — a live capture is always at least as complete as a truncated " +
+    "ICS title, never less, and a short numbered title like 'HW1' must never spuriously " +
+    "prefix-match something like 'HW10'",
+  () => {
+    const shortStored = makeAssignment("c1", "1", "HW1");
+    const snapshotShort = baseSnapshot([shortStored]);
+    const outcomeShort = applySessionEnrichment(snapshotShort, "c1", [{ title: "HW10" }]);
+    assert.equal(outcomeShort.matched, 0, "a short stored title must never prefix-match a longer, genuinely different title");
+
+    // The reverse direction: the stored title is LONGER/fuller than the incoming row — this
+    // should never happen in practice (ICS truncates, it doesn't grow), so it must not match.
+    const fullStored = makeAssignment(
+      "c2",
+      "1",
+      "Chapter 2.1 04-Information Storage.pdf Download (Updated on 04/28/2026) Zoom Recording (05/01/26)",
+    );
+    const snapshotFull = baseSnapshot([fullStored]);
+    const outcomeReverse = applySessionEnrichment(snapshotFull, "c2", [{ title: "Chapter 2.104-Information Storage.pdf  Download (Updated on 04/28/2026)Zoom Reco" }]);
+    assert.equal(outcomeReverse.matched, 0, "must never match in the reverse direction (incoming shorter than stored)");
+  },
+);

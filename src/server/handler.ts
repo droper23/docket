@@ -4,7 +4,7 @@ import { IcsConnector } from "../connectors/icsConnector.js";
 import { bookmarkletHref, bookmarkletSource } from "../connectors/bookmarklet.js";
 import { DEFAULT_USER_ID, getSnapshotStore, isCloudMode, isMultiTenantMode, loadKnownCourses, saveDiscoveredCourses } from "../config.js";
 import type { DiscoveredCourse } from "../config.js";
-import { recentChanges, todayView, upcomingView, workloadView } from "../core/academicViews.js";
+import { recentChanges, scheduleView, workloadView } from "../core/academicViews.js";
 import { computeDiagnostics } from "../core/diagnostics.js";
 import { applySessionEnrichment } from "../core/enrichment.js";
 import type { AssignmentPageRow } from "../core/enrichment.js";
@@ -37,8 +37,7 @@ import {
   renderImportResult,
   renderLogin,
   renderPrivacy,
-  renderToday,
-  renderUpcoming,
+  renderSchedule,
 } from "./render.js";
 
 async function pickConnector(userId: string) {
@@ -100,6 +99,10 @@ function isNonEmptyShortString(v: unknown): v is string {
   return typeof v === "string" && v.trim().length > 0 && v.length <= MAX_FIELD_LEN;
 }
 
+function isNonEmptyString(v: unknown, maxLen: number): v is string {
+  return typeof v === "string" && v.trim().length > 0 && v.length <= maxLen;
+}
+
 function validateDiscoveredCourses(raw: unknown): DiscoveredCourse[] {
   if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_IMPORTED_COURSES) {
     throw new Error("Expected a non-empty list of courses");
@@ -151,19 +154,63 @@ function validateAssignmentRows(raw: unknown): AssignmentPageRow[] {
   return raw.map((item, i) => {
     if (typeof item !== "object" || item === null) throw new Error(`Row #${i + 1} is malformed`);
     const r = item as Record<string, unknown>;
-    if (!isNonEmptyShortString(r.title) || typeof r.due !== "string" || typeof r.score !== "string") {
+    if (!isNonEmptyShortString(r.title)) {
       throw new Error(`Row #${i + 1} is missing required fields`);
     }
     return {
       title: r.title,
-      due: r.due.slice(0, MAX_FIELD_LEN),
-      score: r.score.slice(0, 40),
+      due: typeof r.due === "string" && r.due.length > 0 ? r.due.slice(0, MAX_FIELD_LEN) : undefined,
+      score: typeof r.score === "string" && r.score.length > 0 ? r.score.slice(0, 40) : undefined,
       category: typeof r.category === "string" && r.category.length > 0 ? r.category.slice(0, MAX_FIELD_LEN) : undefined,
       description: typeof r.description === "string" && r.description.length > 0 ? r.description.slice(0, MAX_DESCRIPTION_LEN) : undefined,
       links: validateLinks(r.links),
       completed: r.completed === true,
     };
   });
+}
+
+// Higher than MAX_IMPORTED_ROWS: this payload spans every one of a student's connected
+// courses in one Combined Schedule pass, rather than one course's Assignments page.
+const MAX_SCHEDULE_ITEMS = 600;
+// A Combined Schedule item's "title" comes straight off a calendar SUMMARY field, not a
+// short assignment name off an Assignments-page row — confirmed live at 430 real characters
+// for an instructor's full weekly-reading text, well past MAX_FIELD_LEN (200, sized for
+// actual assignment names). Generous headroom, not a tight fit to one observed case.
+const MAX_SCHEDULE_TITLE_LEN = 1000;
+
+/** One item from the Combined Schedule bookmarklet — see scheduleExtractorSource() in bookmarklet.ts. Groups into per-course AssignmentPageRow batches for applySessionEnrichment. */
+export function validateScheduleItems(raw: unknown): { byCourse: Map<string, AssignmentPageRow[]>; skipped: number } {
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_SCHEDULE_ITEMS) {
+    throw new Error("Expected a non-empty list of schedule items");
+  }
+  const byCourse = new Map<string, AssignmentPageRow[]>();
+  let skipped = 0;
+  // Skips a malformed item rather than throwing (the original bug, found live): one
+  // over-long title used to abort validation entirely, silently discarding every other
+  // item in the same batch along with it — a whole real sync run producing zero saved
+  // items with no visible error beyond a generic "couldn't import" on the request. One bad
+  // item should cost that one item, never the rest of an otherwise-good batch.
+  for (const item of raw) {
+    if (typeof item !== "object" || item === null) {
+      skipped += 1;
+      continue;
+    }
+    const r = item as Record<string, unknown>;
+    if (!isNonEmptyShortString(r.courseId) || !isNonEmptyString(r.title, MAX_SCHEDULE_TITLE_LEN)) {
+      skipped += 1;
+      continue;
+    }
+    const row: AssignmentPageRow = {
+      title: r.title,
+      due: typeof r.due === "string" && r.due.length > 0 ? r.due.slice(0, MAX_FIELD_LEN) : undefined,
+      description: typeof r.description === "string" && r.description.length > 0 ? r.description.slice(0, MAX_DESCRIPTION_LEN) : undefined,
+      links: validateLinks(r.links),
+    };
+    const bucket = byCourse.get(r.courseId) ?? [];
+    bucket.push(row);
+    byCourse.set(r.courseId, bucket);
+  }
+  return { byCourse, skipped };
 }
 
 function html(res: ServerResponse, body: string, status = 200) {
@@ -258,6 +305,46 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, g
           renderImportResult(
             "assignments",
             `<p>Matched ${outcome.matched} of ${rows.length} assignment(s), ${outcome.changeCount} updated with new grade/due-time info.</p>${unmatchedNote}`,
+          ),
+        );
+      } catch (err) {
+        html(res, renderImportResult("assignments", `<p>Couldn't import: ${esc(err instanceof Error ? err.message : String(err))}</p>`), 400);
+      }
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/connect/learningsuite/import-schedule-details") {
+      const body = parseFormBody(await readBody(req));
+      try {
+        const userId = await resolveImportUserId(body.token, multiTenant);
+        if (isCloudMode()) {
+          const rl = await checkRateLimit("import", userId, 30, 60);
+          if (!rl.allowed) throw new Error("Too many import attempts — wait a minute and try again");
+        }
+        const { byCourse, skipped } = validateScheduleItems(JSON.parse(body.items ?? "null"));
+        const snapshot = await store.load(userId);
+        let matched = 0;
+        let total = 0;
+        let changeCount = 0;
+        const unmatched: string[] = [];
+        for (const [courseId, rows] of byCourse) {
+          total += rows.length;
+          const outcome = applySessionEnrichment(snapshot, courseId, rows, "learningsuite-session:combined-schedule");
+          matched += outcome.matched;
+          changeCount += outcome.changeCount;
+          unmatched.push(...outcome.unmatched);
+        }
+        await store.save(userId, snapshot);
+        const unmatchedNote =
+          unmatched.length > 0
+            ? `<p>${unmatched.length} item(s) couldn't be matched to a synced assignment (run <strong>Sync now</strong> first if you haven't synced these courses yet): ${unmatched.map((t) => esc(t)).join(", ")}</p>`
+            : "";
+        const skippedNote = skipped > 0 ? `<p>${skipped} item(s) were malformed and skipped.</p>` : "";
+        html(
+          res,
+          renderImportResult(
+            "assignments",
+            `<p>Matched ${matched} of ${total} schedule item(s) across ${byCourse.size} course(s), ${changeCount} updated with new description/link/due-time info.</p>${unmatchedNote}${skippedNote}`,
           ),
         );
       } catch (err) {
@@ -378,10 +465,12 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, g
     const snapshot = await store.load(userId);
 
     if (req.method === "GET" && url.pathname === "/") {
-      return html(res, renderToday(todayView(snapshot)));
+      return html(res, renderSchedule(scheduleView(snapshot)));
     }
+    // "/upcoming" used to be a separate view (today/upcoming were split); redirect old
+    // links/bookmarks rather than 404ing now that "/" covers the same window.
     if (req.method === "GET" && url.pathname === "/upcoming") {
-      return html(res, renderUpcoming(upcomingView(snapshot)));
+      return redirect(res, "/");
     }
     if (req.method === "GET" && url.pathname === "/courses") {
       return html(res, renderCourses(snapshot, workloadView(snapshot)));
@@ -398,13 +487,16 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, g
       const known = await loadKnownCourses(userId);
       const profile = multiTenant ? await getUserProfile(userId) : null;
       const token = profile?.bookmarkletToken ?? "";
+      const courseMap = known.map((c) => ({ code: c.code, courseId: c.courseId }));
       return html(
         res,
         renderConnect({
           courseListHref: bookmarkletHref("courses", origin, token),
           assignmentsHref: bookmarkletHref("assignments", origin, token),
+          scheduleHref: bookmarkletHref("schedule", origin, token, courseMap),
           courseListSource: bookmarkletSource("courses", origin, token),
           assignmentsSource: bookmarkletSource("assignments", origin, token),
+          scheduleSource: bookmarkletSource("schedule", origin, token, courseMap),
           knownCourseCount: known.length,
           account: profile ? { email: profile.email } : undefined,
         }),

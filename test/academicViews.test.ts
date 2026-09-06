@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { todayView, upcomingView, workloadView } from "../src/core/academicViews.js";
+import { scheduleView, workloadView } from "../src/core/academicViews.js";
 import { todayInSchoolTimeZone } from "../src/core/schoolTime.js";
 import { derivedField, realField } from "../src/core/types.js";
 import type { AcademicSnapshot, AssignmentRecord, CourseRecord } from "../src/core/types.js";
@@ -24,7 +24,7 @@ const course: CourseRecord = {
   title: realField("Test Course", "demo"),
 };
 
-test("todayView excludes calendar_event items even when due today", () => {
+test("scheduleView excludes calendar_event items even when due today", () => {
   const holiday: AssignmentRecord = {
     id: "c1:holiday",
     courseId: "c1",
@@ -41,12 +41,12 @@ test("todayView excludes calendar_event items even when due today", () => {
   };
   const snapshot = snapshotWith([holiday, real], [course]);
 
-  const items = todayView(snapshot);
+  const items = scheduleView(snapshot);
   assert.equal(items.length, 1);
   assert.equal(items[0]!.assignment.title.value, "Homework 1");
 });
 
-test("upcomingView and workloadView also exclude calendar_event items", () => {
+test("scheduleView and workloadView also exclude calendar_event items", () => {
   const holiday: AssignmentRecord = {
     id: "c1:holiday",
     courseId: "c1",
@@ -63,7 +63,7 @@ test("upcomingView and workloadView also exclude calendar_event items", () => {
   };
   const snapshot = snapshotWith([holiday, real], [course]);
 
-  const upcoming = upcomingView(snapshot);
+  const upcoming = scheduleView(snapshot);
   assert.equal(upcoming.length, 1);
   assert.equal(upcoming[0]!.assignment.title.value, "Homework 2");
 
@@ -80,5 +80,5 @@ test("an item with no kind set at all (connector doesn't classify) is treated as
     dueDate: realField(iso(0), "demo"),
   };
   const snapshot = snapshotWith([noKind], [course]);
-  assert.equal(todayView(snapshot).length, 1);
+  assert.equal(scheduleView(snapshot).length, 1);
 });

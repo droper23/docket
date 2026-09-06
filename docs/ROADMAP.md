@@ -32,7 +32,7 @@ computer is on. Now Docket runs in two modes from one codebase (`isCloudMode()`,
 - Generic, connector-agnostic sync engine — create / no-op / update-in-place / missing-grace-period-then-archive (`src/core/syncEngine.ts`)
 - Hand-rolled ICS parser with HTML-entity decoding, RFC 5545 line-folding, malformed-input tolerance (`src/connectors/icsParser.ts`)
 - `IcsConnector`, `DemoConnector` (`src/connectors/`)
-- Today / Upcoming / Courses (workload) / What Changed / Diagnostics dashboard, zero JS framework (`src/server/`)
+- Schedule / Courses (items due) / What Changed / Diagnostics dashboard, zero JS framework (`src/server/`) — Today and Upcoming were originally two separate views, merged into one continuous Schedule list
 - Automatic background sync via `launchd` (`scripts/install-launchd.sh`) — keeps data
   current as teachers add/move/remove assignments, with no human needed since the ICS feed
   needs no auth

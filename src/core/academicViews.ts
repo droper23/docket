@@ -1,23 +1,6 @@
 import { daysUntilInSchoolTimeZone } from "./schoolTime.js";
 import type { AcademicSnapshot, AssignmentRecord, ChangeLogEntry, CourseRecord } from "./types.js";
 
-/** Companion-owned effort heuristic, by LearningSuite's own assignment `type` string. Always "derived" — never shown as fact. */
-const EFFORT_MINUTES_BY_TYPE: Record<string, number> = {
-  lab: 90,
-  homework: 45,
-  quiz: 30,
-  reading: 30,
-  exam: 120,
-  project: 180,
-};
-const DEFAULT_EFFORT_MINUTES = 45;
-
-export function estimateEffortMinutes(a: AssignmentRecord): number {
-  const type = a.type?.value?.toLowerCase();
-  if (!type) return DEFAULT_EFFORT_MINUTES;
-  return EFFORT_MINUTES_BY_TYPE[type] ?? DEFAULT_EFFORT_MINUTES;
-}
-
 function daysUntil(dateStr: string | undefined): number | undefined {
   if (!dateStr) return undefined;
   // Anchored to BYU's own timezone, not the server's — see src/core/schoolTime.ts for why
@@ -51,7 +34,6 @@ export interface AgendaItem {
   assignment: AssignmentRecord;
   course?: CourseRecord;
   daysUntilDue?: number;
-  estimatedMinutes: number;
 }
 
 function courseFor(snapshot: AcademicSnapshot, courseId: string): CourseRecord | undefined {
@@ -63,35 +45,31 @@ function toAgendaItem(snapshot: AcademicSnapshot, a: AssignmentRecord): AgendaIt
     assignment: a,
     course: courseFor(snapshot, a.courseId),
     daysUntilDue: daysUntil(a.dueDate?.value),
-    estimatedMinutes: estimateEffortMinutes(a),
   };
 }
 
-/** "What do I need to do today?" — open, active items due within 2 days, most urgent first. */
-export function todayView(snapshot: AcademicSnapshot): AgendaItem[] {
+/**
+ * "What do I need to do?" — every open, active, real-work item due within
+ * `withinDays` (overdue items included: a negative `daysUntilDue` is never
+ * filtered out here), most urgent first. Used to be two separate views
+ * (`todayView` for <=2 days, `upcomingView` for the rest of the window) —
+ * merged into one since the split forced picking an arbitrary cutoff for a
+ * single continuous list a student reads top-to-bottom anyway.
+ */
+export function scheduleView(snapshot: AcademicSnapshot, withinDays = 14): AgendaItem[] {
   return snapshot.assignments
     .filter((a) => isActive(snapshot, a.id) && isOpen(a) && isRealWork(a) && a.dueDate?.value)
     .map((a) => toAgendaItem(snapshot, a))
-    .filter((item) => item.daysUntilDue !== undefined && item.daysUntilDue <= 2)
-    .sort((x, y) => (x.daysUntilDue ?? 0) - (y.daysUntilDue ?? 0));
-}
-
-/** Everything open and active beyond the urgent window, within `withinDays`. */
-export function upcomingView(snapshot: AcademicSnapshot, withinDays = 14): AgendaItem[] {
-  return snapshot.assignments
-    .filter((a) => isActive(snapshot, a.id) && isOpen(a) && isRealWork(a) && a.dueDate?.value)
-    .map((a) => toAgendaItem(snapshot, a))
-    .filter((item) => item.daysUntilDue !== undefined && item.daysUntilDue > 2 && item.daysUntilDue <= withinDays)
+    .filter((item) => item.daysUntilDue !== undefined && item.daysUntilDue <= withinDays)
     .sort((x, y) => (x.daysUntilDue ?? 0) - (y.daysUntilDue ?? 0));
 }
 
 export interface CourseWorkload {
   course: CourseRecord;
   itemCount: number;
-  estimatedMinutes: number;
 }
 
-/** Estimated workload per course for the next `withinDays` — clearly derived, never presented as LearningSuite fact. */
+/** How many open items are due per course in the next `withinDays` — a plain count, not a time estimate (Docket doesn't guess how long anything takes). */
 export function workloadView(snapshot: AcademicSnapshot, withinDays = 7): CourseWorkload[] {
   const items = snapshot.assignments
     .filter((a) => isActive(snapshot, a.id) && isOpen(a) && isRealWork(a) && a.dueDate?.value)
@@ -101,12 +79,11 @@ export function workloadView(snapshot: AcademicSnapshot, withinDays = 7): Course
   const byCourse = new Map<string, CourseWorkload>();
   for (const item of items) {
     if (!item.course) continue;
-    const existing = byCourse.get(item.course.id) ?? { course: item.course, itemCount: 0, estimatedMinutes: 0 };
+    const existing = byCourse.get(item.course.id) ?? { course: item.course, itemCount: 0 };
     existing.itemCount += 1;
-    existing.estimatedMinutes += item.estimatedMinutes;
     byCourse.set(item.course.id, existing);
   }
-  return [...byCourse.values()].sort((a, b) => b.estimatedMinutes - a.estimatedMinutes);
+  return [...byCourse.values()].sort((a, b) => b.itemCount - a.itemCount);
 }
 
 /** "What changed since I last checked?" */

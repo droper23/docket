@@ -13,6 +13,14 @@ supported by Brigham Young University or LearningSuite.
 against a real LearningSuite account. Completion status and Apple Calendar/Reminders
 integration are not built yet — see [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
+**Also in this repo:** [`reskin/`](reskin/README.md) is a separate, related project — a
+Safari userscript that restyles LearningSuite's *own* pages in place (Apple-HIG-styled
+cards/nav/dark-mode), rather than pulling data into a separate dashboard the way the rest of
+this README describes. $0, no Apple Developer account, installed via the free
+[Userscripts](https://apps.apple.com/us/app/userscripts/id1463298887) Safari extension. See
+[`reskin/README.md`](reskin/README.md) to install it or [`reskin/ROADMAP.md`](reskin/ROADMAP.md)
+for what's built vs. planned there.
+
 ## What it does today
 
 - Discovers your enrolled courses automatically — no course IDs to hunt down or type in
@@ -25,18 +33,19 @@ integration are not built yet — see [`docs/ROADMAP.md`](docs/ROADMAP.md).
   into an assignment (an autograder URL, a scoreboard, submission instructions) — the ICS
   feed alone has none of that. One click, reads a page you're already looking at.
 - Tells real coursework apart from pure calendar markers (holidays, "Start of Classes")
-  that ride along in the same schedule feed — Today/Upcoming only ever show you things
-  you actually need to do, never a federal holiday.
+  that ride along in the same schedule feed — the Schedule view only ever shows you
+  things you actually need to do, never a federal holiday.
 - Normalizes everything into one local data store on your machine — nothing leaves your
   device except read-only requests to LearningSuite's own feed.
-- Shows a **Today** view (what's due now), **Upcoming** (next two weeks), **Courses**
-  (estimated workload per class), **What Changed** (since your last check), and
+- Shows a **Schedule** view (everything due, overdue first, next two weeks), **Courses**
+  (how many items are due per class), **What Changed** (since your last check), and
   **Diagnostics** (is the connection healthy) — grouped by day like LearningSuite's own
   Combined Schedule, each day collapsible so you can focus on one at a time, with a
-  "due in N days" countdown on every card so what needs doing today is obvious at a
-  glance. Tap or click anywhere on a card (not a small link buried in it) to expand its
-  real category, full description, and any linked resources, so you
-  rarely need to open LearningSuite at all.
+  "due in N days" countdown and a "Due Friday" / "Due next Tuesday"-style date on every
+  card so what needs doing today is obvious at a glance without doing date math. Tap or
+  click anywhere on a card (not a small link buried in it) to expand its real category,
+  full description, and any linked resources, so you rarely need to open LearningSuite
+  at all.
 - Deployable to a free Vercel URL that works on your phone from anywhere — no laptop
   needs to be on, ever (see **Deploying so it works from anywhere**). A local-only mode
   also exists for development/demo, reachable over the same Wi-Fi.
@@ -188,6 +197,8 @@ src/server/       handler.ts (shared route logic) + index.ts (local dev server w
 src/cli.ts        sync / reset commands
 api/               Vercel serverless entry points (dashboard + cron sync) for deployed mode
 vercel.json       Vercel build/rewrite/cron config
+reskin/           separate project: a Safari userscript that reskins LearningSuite's own
+                  pages in place — see reskin/README.md, not part of the dashboard above
 scripts/          optional launchd install/uninstall for local automatic background sync
 docs/             architecture, threat model, roadmap
 legacy/           an earlier prototype of this same Phase 1 idea, superseded by src/ —
