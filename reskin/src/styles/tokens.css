@@ -1,181 +1,165 @@
 /**
- * Apple Human Interface Guidelines system colors/materials/type scale —
- * chosen per the project brief's closing line: "LearningSuite, if someone at
- * Apple had designed it," not a copy of Docket's own amber palette.
+ * Eleventh-pass design tokens — a genuine break from the ten prior passes' translucent
+ * Apple-HIG app-chrome (shadow-heavy cards, a blue→purple→pink gradient signature). Sourced
+ * from real, fetched apple.com/about.google/Material 3 production values (see
+ * PASS11_PLAN.md's Phase 4), not memorized impressions: opaque tonal surface steps instead of
+ * a translucent overlay, one flat interactive accent instead of a gradient, and
+ * container/on-container pairs for status color so contrast is structurally guaranteed rather
+ * than computed from a raw hue tint.
  *
  * Dark/light is resolved by src/index.ts, which always sets an explicit
- * data-docket-theme="dark"|"light" on <html> — never left to a bare
- * `prefers-color-scheme` media query. That's deliberate, not an
- * oversight: confirmed live that LearningSuite has its OWN independent
- * dark-mode toggle (`html.dark`, a manual per-site setting, not tied to the
- * OS setting at all) — trusting `prefers-color-scheme` alone meant this
- * reskin's colors could silently mismatch whatever LearningSuite itself was
- * actually displaying (e.g. this reskin painting a light theme while
- * LearningSuite's own page was dark, or vice versa). src/index.ts reads
- * that real signal first and only falls back to `prefers-color-scheme` when
- * the setting is "system" and LearningSuite gives no signal either way.
- *
- * `--docket-bg-elevated` (used for cards/groups) is a translucent overlay,
- * not a hardcoded hex, so a card reads as "slightly raised" against
- * whatever LearningSuite's own surrounding background actually is (also
- * confirmed live to be neither pure black/white nor Apple's own system
- * colors — LearningSuite uses its own dark grays, e.g. rgb(53,53,53) for
- * its page background) instead of imposing a competing, mismatched block
- * of solid color next to it. Everything is scoped under [data-docket-reskin]
- * plus a .docket-scope root class on every element this reskin actually
- * renders, so nothing here can ever apply to LearningSuite's own unrelated
- * markup — see spec §39 (no bare `*` rule, CSS isolation).
+ * data-docket-theme="dark"|"light" on <html> — never left to a bare `prefers-color-scheme`
+ * media query (LearningSuite has its own independent dark-mode toggle, unrelated to the OS
+ * setting — see index.ts's applyTheme() doc comment for the confirmed-live failure mode this
+ * avoids).
  */
 [data-docket-reskin] {
-  /* Inter first (Sep 2026 pass, issue #4): the previous stack only resolved to real
-   * San Francisco on Apple platforms — on Windows/Android/Linux every keyword missed and
-   * text fell through to plain Arial, which is exactly the "generic" look reported. The
+  /* Inter first: the previous stack only resolved to real San Francisco on Apple platforms —
+   * on Windows/Android/Linux every keyword missed and text fell through to plain Arial. The
    * bundled Inter (font-inter.css, base64 data: URI, zero network requests) guarantees the
-   * SAME well-drawn typeface on every platform/browser, and being SF-proportioned it keeps
-   * the Apple-designed feel on macOS too. The OS keywords stay after it as a fallback if
-   * the @font-face ever fails to parse, then Helvetica/Arial, then sans-serif. */
+   * same well-drawn typeface on every platform/browser. */
   --docket-font: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
   --docket-font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 
-  --docket-radius-sm: 8px;
-  --docket-radius-md: 12px;
-  --docket-radius-lg: 20px;
-  /* A bigger, editorial radius (Sep 2026 "look nothing like the original" pass) — apple.com's
-     own product cards and about.google's tiles both round far past the 20px "app chrome"
-     scale above; used for hero surfaces (course cards, the page-header glow container) that
-     should read as a marketing-page tile, not a settings row. */
-  --docket-radius-xl: 28px;
+  /* Simplified radius scale — 14px ("md") is the new default for any card/grouped surface,
+   * not the old 20/28px "editorial tile" scale, which read as an oversized novelty next to
+   * real content once the translucent-overlay backgrounds became opaque fills. */
+  --docket-radius-xs: 6px;
+  --docket-radius-sm: 10px;
+  --docket-radius-md: 14px;
+  --docket-radius-lg: 20px; /* sheets/modals only */
+  --docket-radius-pill: 999px;
 
-  /* A signature multi-hue sweep (Sep 2026 pass) — apple.com's keynote/product-page gradients
-     and about.google's own four-color palette both lean on a visible color transition rather
-     than a single flat brand blue; used sparingly (the hero glow behind a page's
-     .docket-large-title, and the active nav pill) so it reads as a deliberate accent, not a
-     wash over everything. Light/dark values differ only in how saturated/bright the stops are
-     — both sweep blue -> purple -> pink, the same hue family as --docket-blue/--docket-purple
-     so it never fights the rest of the palette. */
-  --docket-accent-gradient: linear-gradient(135deg, #007aff 0%, #af52de 55%, #ff375f 100%);
-  --docket-hero-glow: radial-gradient(closest-side, rgba(0, 122, 255, 0.16), rgba(175, 82, 222, 0.12) 55%, transparent 75%);
+  /* Motion: role-specific curves/durations, replacing the single cubic-bezier(0.16,1,0.3,1)
+   * used sitewide (13 occurrences pre-pass-11). Both reduced-motion gates below already force
+   * near-zero durations regardless of which curve is used. */
+  --docket-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --docket-ease-enter: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --docket-ease-exit: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --docket-dur-fast: 120ms;
+  --docket-dur-medium: 220ms;
+  --docket-dur-slow: 320ms;
 
-  --docket-blue: #007aff;
-  --docket-red: #ff3b30;
-  --docket-red-orange: #ff5c33;
-  --docket-orange: #ff9500;
-  --docket-green: #34c759;
-  --docket-yellow: #ffcc00;
-  /* Yellow itself is too low-contrast to read as badge TEXT on a light canvas (Apple never
-     uses raw systemYellow as small text either) — this is the readable-as-text variant of
-     the same hue, used only for .docket-badge-yellow's foreground color. */
-  --docket-yellow-text: #9a6300;
-  --docket-purple: #af52de;
-  --docket-gray: #8e8e93;
-  /* A tinted-alert fill, not a solid block — matches Apple's own system-yellow banner
-     convention (e.g. Mail/Calendar's "low storage"/permission banners), used for
-     LearningSuite's own native instructor-view banner (.bg-attention in global.css). */
-  --docket-yellow-banner-bg: rgba(255, 204, 0, 0.15);
+  /* Opaque tonal surface steps (Material 3's "surface container" model) — replaces the old
+   * `--docket-bg-elevated` translucent overlay (rgba(0,0,0,0.045) light / rgba(255,255,255,0.08)
+   * dark), which composited to roughly 1.1–1.3:1 contrast against real measured page
+   * backgrounds — barely visible in light mode, mud in dark mode. `--docket-bg-elevated`
+   * itself is kept as an alias (equal to `--docket-surface-1`) so every already-correct,
+   * live-confirmed selector that references it sitewide stays correct without a rename; new
+   * code should reach for `--docket-surface-1/2/3` directly. */
+  --docket-canvas: #ffffff;
+  --docket-surface-1: #f8f9fa; /* grouped-list ground */
+  --docket-surface-2: #f1f3f4; /* card fill / hover state */
+  --docket-surface-3: #e9eaee; /* pressed / selected */
+  --docket-bg-elevated: var(--docket-surface-1);
+  --docket-label: #1f1f1f; /* ~16.5:1 on canvas */
+  --docket-label-secondary: #444746; /* ~9.4:1 on canvas */
+  --docket-label-tertiary: #6c6f70; /* ~5.7:1 — use sparingly, prefer secondary */
+  --docket-separator: #dadce0;
+  --docket-fill: #eceef0; /* hover fill on transparent-background rows/nav */
 
-  /* The unified page canvas — applied globally (global.css) to LearningSuite's own chrome
-     containers (header, both nav bars, body) so the whole page shares one background instead
-     of each panel keeping its own slightly-different native gray. */
-  --docket-canvas: #f2f2f7;
-  /* An overlay tint, not a solid color — cards read as "slightly raised" against whatever
-     --docket-canvas resolves to, without needing a second hardcoded shade to keep in sync. */
-  --docket-bg-elevated: rgba(0, 0, 0, 0.045);
-  /* Was a distinct translucent "sidebar material" (rgba(246,246,246,0.78)) — real user
-     feedback (Sep 2026): the sidebar/top-bar/main backgrounds should all be the SAME, not
-     three subtly different panels. Now just an alias for --docket-canvas so the actual
-     <nav> element (.docket-nav-enhanced in navigation.css) paints the identical flat color
-     as body/header/.bg-top-nav; navigation.css keeps its own box-shadow/hairline for edge
-     definition instead of relying on a color difference to read as a separate panel. */
-  --docket-sidebar-bg: var(--docket-canvas);
-  --docket-label: rgba(0, 0, 0, 0.92);
-  --docket-label-secondary: rgba(60, 60, 67, 0.6);
-  --docket-label-tertiary: rgba(60, 60, 67, 0.3);
-  --docket-separator: rgba(60, 60, 67, 0.29);
-  --docket-fill: rgba(120, 120, 128, 0.12);
-  /* Real elevation, not one flat blur: a tight contact shadow (surface meets canvas) layered
-     under a soft, wider ambient shadow (surface floats above canvas) — the single soft blur
-     this used to be read as a flat tinted box, not a raised one. */
-  --docket-shadow: 0 1px 1px rgba(0, 0, 0, 0.04), 0 2px 6px rgba(0, 0, 0, 0.06), 0 10px 26px rgba(0, 0, 0, 0.08);
-  /* A hairline "glass edge" highlight along a surface's top, the way Apple's own translucent
-     materials catch light — combined with --docket-shadow via box-shadow's multi-value list. */
-  --docket-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  /* Depth now comes from the surface-step difference plus a 1px separator border, not a
+   * shadow — apple.com's own production CSS ships exactly one shadow sitewide, reserved for
+   * photographed product renders, never UI chrome; about.google ships zero. One shadow token
+   * survives, reserved for genuinely floating chrome (dropdown menus, the settings sheet) —
+   * those really do float over arbitrary page content underneath them. `--docket-shadow`/
+   * `--docket-highlight` stay defined (aliased to it) so any selector not yet migrated off
+   * them keeps a reasonable, much lighter appearance instead of a hard error. */
+  --docket-shadow-float: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 8px rgba(0, 0, 0, 0.15);
+  --docket-shadow: var(--docket-shadow-float);
+  --docket-highlight: none;
+
+  /* One flat interactive accent, split into fill/text and container/on-container pairs —
+   * never a gradient. `--docket-blue` is kept as an alias (equal to `--docket-accent`) so
+   * every already-confirmed-live sitewide selector that reaches for it (focus rings, links,
+   * the native "today" marker, radio/checkbox checked states — ~25 occurrences across
+   * global.css/navigation.css/schedule.css) stays correct with zero behavior change; new code
+   * should reach for `--docket-accent`/`--docket-on-accent` directly. */
+  --docket-accent: #0b57d0;
+  --docket-on-accent: #ffffff;
+  --docket-accent-container: #d2e3fc;
+  --docket-on-accent-container: #174ea6;
+  --docket-blue: var(--docket-accent);
+
+  /* Status roles — container/on-container pairs, replacing the old badge system's same-hue
+   * fill+text construction (a ~16% tint of a raw system color as background, the full-strength
+   * color as text), which independently-computed contrast checks found failing WCAG AA in at
+   * least one theme for every single badge color. */
+  --docket-status-overdue-bg: #fce8e6;
+  --docket-status-overdue-fg: #a50e0e;
+  --docket-status-soon-bg: #fef7e0;
+  /* Darkened from Material 3's baseline #b06000 — that value computes at ~4.34:1 against this
+     background, just under WCAG AA's 4.5:1 for normal text (verified live, Sep 2026, via
+     tools/cdp.mjs against the real rendered badges). #9c5500 clears it at ~5.3:1. */
+  --docket-status-soon-fg: #9c5500;
+  --docket-status-upcoming-bg: #e8f0fe;
+  --docket-status-upcoming-fg: #174ea6;
+  --docket-status-done-bg: #e6f4ea;
+  --docket-status-done-fg: #0d652d;
+  --docket-status-neutral-bg: #f1f3f4;
+  --docket-status-neutral-fg: #3c4043;
+
+  /* Raw system hues — reserved for the checkbox-done fill and the native instructor-view
+   * banner (see global.css's .bg-attention rule); never for status/grade badge text, which
+   * uses the container/on-container pairs above instead. */
+  --docket-green: #146c2e;
+  --docket-yellow-banner-bg: rgba(234, 138, 0, 0.14);
+
   color-scheme: light dark;
 }
 
 [data-docket-reskin][data-docket-theme="dark"] {
-  /* Background tint overrides (Settings > Background, Sep 2026 pass): same six curated
-   * choices in both themes, each with a light + dark value. Tints sit close to the theme's
-   * own canvas so LearningSuite's near-black/near-white text stays readable on every one
-   * (see settings.ts BACKGROUND_CHOICES). Applied to <html> as `data-docket-background` by
-   * src/index.ts; "default" simply never writes the attribute, so these rules don't fire.
-   * Each rule below carries the full [data-docket-reskin][data-docket-theme][data-docket-background]
-   * attribute chain so it out-specifies (not just out-orders) the base dark canvas above. */
-  --docket-blue: #0a84ff;
-  --docket-red: #ff453a;
-  --docket-red-orange: #ff6a4d;
-  --docket-orange: #ff9f0a;
+  --docket-canvas: #131314;
+  --docket-surface-1: #1b1b1c;
+  --docket-surface-2: #1f1f20;
+  --docket-surface-3: #2a2a2c;
+  --docket-bg-elevated: var(--docket-surface-1);
+  --docket-label: #e3e3e3; /* ~14.5:1 on canvas */
+  --docket-label-secondary: #c4c7c5; /* ~10.9:1 on canvas */
+  --docket-label-tertiary: #9a9d9c; /* ~6:1 */
+  --docket-separator: #444746;
+  --docket-fill: #2a2a2c;
+
+  --docket-shadow-float: 0 1px 3px rgba(0, 0, 0, 0.5), 0 4px 8px rgba(0, 0, 0, 0.3);
+  --docket-shadow: var(--docket-shadow-float);
+  --docket-highlight: none;
+
+  /* Dark mode's accent is a light blue, so its own-accent text must be DARK, not a naive
+   * "always white" — white-on-light-blue fails contrast. */
+  --docket-accent: #a8c7fa;
+  --docket-on-accent: #062e6f;
+  --docket-accent-container: #0e2a4d;
+  --docket-on-accent-container: #aecbfa;
+  --docket-blue: var(--docket-accent);
+
+  --docket-status-overdue-bg: #4a1512;
+  --docket-status-overdue-fg: #f6aea9;
+  --docket-status-soon-bg: #42320a;
+  --docket-status-soon-fg: #fde293;
+  --docket-status-upcoming-bg: #0f2c52;
+  --docket-status-upcoming-fg: #aecbfa;
+  --docket-status-done-bg: #0e2d1b;
+  --docket-status-done-fg: #a8dab5;
+  --docket-status-neutral-bg: #2b2b2f;
+  --docket-status-neutral-fg: #c4c7c5;
+
   --docket-green: #30d158;
-  --docket-yellow: #ffd60a;
-  --docket-yellow-text: #ffd60a;
-  --docket-purple: #bf5af2;
-  --docket-gray: #8e8e93;
   --docket-yellow-banner-bg: rgba(255, 214, 10, 0.16);
-
-  --docket-canvas: #000000;
-  --docket-bg-elevated: rgba(255, 255, 255, 0.08);
-  --docket-accent-gradient: linear-gradient(135deg, #0a84ff 0%, #bf5af2 55%, #ff375f 100%);
-  --docket-hero-glow: radial-gradient(closest-side, rgba(10, 132, 255, 0.28), rgba(191, 90, 242, 0.2) 55%, transparent 75%);
-  /* No longer a separate dark-mode-only override (see the :root definition's comment) —
-     --docket-sidebar-bg just aliases --docket-canvas, which this block already redefines. */
-  --docket-label: rgba(255, 255, 255, 0.92);
-  --docket-label-secondary: rgba(235, 235, 245, 0.6);
-  --docket-label-tertiary: rgba(235, 235, 245, 0.3);
-  --docket-separator: rgba(255, 255, 255, 0.14);
-  --docket-fill: rgba(255, 255, 255, 0.1);
-  /* A dark shadow barely reads against the near-black canvas dark mode uses, so the
-     highlight below (not this shadow) carries most of the actual depth cue here — the
-     shadow stays for surfaces that end up elevated over something lighter than canvas
-     (e.g. a card inside a card) and for parity with the light-mode token shape. */
-  --docket-shadow: 0 1px 1px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.4), 0 16px 40px rgba(0, 0, 0, 0.35);
-  --docket-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-/* Dark-theme background tints — see the comment inside the dark block above.
-   Graphite intentionally keeps the pure-black canvas ("darker than default" is its whole
-   point, matching macOS's Graphite accent being the neutral option). */
-[data-docket-reskin][data-docket-theme="dark"][data-docket-background="graphite"] {
-  --docket-canvas: #000000;
-}
-[data-docket-reskin][data-docket-theme="dark"][data-docket-background="blue"] {
-  --docket-canvas: #0b1220;
-}
-[data-docket-reskin][data-docket-theme="dark"][data-docket-background="purple"] {
-  --docket-canvas: #150b20;
-}
-[data-docket-reskin][data-docket-theme="dark"][data-docket-background="rose"] {
-  --docket-canvas: #1c0a10;
-}
-[data-docket-reskin][data-docket-theme="dark"][data-docket-background="sand"] {
-  --docket-canvas: #16120a;
-}
+/* Background tint overrides (Settings > Background) — same six curated choices in both
+   themes, kept close to the theme's own canvas so label text stays readable on every one. */
+[data-docket-reskin][data-docket-theme="dark"][data-docket-background="graphite"] { --docket-canvas: #000000; }
+[data-docket-reskin][data-docket-theme="dark"][data-docket-background="blue"] { --docket-canvas: #0b1220; }
+[data-docket-reskin][data-docket-theme="dark"][data-docket-background="purple"] { --docket-canvas: #150b20; }
+[data-docket-reskin][data-docket-theme="dark"][data-docket-background="rose"] { --docket-canvas: #1c0a10; }
+[data-docket-reskin][data-docket-theme="dark"][data-docket-background="sand"] { --docket-canvas: #16120a; }
 
-/* Light-theme background tints — same six choices as dark; each stays close enough to
-   LearningSuite's own light canvas that near-black labels keep their contrast. */
-[data-docket-reskin][data-docket-theme="light"][data-docket-background="graphite"] {
-  --docket-canvas: #e8e8ed;
-}
-[data-docket-reskin][data-docket-theme="light"][data-docket-background="blue"] {
-  --docket-canvas: #e4edf8;
-}
-[data-docket-reskin][data-docket-theme="light"][data-docket-background="purple"] {
-  --docket-canvas: #eee7f8;
-}
-[data-docket-reskin][data-docket-theme="light"][data-docket-background="rose"] {
-  --docket-canvas: #f8e7ea;
-}
-[data-docket-reskin][data-docket-theme="light"][data-docket-background="sand"] {
-  --docket-canvas: #f7f1e5;
-}
+[data-docket-reskin][data-docket-theme="light"][data-docket-background="graphite"] { --docket-canvas: #e8e8ed; }
+[data-docket-reskin][data-docket-theme="light"][data-docket-background="blue"] { --docket-canvas: #e4edf8; }
+[data-docket-reskin][data-docket-theme="light"][data-docket-background="purple"] { --docket-canvas: #eee7f8; }
+[data-docket-reskin][data-docket-theme="light"][data-docket-background="rose"] { --docket-canvas: #f8e7ea; }
+[data-docket-reskin][data-docket-theme="light"][data-docket-background="sand"] { --docket-canvas: #f7f1e5; }
 
 @media (prefers-reduced-motion: reduce) {
   .docket-scope * {

@@ -1,7 +1,7 @@
 import type { Adapter } from "./types.js";
 import { looksLikeGradesPage } from "../core/pageDetector.js";
-import { overlayContent, markProcessed, h } from "../lib/dom.js";
-import type { Overlay } from "../lib/dom.js";
+import { overlayContent, markProcessed, h, listItem, createOverlayToggle } from "../lib/dom.js";
+import type { Overlay, OverlayToggle } from "../lib/dom.js";
 import { extractRows, buildCard } from "./assignmentsAdapter.js";
 import { diagnostics } from "../core/diagnostics.js";
 
@@ -29,6 +29,7 @@ import { diagnostics } from "../core/diagnostics.js";
 let overlay: Overlay | null = null;
 let listContainer: HTMLElement | null = null;
 let processedRows: HTMLElement[] = [];
+let toggle: OverlayToggle | null = null;
 
 export const gradesAdapter: Adapter = {
   id: "grades",
@@ -41,18 +42,17 @@ export const gradesAdapter: Adapter = {
 
     for (const r of rows) markProcessed(r.el, "assignmentrow");
     processedRows.push(...rows.map((r) => r.el));
-    const cards = rows.map((r) => buildCard(() => overlay, r));
+    const cards = rows.map((r) => listItem(buildCard(() => toggle?.reveal(), r)));
 
     if (overlay && listContainer) {
       for (const c of cards) listContainer.appendChild(c);
     } else {
-      listContainer = h("div", { class: "docket-group" }, cards);
-      const backToCards = h("button", { class: "docket-toggle-original" }, ["← Back to card view"]);
-      backToCards.addEventListener("click", () => overlay?.setOriginalHidden(true));
+      listContainer = h("div", { class: "docket-group", role: "list" }, cards);
+      toggle = createOverlayToggle(() => overlay);
       const view = h("div", { class: "docket-scope docket-page" }, [
-        h("div", { class: "docket-header" }, [h("div", { class: "docket-large-title" }, ["Grades"])]),
-        backToCards,
+        h("div", { class: "docket-header" }, [h("h1", { class: "docket-display" }, ["Grades"])]),
         listContainer,
+        toggle.button,
       ]);
       overlay = overlayContent(main, view, compatibilityMode);
     }
@@ -62,6 +62,7 @@ export const gradesAdapter: Adapter = {
     overlay?.remove();
     overlay = null;
     listContainer = null;
+    toggle = null;
     for (const el of processedRows) el.removeAttribute("data-docket-assignmentrow");
     processedRows = [];
   },

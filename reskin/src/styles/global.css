@@ -20,6 +20,16 @@
  * blanket override risks erasing a real visual signal elsewhere).
  */
 
+/* Ready-gate: hides real content for one frame rather than showing unstyled/un-hidden native
+   markup before an adapter has had a chance to run — `data-docket-ready` is set by
+   runAdapters() once theme/background are applied and any matching adapter has mounted (see
+   index.ts), with a ~400ms failsafe in earlyInject() so a page with no matching adapter is
+   never left permanently hidden. Deliberately narrow (`main` only, not the whole page) so the
+   masthead/nav are never hidden even during the gated window. */
+html[data-docket-reskin]:not([data-docket-ready]) main {
+  visibility: hidden;
+}
+
 /* Canvas: one consistent background across chrome that used to be several
    slightly-different native grays. Body's background alone already reaches
    the main content area (confirmed live: <main> itself has no background
@@ -51,31 +61,8 @@ html[data-docket-reskin],
   -webkit-font-smoothing: antialiased;
 }
 [data-docket-reskin] ::selection {
-  background-color: var(--docket-blue);
-  color: #fff;
-}
-
-/**
- * A signature gradient hairline under the masthead (Sep 2026 "look nothing like the
- * original" pass) — confirmed live `header` computes `position: static`, so this cannot
- * disturb any sticky/fixed behavior it might otherwise have. The one piece of chrome on
- * literally every page previously had zero color signature of its own (a stark flat bar);
- * this is the same accent sweep used for the active nav pill/top-tab underline/buttons,
- * applied where a visitor sees it before anything else, the way about.google's masthead and
- * apple.com's own product-page headers both lead with color rather than plain black/white.
- */
-[data-docket-reskin] header {
-  position: relative;
-}
-[data-docket-reskin] header::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 3px;
-  background: var(--docket-accent-gradient);
-  pointer-events: none;
+  background-color: var(--docket-accent);
+  color: var(--docket-on-accent);
 }
 
 /**
@@ -104,17 +91,17 @@ html[data-docket-reskin],
 [data-docket-reskin] h2,
 [data-docket-reskin] h3 {
   font-family: var(--docket-font) !important;
-  /* 700 -> 800, sizes bumped (Sep 2026 "look nothing like the original" pass) — matching
-     .docket-large-title's own headline-not-app-chrome scale, so pages that still render a
-     plain native <h1> (Announcements, Class Info, etc., with no dedicated adapter) get the
-     same editorial-headline feel as the adapter-rendered pages instead of reading as a
-     visibly smaller/older design generation. */
-  font-weight: 800 !important;
+  /* Weight capped at 600, matching .docket-title-1/-2's own scale — both real references
+     (apple.com, about.google) cap headline weight at 600; 800-weight, tightly-tracked
+     headlines belong to neither. Applies to pages that still render a plain native heading
+     (Announcements, Class Info, etc., with no dedicated adapter) so they match the
+     adapter-rendered pages' hierarchy instead of reading as an older design generation. */
+  font-weight: 600 !important;
   color: var(--docket-label) !important;
 }
-[data-docket-reskin] h1 { font-size: 34px !important; letter-spacing: -0.03em; }
-[data-docket-reskin] h2 { font-size: 25px !important; letter-spacing: -0.02em; }
-[data-docket-reskin] h3 { font-size: 18px !important; letter-spacing: -0.01em; }
+[data-docket-reskin] h1 { font-size: 26px !important; letter-spacing: -0.015em; }
+[data-docket-reskin] h2 { font-size: 20px !important; letter-spacing: -0.01em; }
+[data-docket-reskin] h3 { font-size: 17px !important; letter-spacing: -0.005em; }
 
 /**
  * Instructor-authored rich text (a Content page's file list, syllabus body text, etc.)
@@ -134,9 +121,9 @@ html[data-docket-reskin],
   font-family: var(--docket-font) !important;
   background-color: #fff !important;
   color: #1d1d1f !important;
+  border: 1px solid var(--docket-separator);
   border-radius: var(--docket-radius-md);
   padding: 16px;
-  box-shadow: var(--docket-shadow);
 }
 
 /**
@@ -226,8 +213,10 @@ html[data-docket-reskin],
    this is a background utility, not a text one. Confirmed only on this one calendar widget
    this pass; re-audit before assuming `.bg-primary` is safe to remap elsewhere. */
 [data-docket-reskin] .bg-primary {
-  background-color: var(--docket-blue) !important;
-  color: #fff !important;
+  background-color: var(--docket-accent) !important;
+  /* NOT hardcoded white — dark mode's accent is a light blue (see tokens.css), so its
+     on-accent text must be dark or this fails contrast badly in that theme. */
+  color: var(--docket-on-accent) !important;
 }
 
 /* Section/category header bars (e.g. a grade category's "20% of grade" strip) —
@@ -248,25 +237,20 @@ html[data-docket-reskin],
    treatment in navigation.css) and the Preferences dialog's accordion headers (a <div>,
    styled with the modal chrome below) — a blanket class rule would have fought both.
    Never bare `button` for dropdown triggers — see the file comment.
-   Full pill radius (Sep 2026 comparison pass), not the 8px rectangle every other rounded
-   surface in this reskin uses: apple.com/about.google's own primary CTAs are consistently
-   full pills, and unlike a card or row, a single free-floating action button reads as more
-   confidently "designed" at 999px than at the small-radius-rectangle scale meant for
-   surfaces containing other content. */
-/* Flat single-color CTAs (Sep 2026 pass): moved to the same signature gradient sweep as the
-   active nav pill/top-tab underline (tokens.css) rather than a flat brand blue — every
-   generic dashboard's own primary-button color. `background-color` stays as a fallback for
-   engines that don't parse the gradient function used. */
+   Full pill radius: apple.com/about.google's own primary CTAs are consistently full pills,
+   and unlike a card or row, a single free-floating action button reads as more confidently
+   "designed" at a full pill than at the small-radius-rectangle scale meant for surfaces
+   containing other content. Flat single-color fill, never a gradient — neither real
+   reference uses one anywhere in its shipped CSS. */
 [data-docket-reskin] .goBtn,
 [data-docket-reskin] .bg-action,
 [data-docket-reskin] button.bg-primary-dark {
   font-family: var(--docket-font) !important;
-  border-radius: 999px !important;
-  background-color: var(--docket-blue) !important;
-  background: var(--docket-accent-gradient) !important;
-  color: #fff !important;
+  border-radius: var(--docket-radius-pill) !important;
+  background-color: var(--docket-accent) !important;
+  color: var(--docket-on-accent) !important;
   border: none !important;
-  font-weight: 700 !important;
+  font-weight: 600 !important;
 }
 [data-docket-reskin] .goBtn:hover,
 [data-docket-reskin] .bg-action:hover,
@@ -278,7 +262,7 @@ html[data-docket-reskin],
 [data-docket-reskin] .goBtn:focus-visible,
 [data-docket-reskin] .bg-action:focus-visible,
 [data-docket-reskin] button.bg-primary-dark:focus-visible {
-  outline: 2px solid var(--docket-blue);
+  outline: 2px solid var(--docket-accent);
   outline-offset: 2px;
 }
 
@@ -324,10 +308,10 @@ html[data-docket-reskin],
 [data-docket-reskin] table {
   border-collapse: separate;
   border-spacing: 0;
-  border-radius: var(--docket-radius-lg);
+  border-radius: var(--docket-radius-md);
   overflow: hidden;
-  box-shadow: var(--docket-shadow), var(--docket-highlight);
-  background-color: var(--docket-bg-elevated);
+  border: 1px solid var(--docket-separator);
+  background-color: var(--docket-surface-1);
 }
 [data-docket-reskin] table td,
 [data-docket-reskin] table th {
@@ -350,13 +334,16 @@ html[data-docket-reskin],
  */
 [data-docket-reskin] .bg-gray1.text-primary-alt.px-4.py-2 {
   border-radius: var(--docket-radius-sm) var(--docket-radius-sm) 0 0 !important;
+  border: 1px solid var(--docket-separator);
+  border-bottom: none;
   font-family: var(--docket-font) !important;
   font-weight: 600 !important;
 }
 [data-docket-reskin] .bg-gray1.text-primary-alt.px-4.py-2 + .pl-mobile {
-  background-color: var(--docket-bg-elevated);
+  background-color: var(--docket-surface-1);
+  border: 1px solid var(--docket-separator);
+  border-top: none;
   border-radius: 0 0 var(--docket-radius-sm) var(--docket-radius-sm);
-  box-shadow: var(--docket-shadow);
   padding: 10px 16px 14px;
   margin-bottom: 10px;
 }
@@ -373,17 +360,18 @@ html[data-docket-reskin],
  * reskin's own `.docket-badge` idiom elsewhere.
  */
 [data-docket-reskin] .gridColsStyle {
-  background-color: var(--docket-bg-elevated);
-  border-radius: var(--docket-radius-lg) !important;
-  box-shadow: var(--docket-shadow), var(--docket-highlight);
+  background-color: var(--docket-surface-1);
+  border: 1px solid var(--docket-separator);
+  border-radius: var(--docket-radius-md) !important;
   padding: 8px 16px;
   overflow: hidden;
 }
 [data-docket-reskin] .gridColsStyle .clicky {
   display: inline-flex;
   padding: 3px 12px;
-  border-radius: 999px;
-  background-color: color-mix(in srgb, var(--docket-blue) 14%, transparent);
+  border-radius: var(--docket-radius-pill);
+  background-color: var(--docket-accent-container);
+  color: var(--docket-on-accent-container) !important;
 }
 
 /**
@@ -401,7 +389,7 @@ html[data-docket-reskin],
  */
 [data-docket-reskin] .bg-base.text-highlight {
   border-radius: var(--docket-radius-sm) !important;
-  transition: background-color 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color var(--docket-dur-fast) var(--docket-ease-standard);
 }
 [data-docket-reskin] .bg-base.text-highlight:hover {
   background-color: var(--docket-fill) !important;
@@ -428,9 +416,9 @@ html[data-docket-reskin],
   -webkit-backdrop-filter: saturate(180%) blur(20px);
 }
 [data-docket-reskin] .popupWrapper .minMax {
-  border-radius: var(--docket-radius-xl) !important;
+  border-radius: var(--docket-radius-lg) !important;
   background-color: var(--docket-canvas) !important;
-  box-shadow: var(--docket-shadow);
+  box-shadow: var(--docket-shadow-float);
 }
 /* The Preferences dialog's accordion section headers ("General", etc.) are confirmed
    live to be `div.text-white.bg-primary-dark.px-4.py-2.cursor-pointer` — the same
@@ -473,6 +461,5 @@ html[data-docket-reskin],
 [data-docket-reskin] iframe {
   border-radius: var(--docket-radius-md);
   overflow: hidden;
-  box-shadow: var(--docket-shadow), var(--docket-highlight);
-  border: none;
+  border: 1px solid var(--docket-separator);
 }

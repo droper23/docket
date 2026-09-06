@@ -186,7 +186,6 @@ export function openSettingsPanel(onSave: (settings: ReskinSettings) => void): v
     group([appearanceRow(settings.appearance, (v) => persist({ appearance: v })), backgroundRow(settings.background, (v) => persist({ background: v }))]),
     group([
       switchRow(shadow, "Use Companion navigation", settings.useCompanionNav, (v) => persist({ useCompanionNav: v })),
-      switchRow(shadow, "Show upcoming on Home", settings.showUpcomingOnHome, (v) => persist({ showUpcomingOnHome: v })),
       switchRow(shadow, "Reduce Motion", settings.reducedMotion, (v) => persist({ reducedMotion: v })),
     ]),
     group([

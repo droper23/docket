@@ -1,7 +1,7 @@
 import type { Adapter } from "./types.js";
 import { looksLikeAssignmentsPage } from "../core/pageDetector.js";
-import { overlayContent, markProcessed, isProcessed, h } from "../lib/dom.js";
-import type { Overlay } from "../lib/dom.js";
+import { overlayContent, markProcessed, isProcessed, h, listItem, createOverlayToggle } from "../lib/dom.js";
+import type { Overlay, OverlayToggle } from "../lib/dom.js";
 import { assignmentCard } from "../components/assignmentCard.js";
 import { parseAssignmentDueText } from "../lib/parseDueText.js";
 import { diagnostics } from "../core/diagnostics.js";
@@ -17,6 +17,15 @@ export interface RowData {
   categoryWeight?: string;
   dueText?: string;
   completed: boolean;
+  /** Availability-only date ("Opens Sep 9" — confirmed live, Sep 2026: a real status word
+   * distinct from the row's own due date, which is parsed separately as `dueText` above and
+   * is unaffected by this). Never carries urgency/overdue styling — see components/dueBadge.ts. */
+  opensText?: string;
+  /** Earned points, copied verbatim from the row's own score fraction — absent (not "0") when
+   * the assignment hasn't been graded yet. See assignmentCard.ts's score readout. */
+  scoreEarned?: string;
+  /** Possible points for the assignment, copied verbatim — present even when ungraded. */
+  scorePossible?: string;
 }
 
 /**
@@ -78,18 +87,35 @@ export function extractRows(main: Element): RowData[] {
     const rowText = el.textContent?.replace(/\s+/g, " ").trim() ?? "";
     const dueMatch = rowText.match(/[A-Z][a-z]{2}\s+\d{1,2}\s+\d{1,2}:\d{2}\s*[ap]m\s*[A-Z]{2,5}/);
     const afterDue = dueMatch ? rowText.slice(dueMatch.index! + dueMatch[0].length) : rowText;
-    const afterDueForScore = afterDue.replace(/^\s*Opens\s+[A-Z][a-z]{2}\s+\d{1,2}/, "");
+    // Confirmed live (Sep 2026, MATH 113 gradebook): a not-yet-available assignment's status
+    // column reads "Opens <Mon D>" here — its own real availability date, separate from the
+    // due date `dueMatch` already found above (e.g. "... Sep 11 1:59 pm MDT Opens Sep 9 ...").
+    // Carried through as `opensText` so the card can show it without ever treating it as an
+    // overdue signal (see components/assignmentCard.ts).
+    const opensMatch = afterDue.match(/^\s*Opens\s+([A-Z][a-z]{2}\s+\d{1,2})/);
+    const afterDueForScore = opensMatch ? afterDue.slice(opensMatch[0].length) : afterDue;
     const scoreMatch = afterDueForScore.match(/(\d+(?:\.\d+)?)?\s*\/\s*(\d+(?:\.\d+)?)/);
     const submissionText = (scoreMatch ? afterDueForScore.slice(0, scoreMatch.index) : afterDueForScore).trim();
     const completed = /\bcompleted\b/i.test(submissionText) || !!(scoreMatch && scoreMatch[1]);
 
-    results.push({ el: el as HTMLElement, titleCell, title, category: currentCategory, categoryWeight: currentWeight, dueText: dueMatch?.[0], completed });
+    results.push({
+      el: el as HTMLElement,
+      titleCell,
+      title,
+      category: currentCategory,
+      categoryWeight: currentWeight,
+      dueText: dueMatch?.[0],
+      completed,
+      opensText: opensMatch?.[1],
+      scoreEarned: scoreMatch?.[1],
+      scorePossible: scoreMatch?.[2],
+    });
   }
   return results;
 }
 
 /** Exported for gradesAdapter.ts — see extractRows()'s own export comment above. */
-export function buildCard(overlayRef: () => Overlay | null, r: RowData): HTMLElement {
+export function buildCard(reveal: () => void, r: RowData): HTMLElement {
   const { iso, time } = parseAssignmentDueText(r.dueText);
   const daysUntilDue = iso ? daysUntilInSchoolTimeZone(iso) : undefined;
   return assignmentCard(
@@ -101,12 +127,15 @@ export function buildCard(overlayRef: () => Overlay | null, r: RowData): HTMLEle
       dueTime: time,
       daysUntilDue,
       completed: r.completed,
+      opensText: r.opensText,
+      scoreEarned: r.scoreEarned,
+      scorePossible: r.scorePossible,
     },
     () => {
       // Reveal LearningSuite's own row and re-fire its real click handler —
       // this is how expand/submit/view-feedback keep working: nothing here
       // is reimplemented, just surfaced.
-      overlayRef()?.setOriginalHidden(false);
+      reveal();
       r.titleCell.click();
       r.el.scrollIntoView({ block: "center", behavior: "smooth" });
     },
@@ -116,6 +145,7 @@ export function buildCard(overlayRef: () => Overlay | null, r: RowData): HTMLEle
 let overlay: Overlay | null = null;
 let listContainer: HTMLElement | null = null;
 let processedRows: HTMLElement[] = [];
+let toggle: OverlayToggle | null = null;
 
 export const assignmentsAdapter: Adapter = {
   id: "assignments",
@@ -128,7 +158,7 @@ export const assignmentsAdapter: Adapter = {
 
     for (const r of rows) markProcessed(r.el, "assignmentrow");
     processedRows.push(...rows.map((r) => r.el));
-    const cards = rows.map((r) => buildCard(() => overlay, r));
+    const cards = rows.map((r) => listItem(buildCard(() => toggle?.reveal(), r)));
 
     if (overlay && listContainer) {
       // A MutationObserver pass found newly-rendered rows (e.g. an
@@ -137,13 +167,12 @@ export const assignmentsAdapter: Adapter = {
       // wrongly re-capture our own enhanced view as "original" content.
       for (const c of cards) listContainer.appendChild(c);
     } else {
-      listContainer = h("div", { class: "docket-group" }, cards);
-      const backToCards = h("button", { class: "docket-toggle-original" }, ["← Back to card view"]);
-      backToCards.addEventListener("click", () => overlay?.setOriginalHidden(true));
+      listContainer = h("div", { class: "docket-group", role: "list" }, cards);
+      toggle = createOverlayToggle(() => overlay);
       const view = h("div", { class: "docket-scope docket-page" }, [
-        h("div", { class: "docket-header" }, [h("div", { class: "docket-large-title" }, ["Assignments"])]),
-        backToCards,
+        h("div", { class: "docket-header" }, [h("h1", { class: "docket-display" }, ["Assignments"])]),
         listContainer,
+        toggle.button,
       ]);
       overlay = overlayContent(main, view, compatibilityMode);
     }
@@ -153,6 +182,7 @@ export const assignmentsAdapter: Adapter = {
     overlay?.remove();
     overlay = null;
     listContainer = null;
+    toggle = null;
     for (const el of processedRows) el.removeAttribute("data-docket-assignmentrow");
     processedRows = [];
   },

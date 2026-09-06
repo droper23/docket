@@ -7,6 +7,7 @@ import { h } from "../lib/dom.js";
 let navEl: Element | null = null;
 let topTabsEl: Element | null = null;
 let fabBar: HTMLElement | null = null;
+let skipLink: HTMLElement | null = null;
 
 /**
  * Boundary-safe path comparison: `current` is considered "on" `link` if they're equal, or
@@ -120,7 +121,18 @@ export function mountShell(settings: ReskinSettings, onSettingsSaved: (s: Reskin
   const settingsBtn = h("button", { class: "docket-fab", "aria-label": "Docket reskin settings" }, [icons.gear()]);
   settingsBtn.addEventListener("click", () => openSettingsPanel(onSettingsSaved));
   fabBar.appendChild(settingsBtn);
-  document.body.appendChild(fabBar);
+  // `position: fixed` means this doesn't move it visually — but on a long page (Combined
+  // Schedule can render ~300 rows) appending it at the end of <body> put it near the very
+  // last tab stop. Inserted at the front instead so it's reachable early.
+  document.body.insertBefore(fabBar, document.body.firstChild);
+
+  for (const stale of document.querySelectorAll(".docket-skip")) stale.remove();
+  const main = document.querySelector("main");
+  if (main) {
+    if (!main.id) main.id = "docket-main";
+    skipLink = h("a", { href: `#${main.id}`, class: "docket-skip docket-scope" }, ["Skip to content"]);
+    document.body.insertBefore(skipLink, document.body.firstChild);
+  }
 }
 
 export function unmountShell(): void {
@@ -137,4 +149,6 @@ export function unmountShell(): void {
   topTabsEl = null;
   fabBar?.remove();
   fabBar = null;
+  skipLink?.remove();
+  skipLink = null;
 }

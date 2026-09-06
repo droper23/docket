@@ -1,11 +1,11 @@
 import type { Adapter } from "./types.js";
 import { looksLikeScheduleListView } from "../core/pageDetector.js";
-import { overlayContent, markProcessed, isProcessed, h } from "../lib/dom.js";
-import type { Overlay } from "../lib/dom.js";
+import { overlayContent, markProcessed, isProcessed, h, listItem, createOverlayToggle } from "../lib/dom.js";
+import type { Overlay, OverlayToggle } from "../lib/dom.js";
 import { assignmentCard } from "../components/assignmentCard.js";
 import { icons } from "../components/icons.js";
 import { parseSlashDate, formatIsoDate } from "../lib/parseDueText.js";
-import { dayLabel } from "../../../src/core/agendaFormatting.js";
+import { dayLabel, dueDateLabel } from "../../../src/core/agendaFormatting.js";
 import { daysUntilInSchoolTimeZone } from "../../../src/core/schoolTime.js";
 import { diagnostics } from "../core/diagnostics.js";
 
@@ -14,6 +14,12 @@ interface ScheduleItem {
   courseCode?: string;
   dateIso: string;
   anchor: HTMLElement;
+  /** Confirmed live (Sep 2026): a not-yet-due item's own real anchor text ends in the literal
+   * word "Opens" (e.g. "HW 1 - Information Storage Opens") when listed under its availability
+   * date rather than its due date — that day can be well in the past, which previously read as
+   * "Overdue by N days" in the most alarming color in the badge system. Stripped from the
+   * display title; carried forward so the card can show a neutral "Opens ..." badge instead. */
+  opens: boolean;
 }
 
 // Same window src/connectors/bookmarklet.ts's scheduleExtractorSource() uses, for the same
@@ -53,9 +59,11 @@ function extractItems(main: Element): ScheduleItem[] {
     if (!titleCell || !headerEl) continue;
     const date = parseSlashDate(headerEl.textContent?.trim() ?? "");
     if (!date || date < minDate || date > maxDate) continue;
-    const title = a.textContent?.replace(/\s+/g, " ").trim() ?? "";
-    if (!title) continue;
-    results.push({ title, courseCode: courseCell?.textContent?.trim() || undefined, dateIso: formatIsoDate(date), anchor: a as HTMLElement });
+    const rawTitle = a.textContent?.replace(/\s+/g, " ").trim() ?? "";
+    if (!rawTitle) continue;
+    const opensMatch = rawTitle.match(/^(.*?)\s+Opens$/i);
+    const title = opensMatch ? opensMatch[1]! : rawTitle;
+    results.push({ title, courseCode: courseCell?.textContent?.trim() || undefined, dateIso: formatIsoDate(date), anchor: a as HTMLElement, opens: !!opensMatch });
   }
   results.sort((x, y) => x.dateIso.localeCompare(y.dateIso));
   return results;
@@ -91,6 +99,12 @@ function groupByDate(items: ScheduleItem[]): { dateIso: string; items: ScheduleI
 let overlay: Overlay | null = null;
 let dayList: HTMLElement | null = null;
 let processedAnchors: HTMLElement[] = [];
+let toggle: OverlayToggle | null = null;
+/** Scrolls to today's day group once, the first time it's found rendered — see mount()'s end.
+ * A module-level flag, not a per-render check, so a later mutation-triggered re-render (which
+ * only ever ADDS rows, see `accumulated`'s own doc) never re-triggers the scroll and yanks the
+ * student back to today after they've scrolled elsewhere themselves. */
+let scrolledToToday = false;
 
 export const homeAdapter: Adapter = {
   id: "home",
@@ -108,23 +122,31 @@ export const homeAdapter: Adapter = {
     processedAnchors.push(...items.map((i) => i.anchor));
 
     // Always re-render from the FULL accumulated set (see accumulated's doc).
-    const groups = groupByDate(mergedItemsSorted()).map((g) =>
+    const groupedData = groupByDate(mergedItemsSorted());
+    const groups = groupedData.map((g) =>
       h("div", { class: "docket-section" }, [
         h("div", { class: "docket-day-header" }, [
-          h("div", { class: "docket-headline" }, [dayLabel(g.dateIso)]),
+          h("h2", { class: "docket-title-2" }, [dayLabel(g.dateIso)]),
           h("span", { class: "docket-day-count" }, [String(g.items.length)]),
         ]),
         h(
           "div",
-          { class: "docket-group" },
+          { class: "docket-group", role: "list" },
           g.items.map((item) =>
-            assignmentCard(
-              { title: item.title, category: item.courseCode, daysUntilDue: daysUntilInSchoolTimeZone(item.dateIso) },
-              () => {
-                overlay?.setOriginalHidden(false);
-                item.anchor.click();
-                item.anchor.scrollIntoView({ block: "center", behavior: "smooth" });
-              },
+            listItem(
+              assignmentCard(
+                {
+                  title: item.title,
+                  category: item.courseCode,
+                  daysUntilDue: daysUntilInSchoolTimeZone(item.dateIso),
+                  opensText: item.opens ? dueDateLabel(item.dateIso) : undefined,
+                },
+                () => {
+                  toggle?.reveal();
+                  item.anchor.click();
+                  item.anchor.scrollIntoView({ block: "center", behavior: "smooth" });
+                },
+              ),
             ),
           ),
         ),
@@ -141,14 +163,24 @@ export const homeAdapter: Adapter = {
           ? groups
           : [h("div", { class: "docket-empty" }, [icons.checklist(), h("span", {}, ["Nothing in the next two weeks."])])],
       );
-      const backToCards = h("button", { class: "docket-toggle-original" }, ["← Back to card view"]);
-      backToCards.addEventListener("click", () => overlay?.setOriginalHidden(true));
+      toggle = createOverlayToggle(() => overlay);
       const view = h("div", { class: "docket-scope docket-page" }, [
-        h("div", { class: "docket-header" }, [h("div", { class: "docket-large-title" }, ["Today & Upcoming"])]),
-        backToCards,
+        h("div", { class: "docket-header" }, [h("h1", { class: "docket-display" }, ["Today & Upcoming"])]),
         dayList,
+        toggle.button,
       ]);
       overlay = overlayContent(main, view, compatibilityMode);
+    }
+
+    if (!scrolledToToday) {
+      const todayIso = formatIsoDate(new Date());
+      const idx = groupedData.findIndex((g) => g.dateIso >= todayIso);
+      if (idx >= 0) {
+        // Optional call: jsdom (this project's test environment) doesn't implement
+        // scrollIntoView at all — real browsers always have it.
+        groups[idx]!.scrollIntoView?.({ block: "start" });
+        scrolledToToday = true;
+      }
     }
     diagnostics.transformCount += items.length;
   },
@@ -156,6 +188,8 @@ export const homeAdapter: Adapter = {
     overlay?.remove();
     overlay = null;
     dayList = null;
+    toggle = null;
+    scrolledToToday = false;
     for (const a of processedAnchors) {
       a.removeAttribute("data-docket-scheduleitem");
       accumulated.delete(a);

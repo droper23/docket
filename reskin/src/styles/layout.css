@@ -4,37 +4,15 @@
 .docket-page {
   /* Deliberately no background here — confirmed live that painting one made this read as a
      mismatched box sitting inside LearningSuite's own page rather than blending with it.
-     Individual cards/groups carry their own subtle elevated surface instead. */
+     Individual cards/groups carry their own opaque surface instead. */
   padding: 40px 28px 72px;
-  /* Widened + more generous side padding (Sep 2026 "look nothing like the original" pass):
-     apple.com/about.google's biggest visible difference from stock SaaS chrome is generous
-     whitespace around a wider content column, not a cramped 760px app column. */
-  max-width: 960px;
+  /* apple.com's real content column is ~980px, about.google's is ~1024px; 1120 gives a wider
+     column real multi-column data room without reading too wide for a single paragraph. */
+  max-width: 1120px;
   margin: 0 auto;
 }
 .docket-header {
   margin-bottom: 32px;
-  position: relative;
-  /* Contains the glow pseudo-element's negative z-index to this header only, so it can never
-     render behind unrelated DOM earlier in the page (nav, native top bar). */
-  isolation: isolate;
-}
-/* The "hero glow" (Sep 2026 pass) — a soft, blurred multi-hue wash behind every page's own
-   title, the same device apple.com's product pages use above a headline and a softer cousin
-   of about.google's own colorful accent shapes. Purely decorative (pointer-events: none) and
-   scoped to .docket-header only — never applied to LearningSuite's own untouched native
-   headings, which have no equivalent wrapping container to hang it from. */
-.docket-header::before {
-  content: "";
-  position: absolute;
-  top: -60px;
-  left: -40px;
-  width: 340px;
-  height: 220px;
-  background: var(--docket-hero-glow);
-  filter: blur(6px);
-  z-index: -1;
-  pointer-events: none;
 }
 .docket-section { margin: 26px 0 10px; }
 .docket-day-header {
@@ -42,7 +20,7 @@
   padding: 4px 4px 8px;
 }
 .docket-day-count {
-  font-size: 12px; color: var(--docket-label-tertiary); font-weight: 600;
+  font-size: 13px; color: var(--docket-label-secondary); font-weight: 600;
 }
 
 .docket-course-grid {
@@ -51,40 +29,55 @@
   gap: 18px;
 }
 /**
- * Sep 2026 "look nothing like the original" pass: flat gray tiles read as generic app
- * chrome. Each card now washes its own course color (already computed per-course by
- * accentForCourse() and set as the --docket-card-accent custom property directly on this
- * element by courseCard.ts — a plain style-attribute addition, no behavior change) through a
- * soft gradient, the way about.google's own colorful tiles and apple.com's product cards
- * both use color/imagery to tell cards apart rather than a uniform neutral surface. The
- * flat `background` line first is a deliberate fallback for engines without color-mix.
+ * Flat, opaque surface — replaces the old translucent-overlay gradient wash (a 20%-hue mix
+ * into `--docket-bg-elevated`'s old rgba fill), which measured out to near-invisible in light
+ * mode and muddy/desaturated in dark mode. The course's own de-collided color (courseColor.ts,
+ * fed in per-card as the `--docket-card-accent` custom property) now appears once, at full
+ * strength, as a top-edge accent rule instead of washed across the whole card.
  */
 .docket-course-card {
-  background: var(--docket-bg-elevated);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--docket-card-accent, var(--docket-blue)) 20%, var(--docket-bg-elevated)) 0%, var(--docket-bg-elevated) 60%);
-  border-radius: var(--docket-radius-xl);
-  box-shadow: var(--docket-shadow), var(--docket-highlight);
+  position: relative;
+  overflow: hidden;
+  background: var(--docket-surface-1);
+  border: 1px solid var(--docket-separator);
+  border-radius: var(--docket-radius-md);
   padding: 22px;
   text-decoration: none;
   color: inherit;
   display: block;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: border-radius var(--docket-dur-medium) var(--docket-ease-enter), background-color var(--docket-dur-fast) var(--docket-ease-standard);
+}
+.docket-course-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: var(--docket-card-accent, var(--docket-accent));
+}
+/* A state-layer overlay, not a lift — `translateY` moved the click target out from under the
+   cursor and doesn't read correctly against an opaque surface with a hard border. The
+   asymmetric corner morph is about.google's own real hover signature on its image tiles. */
+.docket-course-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--docket-dur-fast) var(--docket-ease-standard);
 }
 .docket-course-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08), 0 16px 32px rgba(0, 0, 0, 0.14), var(--docket-highlight);
+  border-radius: 4px var(--docket-radius-lg) var(--docket-radius-lg) var(--docket-radius-lg);
 }
-.docket-course-card .docket-dot {
-  width: 14px;
-  height: 14px;
-  margin-bottom: 14px;
-  box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 18%, transparent);
-}
+.docket-course-card:hover::after { opacity: 0.06; }
+.docket-course-card:focus-visible::after { opacity: 0.08; }
+.docket-course-card:active::after { opacity: 0.1; }
 /* Real link (real href) or a `role="link" tabindex="0"` div standing in for one when
    LearningSuite gives no static href (see courseCard.ts) — both are keyboard-reachable and
    need the same visible focus signal every other control in this reskin carries. */
 .docket-course-card:focus-visible {
-  outline: 2px solid var(--docket-blue);
+  outline: 2px solid var(--docket-accent);
   outline-offset: 2px;
 }
 
@@ -94,6 +87,7 @@
   display: flex;
   gap: 14px;
   margin-top: 10px;
+  flex-wrap: wrap;
 }
 .docket-grade-stat {
   display: flex;
@@ -101,19 +95,38 @@
   align-items: flex-start;
   gap: 3px;
 }
-.docket-grade-stat .docket-footnote {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-}
 
 .docket-toggle-original {
   display: inline-flex; align-items: center; gap: 6px;
-  font-size: 13px; color: var(--docket-blue);
-  background: none; border: none; cursor: pointer; padding: 6px 2px; margin-top: 4px;
-  border-radius: var(--docket-radius-sm);
+  font-family: var(--docket-font);
+  font-size: 13px; font-weight: 600; color: var(--docket-accent);
+  background: none; border: none; cursor: pointer; padding: 6px 2px; margin-top: 16px;
+  border-radius: var(--docket-radius-xs);
 }
 .docket-toggle-original:focus-visible {
-  outline: 2px solid var(--docket-blue);
+  outline: 2px solid var(--docket-accent);
+  outline-offset: 2px;
+}
+
+/* Visually hidden until keyboard-focused — the first focusable element on every page, letting
+   a keyboard/screen-reader user jump past the nav straight to the real content. */
+.docket-skip {
+  position: fixed;
+  top: -100px;
+  left: 12px;
+  z-index: 2147483000;
+  background: var(--docket-accent);
+  color: var(--docket-on-accent);
+  padding: 10px 16px;
+  border-radius: var(--docket-radius-sm);
+  font-family: var(--docket-font);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: top var(--docket-dur-fast) var(--docket-ease-standard);
+}
+.docket-skip:focus-visible {
+  top: 12px;
+  outline: 2px solid var(--docket-on-accent);
   outline-offset: 2px;
 }

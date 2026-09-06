@@ -26,7 +26,6 @@ export interface ReskinSettings {
    * §42.
    */
   compatibilityMode: boolean;
-  showUpcomingOnHome: boolean;
   reducedMotion: boolean;
   background: BackgroundChoice;
 }
@@ -35,7 +34,6 @@ export const DEFAULT_SETTINGS: ReskinSettings = {
   appearance: "system",
   useCompanionNav: true,
   compatibilityMode: false,
-  showUpcomingOnHome: true,
   reducedMotion: false,
   background: "default",
 };

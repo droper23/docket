@@ -1,9 +1,9 @@
 /* Apple "grouped list" idiom (Reminders/Settings/Mail): a rounded card containing
-   hairline-divided rows, not Docket's individually-bordered tile cards. */
+   hairline-divided rows, not individually-bordered tile cards. */
 .docket-group {
-  background: var(--docket-bg-elevated);
-  border-radius: var(--docket-radius-lg);
-  box-shadow: var(--docket-shadow), var(--docket-highlight);
+  background: var(--docket-surface-1);
+  border: 1px solid var(--docket-separator);
+  border-radius: var(--docket-radius-md);
   overflow: hidden;
   margin-bottom: 24px;
 }
@@ -12,27 +12,34 @@
   align-items: center;
   gap: 14px;
   padding: 15px 20px;
-  border-bottom: 0.5px solid var(--docket-separator);
+  border-bottom: 1px solid var(--docket-separator);
   min-height: 44px; /* Apple's minimum touch target */
-  transition: background-color 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color var(--docket-dur-fast) var(--docket-ease-standard);
 }
 .docket-group .docket-row:last-child { border-bottom: none; }
 .docket-row-tappable { cursor: pointer; }
 .docket-row-tappable:hover { background: var(--docket-fill); }
 .docket-row-tappable:active { background: var(--docket-fill); }
-/* Real keyboard-focusable widget (tabindex="0" + role="button", see assignmentCard.ts) —
+/* Real keyboard-focusable widget (tabindex="0" + role="link", see assignmentCard.ts) —
    without this it was reachable by keyboard but gave zero visual signal when focused. */
 .docket-row-tappable:focus-visible {
-  outline: 2px solid var(--docket-blue);
+  outline: 2px solid var(--docket-accent);
   outline-offset: -2px;
 }
 
-.docket-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-
 .docket-row-main { flex: 1; min-width: 0; }
-.docket-row-title { font-size: 15px; font-weight: 600; color: var(--docket-label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.docket-row-subtitle { font-size: 13px; color: var(--docket-label-secondary); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.docket-row-trailing { flex-shrink: 0; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--docket-label-secondary); }
+.docket-row-title {
+  font-size: 15px; font-weight: 600; color: var(--docket-label);
+  /* A 2-line clamp, not nowrap+ellipsis — the old truncation cut real content mid-word well
+     before its actionable half. */
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.docket-row-subtitle {
+  font-size: 13px; color: var(--docket-label-secondary); margin-top: 1px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.docket-row-trailing { flex-shrink: 0; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--docket-label-secondary); }
+.docket-score { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--docket-label); }
 .docket-chevron { width: 8px; height: 8px; border-top: 1.6px solid var(--docket-label-tertiary); border-right: 1.6px solid var(--docket-label-tertiary); transform: rotate(45deg); flex-shrink: 0; }
 
 .docket-row-body { padding: 0 16px 14px 38px; font-size: 13px; color: var(--docket-label-secondary); line-height: 1.5; }
@@ -40,31 +47,34 @@
 
 .docket-link-chip {
   display: inline-block;
-  font-size: 12px;
+  font-size: 13px;
   padding: 4px 10px;
   margin: 0 6px 6px 0;
-  border-radius: 999px;
+  border-radius: var(--docket-radius-pill);
   background: var(--docket-fill);
-  color: var(--docket-blue);
+  color: var(--docket-accent);
   text-decoration: none;
 }
 
+/**
+ * Status roles — container/on-container pairs, replacing the old same-hue fill+text
+ * construction (a ~16% tint of a raw system color as background, the full-strength color as
+ * text), which computed under WCAG AA in at least one theme for every single badge color.
+ */
 .docket-badge {
   display: inline-flex;
   align-items: center;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
   padding: 3px 11px;
-  border-radius: 999px;
+  border-radius: var(--docket-radius-pill);
 }
-.docket-badge-red { background: color-mix(in srgb, var(--docket-red) 16%, transparent); color: var(--docket-red); }
-.docket-badge-red-orange { background: color-mix(in srgb, var(--docket-red-orange) 18%, transparent); color: var(--docket-red-orange); }
-.docket-badge-orange { background: color-mix(in srgb, var(--docket-orange) 16%, transparent); color: var(--docket-orange); }
-.docket-badge-yellow { background: color-mix(in srgb, var(--docket-yellow) 22%, transparent); color: var(--docket-yellow-text); }
-.docket-badge-gray { background: var(--docket-fill); color: var(--docket-label-secondary); }
-.docket-badge-blue { background: color-mix(in srgb, var(--docket-blue) 16%, transparent); color: var(--docket-blue); }
-.docket-badge-green { background: color-mix(in srgb, var(--docket-green) 16%, transparent); color: var(--docket-green); }
+.docket-badge-overdue { background: var(--docket-status-overdue-bg); color: var(--docket-status-overdue-fg); }
+.docket-badge-soon { background: var(--docket-status-soon-bg); color: var(--docket-status-soon-fg); }
+.docket-badge-upcoming { background: var(--docket-status-upcoming-bg); color: var(--docket-status-upcoming-fg); }
+.docket-badge-done { background: var(--docket-status-done-bg); color: var(--docket-status-done-fg); }
+.docket-badge-neutral { background: var(--docket-status-neutral-bg); color: var(--docket-status-neutral-fg); }
 
 /* Apple empty-state idiom (Reminders' "No Reminders", Mail's "No Unread Mail"): a large
    muted glyph over a short, calm line of text, not a bare sentence sitting in whitespace. */

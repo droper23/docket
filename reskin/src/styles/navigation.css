@@ -1,9 +1,10 @@
 /**
  * Applied to LearningSuite's OWN existing top-level nav element in place
  * (see adapters/shell.ts) — never a fabricated replacement nav with guessed
- * routes. Styled like macOS's sidebar material / Reminders' list switcher:
- * a translucent bar, pill-shaped active state, no invented icons on links
- * whose destination we can't independently verify.
+ * routes. An opaque "island" rail (macOS Sonoma's own sidebar treatment):
+ * inset with a margin so canvas shows all the way around it, one step
+ * darker/lighter than canvas via the surface-1 token, edge-defined with a
+ * 1px separator border rather than a shadow.
  *
  * `background-color` (not the `background` shorthand) with `!important`:
  * confirmed live this element also carries LearningSuite's own
@@ -17,25 +18,14 @@
  * `flex-direction`) were confirmed live to already compose correctly —
  * only the fill color was ever actually broken.
  */
-/**
- * Sep 2026 "look nothing like the original" pass: a flush, edge-to-edge sidebar is exactly
- * the generic-SaaS shape the brief is asking to get away from. `margin` insets the same real
- * `<nav>` element within its own column (the column's width is set by the parent
- * `.bg-left-nav` wrapper, not by `<nav>` itself — confirmed in ROADMAP's own third pass — so
- * this cannot shift or resize the main content area) so canvas shows all the way around it,
- * reading as a floating rounded "island" (macOS Sonoma's own sidebar treatment) rather than a
- * flush native rail. Bigger radius/padding/gap to match.
- */
 .docket-nav-enhanced {
   display: flex !important;
   gap: 4px;
   padding: 10px;
   margin: 12px 10px;
-  background-color: var(--docket-sidebar-bg) !important;
-  backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  background-color: var(--docket-surface-1) !important;
+  border: 1px solid var(--docket-separator);
   border-radius: var(--docket-radius-lg);
-  box-shadow: var(--docket-shadow), var(--docket-highlight);
   font-family: var(--docket-font);
   overflow-x: auto;
 }
@@ -49,26 +39,26 @@
   color: var(--docket-label) !important;
   text-decoration: none !important;
   padding: 10px 14px !important;
-  border-radius: 999px !important;
+  border-radius: var(--docket-radius-pill) !important;
   white-space: nowrap;
   background-color: transparent !important;
-  transition: background-color 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color var(--docket-dur-fast) var(--docket-ease-standard);
 }
 .docket-nav-enhanced .docket-nav-item:hover { background-color: var(--docket-fill) !important; }
 /* Real `<a>` — reachable by keyboard already; this replaces the browser's own default ring
-   (which varies per browser and never matches the app's own blue) with the same focus
+   (which varies per browser and never matches the app's own accent) with the same focus
    language every other control in this reskin uses. Negative offset keeps the ring inside
    the pill instead of overlapping the next nav item in a tight sidebar. */
 .docket-nav-enhanced .docket-nav-item:focus-visible {
-  outline: 2px solid var(--docket-blue) !important;
+  outline: 2px solid var(--docket-accent) !important;
   outline-offset: -2px;
 }
-/* A flat single-color active pill was indistinguishable from any other flat-blue app on the
-   market; the signature accent sweep (see tokens.css) makes the current section read as a
-   deliberate, designed accent rather than a default `background: blue`. */
+/* A flat container fill, not a gradient — the active section reads as a deliberate, quieter
+   accent (not competing with real primary buttons on the same screen), matching Material's
+   own container/on-container role pairing for guaranteed contrast in both themes. */
 .docket-nav-enhanced .docket-nav-item-active {
-  background: var(--docket-accent-gradient) !important;
-  color: #fff !important;
+  background: var(--docket-accent-container) !important;
+  color: var(--docket-on-accent-container) !important;
 }
 /* Matched by real label text in shell.ts's restyleNav() — see icons.ts's navIconByLabel.
    Secondary/muted at rest so the label text stays the primary read, full label color when
@@ -81,7 +71,7 @@
   color: var(--docket-label-secondary);
 }
 .docket-nav-enhanced .docket-nav-item-active .docket-nav-icon {
-  color: #fff;
+  color: var(--docket-on-accent-container);
 }
 
 /**
@@ -94,38 +84,32 @@
 .docket-top-tabs .docket-top-tab {
   font-family: var(--docket-font) !important;
   font-size: 13px !important;
-  font-weight: 700 !important;
+  font-weight: 600 !important;
   color: var(--docket-label-secondary) !important;
   text-decoration: none !important;
   background: transparent !important;
   border-bottom: 3px solid transparent !important;
-  transition: color 0.16s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: color var(--docket-dur-fast) var(--docket-ease-standard), border-color var(--docket-dur-fast) var(--docket-ease-standard);
 }
 .docket-top-tabs .docket-top-tab:hover {
   color: var(--docket-label) !important;
 }
 .docket-top-tabs .docket-top-tab:focus-visible {
-  outline: 2px solid var(--docket-blue) !important;
+  outline: 2px solid var(--docket-accent) !important;
   outline-offset: 2px;
-  border-radius: var(--docket-radius-sm);
+  border-radius: var(--docket-radius-xs);
 }
-/* Gradient underline (see .docket-nav-item-active above) instead of a flat blue line — the
-   same signature accent, just applied via border-image since border-color can't take a
-   gradient directly. */
+/* A flat accent underline, not a gradient border-image. */
 .docket-top-tabs .docket-top-tab-active {
-  color: var(--docket-blue) !important;
-  border-bottom-color: var(--docket-blue) !important;
-  border-image: var(--docket-accent-gradient) 1;
+  color: var(--docket-accent) !important;
+  border-bottom-color: var(--docket-accent) !important;
 }
 
 .docket-floating-bar {
   position: fixed;
   bottom: max(18px, env(safe-area-inset-bottom));
-  /* Left-anchored (user request, Sep 2026 pass): the gear FAB reads as a global
-   * settings control, so it lives opposite the content, away from where scroll
-   * gestures land. Verified live at 390px (iPhone width): no collision with the
-   * sidebar rail or the bottom of the course nav — the bar is 44px tall against
-   * a ~90px rail and the page's own bottom padding clears it. */
+  /* Left-anchored: the gear FAB reads as a global settings control, so it lives opposite the
+   * content, away from where scroll gestures land. */
   left: 18px;
   z-index: 2147483000;
   display: flex;
@@ -134,20 +118,20 @@
 .docket-fab {
   width: 44px; height: 44px;
   border-radius: 50%;
-  background: var(--docket-sidebar-bg);
-  backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  box-shadow: var(--docket-shadow), var(--docket-highlight);
+  /* Genuinely floating chrome — sits over arbitrary scrolled content, like the dropdown
+     menus below, so it keeps the one surviving shadow token. */
+  background: var(--docket-surface-2);
+  box-shadow: var(--docket-shadow-float);
   border: none;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
   color: var(--docket-label);
-  transition: background-color 0.16s cubic-bezier(0.16, 1, 0.3, 1), transform 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color var(--docket-dur-fast) var(--docket-ease-standard), transform var(--docket-dur-fast) var(--docket-ease-standard);
 }
 .docket-fab:hover { background: var(--docket-fill); }
 .docket-fab:active { transform: scale(0.94); }
 .docket-fab:focus-visible {
-  outline: 2px solid var(--docket-blue);
+  outline: 2px solid var(--docket-accent);
   outline-offset: 2px;
 }
 .docket-icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
@@ -175,16 +159,16 @@
   flex-shrink: 0;
   position: relative;
   border: 1.5px solid var(--docket-label-tertiary);
-  background-color: var(--docket-bg-elevated);
+  background-color: var(--docket-surface-1);
   cursor: pointer;
-  transition: background-color 0.16s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color var(--docket-dur-fast) var(--docket-ease-standard), border-color var(--docket-dur-fast) var(--docket-ease-standard);
 }
 [data-docket-reskin] input[type="radio"] { border-radius: 50%; }
 [data-docket-reskin] input[type="checkbox"] { border-radius: 5px; }
 [data-docket-reskin] input[type="radio"]:checked,
 [data-docket-reskin] input[type="checkbox"]:checked {
-  border-color: var(--docket-blue);
-  background-color: var(--docket-blue);
+  border-color: var(--docket-accent);
+  background-color: var(--docket-accent);
 }
 [data-docket-reskin] input[type="radio"]:checked::after {
   content: "";
@@ -192,7 +176,7 @@
   top: 50%; left: 50%;
   width: 8px; height: 8px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--docket-on-accent);
   transform: translate(-50%, -50%);
 }
 [data-docket-reskin] input[type="checkbox"]:checked::after {
@@ -200,13 +184,13 @@
   position: absolute;
   top: 2px; left: 6px;
   width: 5px; height: 10px;
-  border-right: 2px solid #fff;
-  border-bottom: 2px solid #fff;
+  border-right: 2px solid var(--docket-on-accent);
+  border-bottom: 2px solid var(--docket-on-accent);
   transform: rotate(45deg);
 }
 [data-docket-reskin] input[type="radio"]:focus-visible,
 [data-docket-reskin] input[type="checkbox"]:focus-visible {
-  outline: 2px solid var(--docket-blue);
+  outline: 2px solid var(--docket-accent);
   outline-offset: 2px;
 }
 
@@ -222,7 +206,7 @@
 [data-docket-reskin] input[type="text"],
 [data-docket-reskin] input[type="number"] {
   font-family: var(--docket-font) !important;
-  background-color: var(--docket-bg-elevated) !important;
+  background-color: var(--docket-surface-1) !important;
   border: 1px solid var(--docket-separator) !important;
   border-radius: var(--docket-radius-sm) !important;
   color: var(--docket-label) !important;
@@ -230,27 +214,27 @@
 }
 [data-docket-reskin] input[type="text"]:focus-visible,
 [data-docket-reskin] input[type="number"]:focus-visible {
-  outline: 2px solid var(--docket-blue);
+  outline: 2px solid var(--docket-accent);
   outline-offset: 2px;
   border-color: transparent !important;
 }
 
 /**
- * The masthead's own two dropdown triggers (Sep 2026 comparison pass against apple.com/
- * about.google) — confirmed live real elements: `button.header-coursedropdown-trigger`
- * ("All courses" / the course name, top-left) and `button.header-userdropdown-trigger`
- * (the account name, top-right). Both present on literally every page, and — unlike the
- * sidebar and the dropdown panels they open — never given a hover/pill treatment: bare text
- * next to a caret with no affordance at all that they're interactive. A soft pill-shaped
- * hover fill (the same idiom already used for menu rows and nav items) is enough to make the
- * one piece of chrome that's on every screen stop reading as unstyled Bootstrap.
+ * The masthead's own two dropdown triggers — confirmed live real elements:
+ * `button.header-coursedropdown-trigger` ("All courses" / the course name, top-left) and
+ * `button.header-userdropdown-trigger` (the account name, top-right). Both present on
+ * literally every page, and — unlike the sidebar and the dropdown panels they open — never
+ * given a hover/pill treatment: bare text next to a caret with no affordance at all that
+ * they're interactive. A soft pill-shaped hover fill (the same idiom already used for menu
+ * rows and nav items) is enough to make the one piece of chrome that's on every screen stop
+ * reading as unstyled Bootstrap.
  */
 [data-docket-reskin] .header-coursedropdown-trigger,
 [data-docket-reskin] .header-userdropdown-trigger {
-  border-radius: 999px !important;
+  border-radius: var(--docket-radius-pill) !important;
   padding: 4px 12px !important;
   margin: -4px -12px !important;
-  transition: background-color 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color var(--docket-dur-fast) var(--docket-ease-standard);
 }
 [data-docket-reskin] .header-coursedropdown-trigger:hover,
 [data-docket-reskin] .header-userdropdown-trigger:hover {
@@ -258,13 +242,13 @@
 }
 [data-docket-reskin] .header-coursedropdown-trigger:focus-visible,
 [data-docket-reskin] .header-userdropdown-trigger:focus-visible {
-  outline: 2px solid var(--docket-blue);
+  outline: 2px solid var(--docket-accent);
   outline-offset: 2px;
 }
 
 /**
- * Floating menu chrome — the top bar's own dropdown panels, confirmed live (Sep 2026,
- * dark theme, reskin un-injected) on the Combined Schedule page:
+ * Floating menu chrome — the top bar's own dropdown panels, confirmed live on the Combined
+ * Schedule page:
  *
  * - Account menu (Messages/Preferences/Help/Logout): container
  *   `div.header-userdropdown-dropdown` wrapping `ul ... bg-base border-info lg:rounded`
@@ -274,26 +258,20 @@
  *   container `div.header-coursedropdown-dropdown` wrapping `ul ... bg-base border-info
  *   sm:rounded`.
  *
- * Both panels rendered natively as a solid rgb(36,36,36) box, 4px radius, NO shadow and
- * NO backdrop blur sitting on top of an otherwise-redesigned page — the seam this pass
- * was opened to eliminate. The containers themselves stay untouched (zero-height
- * position-only wrappers; the `ul` does all the visual work). LearningSuite's own
- * `transition-all duration-100 origin-top` open/close animation on the `ul` is confirmed
- * live and deliberately NOT overridden — only fill/radius/shadow change here.
- *
- * Material: same translucent recipe as `.docket-nav-enhanced` above but more opaque
- * (menus float over arbitrary page content, not a sidebar's quiet edge), so text stays
- * readable in both themes. The first `background-color` declaration is a deliberate
- * fallback for engines without `color-mix` — such engines keep the previous opaque
- * canvas fill instead of an unreadably transparent menu. The glass-edge highlight rides
- * along in the same box-shadow list as everywhere else (--docket-highlight).
+ * Both panels rendered natively as a solid off-palette box with no shadow and no backdrop
+ * blur sitting on top of an otherwise-redesigned page. The containers themselves stay
+ * untouched (zero-height position-only wrappers; the `ul` does all the visual work).
+ * LearningSuite's own `transition-all duration-100 origin-top` open/close animation on the
+ * `ul` is confirmed live and deliberately NOT overridden — only fill/radius/shadow change
+ * here. These genuinely float over arbitrary page content, so — unlike the now-opaque nav
+ * rail — they keep a translucent, blurred material and the one surviving shadow token.
  */
 [data-docket-reskin] .header-userdropdown-dropdown > ul,
 [data-docket-reskin] .header-coursedropdown-dropdown > ul {
   background-color: var(--docket-canvas) !important;
-  background-color: color-mix(in srgb, var(--docket-canvas) 85%, transparent) !important;
+  background-color: color-mix(in srgb, var(--docket-canvas) 92%, transparent) !important;
   border-radius: var(--docket-radius-md) !important;
-  box-shadow: var(--docket-shadow), var(--docket-highlight);
+  box-shadow: var(--docket-shadow-float);
   backdrop-filter: saturate(180%) blur(20px);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
 }
@@ -304,10 +282,7 @@
  * inside the Preferences sheet the timezone-picker options are
  * `div.cursor-pointer.text-primary.hover\:bg-accent`. Natively the hover fill is
  * LearningSuite's accent color (var(--ac)); here it becomes the same neutral fill every
- * other hoverable row in the redesign uses. A sitewide `.hover\:bg-accent` remap was
- * considered and deliberately deferred — it is a Tailwind-style utility that could sit on
- * unconfirmed non-menu elements; extend only after re-auditing wherever it next appears
- * (noted in ROADMAP.md).
+ * other hoverable row in the redesign uses.
  */
 [data-docket-reskin] .header-userdropdown-dropdown li.hover\:bg-accent:hover,
 [data-docket-reskin] .header-coursedropdown-dropdown li.hover\:bg-accent:hover,

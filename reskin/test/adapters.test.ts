@@ -168,7 +168,7 @@ test("gradesAdapter renders the Grades page's identical row shape as a grade lis
     assert.equal(gradesAdapter.matches(), true);
     assert.equal(assignmentsAdapter.matches(), false, "the identical row shape must not also match Assignments once .bg-top-nav-highlight reads Grades");
     gradesAdapter.mount(false);
-    assert.equal(document.querySelector(".docket-large-title")?.textContent, "Grades");
+    assert.equal(document.querySelector(".docket-display")?.textContent, "Grades");
     const titles = Array.from(document.querySelectorAll(".docket-row-title")).map((el) => el.textContent);
     assert.deepEqual(titles, ["Lab 3: Linked Lists", "Lab 2: Arrays"]);
   } finally {
@@ -186,7 +186,28 @@ test("gradeSummaryAdapter renders one card per course, skipping the header row, 
     const hrefs = Array.from(cards).map((c) => c.getAttribute("href")).sort();
     assert.deepEqual(hrefs, ["/cid-abc123/student/home", "/cid-def456/student/home"]);
     const badgeTexts = Array.from(document.querySelectorAll(".docket-badge")).map((b) => b.textContent);
-    assert.deepEqual(badgeTexts, ["0%", "0%", "100%", "0.58%"], "both Current and Total progress percentages must carry into the card, in document order");
+    // DANCE 280 (0/8 assignments scored) must read as neutral "Not yet graded," never a
+    // failing red 0% — see gradeBadge.ts. MATH 113 (5/171 scored) has genuinely been graded,
+    // so its real 0.58% still bands red: "nothing scored yet" and "scored and doing badly"
+    // must not collapse into the same signal.
+    assert.deepEqual(badgeTexts, ["Not yet graded", "Not yet graded", "100%", "0.58%"]);
+    const overdueBadges = document.querySelectorAll(".docket-badge-overdue");
+    assert.equal(overdueBadges.length, 1, "MATH 113's genuinely-scored 0.58% must still band red");
+  } finally {
+    gradeSummaryAdapter.unmount();
+  }
+});
+
+test("gradeSummaryAdapter carries the real 'N/M assignments scored' detail and the native explanatory footnote through, and adds an escape hatch", () => {
+  setupDom(gradeSummaryHtml, "https://learningsuite.byu.edu/student/top/summary");
+  try {
+    gradeSummaryAdapter.mount(false);
+    const details = Array.from(document.querySelectorAll(".docket-grade-stat .docket-body-sm")).map((el) => el.textContent);
+    assert.ok(details.some((d) => d === "0/8 assignments scored"));
+    assert.ok(details.some((d) => d === "5/171 assignments scored"));
+    const footer = document.querySelector(".docket-page > .docket-body-sm");
+    assert.ok(footer?.textContent?.includes("Current progress represents"), "the native legend explaining the two columns must not be silently dropped");
+    assert.ok(document.querySelector(".docket-toggle-original"), "this adapter previously had zero way back to the native page");
   } finally {
     gradeSummaryAdapter.unmount();
   }
@@ -211,7 +232,7 @@ test("dashboardAdapter renders the per-day schedule as grouped cards without hid
 
     assert.equal(dashboardAdapter.matches(), true);
     dashboardAdapter.mount(false);
-    const dayHeadlines = Array.from(document.querySelectorAll(".docket-day-header .docket-headline")).map((el) => el.textContent);
+    const dayHeadlines = Array.from(document.querySelectorAll(".docket-day-header .docket-title-2")).map((el) => el.textContent);
     assert.deepEqual(dayHeadlines, ["Mon, Sep 7", "Tue, Sep 8"]);
     const rowTitles = Array.from(document.querySelectorAll(".docket-row-title")).map((el) => el.textContent);
     assert.deepEqual(rowTitles, ["Labor Day", "Recitation Quiz 5.3/5.5: The FUNdamental Theorem", "Recitation Quiz 9/8"]);
@@ -229,6 +250,45 @@ test("dashboardAdapter renders the per-day schedule as grouped cards without hid
     });
     (Array.from(document.querySelectorAll(".docket-row-title")).find((el) => el.textContent === "Recitation Quiz 9/8")!.closest(".docket-row-tappable") as HTMLElement).click();
     assert.equal(originalClicked, true, "clicking a real assignment row must re-fire the original element's own click handler");
+  } finally {
+    dashboardAdapter.unmount();
+  }
+});
+
+test("dashboardAdapter preserves every real anchor in a paragraph, not just the first", () => {
+  const html = `<main>
+    <h1>Dashboard</h1>
+    <div class="flex flex-col-reverse md:flex-row md:justify-between">
+      <div class="md:w-3/4 md:mr-6">
+        <div class="mb-2">
+          <div class="mb-4 text-primary-alt bg-gray1 text-md font-normal px-4 py-2">Wed, Sep 9</div>
+          <div class="pl-mobile sm:pl-0">
+            <div>
+              <h3>Column 1</h3>
+              <div class="pb-5 pt-1 break-words">
+                <p class="mb-2 text-sm break-words"><a class="cursor-pointer">Lecture Recording</a> <a class="cursor-pointer">Slides PDF</a> (Updated on 9/9)</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="announcements-widget"></div>
+    </div>
+  </main>`;
+  setupDom(html, "https://learningsuite.byu.edu/cid-abc123/student/home");
+  try {
+    dashboardAdapter.mount(false);
+    const rowTitles = Array.from(document.querySelectorAll(".docket-row-title")).map((el) => el.textContent);
+    assert.deepEqual(rowTitles, ["Lecture Recording", "Slides PDF", "(Updated on 9/9)"], "both real anchors, plus the leftover meta text, must each render as their own row");
+
+    let recordingClicked = false;
+    let slidesClicked = false;
+    const [recordingLink, slidesLink] = Array.from(document.querySelectorAll("a.cursor-pointer")) as HTMLElement[];
+    recordingLink!.addEventListener("click", () => (recordingClicked = true));
+    slidesLink!.addEventListener("click", () => (slidesClicked = true));
+    (Array.from(document.querySelectorAll(".docket-row-title")).find((el) => el.textContent === "Slides PDF")!.closest(".docket-row-tappable") as HTMLElement).click();
+    assert.equal(slidesClicked, true, "the second anchor's own click handler must be reachable, not just the first");
+    assert.equal(recordingClicked, false);
   } finally {
     dashboardAdapter.unmount();
   }

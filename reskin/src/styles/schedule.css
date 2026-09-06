@@ -56,8 +56,8 @@
  * Apple segmented-control semantics: the selected segment gets the accent
  * fill, not the same fill as the rest. */
 [data-docket-page="schedule"] main .outerBox > .bg-base.border-gray3 > .bg-accent {
-  background-color: var(--docket-blue) !important;
-  color: #fff !important;
+  background-color: var(--docket-accent) !important;
+  color: var(--docket-on-accent) !important;
 }
 
 /* ── Week header rows (Table view) ────────────────────────────────────────

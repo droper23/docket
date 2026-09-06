@@ -1,8 +1,9 @@
 import type { Adapter } from "./types.js";
 import { looksLikeCourseListPage } from "../core/pageDetector.js";
-import { overlayContent, markProcessed, isProcessed, h } from "../lib/dom.js";
+import { overlayContent, markProcessed, isProcessed, h, listItem, createOverlayToggle } from "../lib/dom.js";
 import type { Overlay } from "../lib/dom.js";
-import { courseCard, accentForCourse } from "../components/courseCard.js";
+import { courseCard } from "../components/courseCard.js";
+import { assignCourseColors } from "../lib/courseColor.js";
 import { diagnostics } from "../core/diagnostics.js";
 
 interface ParsedCourse {
@@ -18,10 +19,11 @@ function splitCodeTitle(label: string): { code: string; title: string } {
   const dashIdx = label.indexOf(" - ");
   const codeRaw = dashIdx >= 0 ? label.slice(0, dashIdx) : label;
   const title = dashIdx >= 0 ? label.slice(dashIdx + 3).trim() : "";
-  const code = codeRaw
-    .replace(/\s*\(\d+\)\s*$/, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  // Keep the section number ("(003)") — gradeSummaryAdapter.ts's own extraction never strips
+  // it, so a student in two sections of the same course previously saw identical cards here
+  // but different labels on Grade Summary. Stripping it also made two real sections
+  // indistinguishable from each other on this page alone.
+  const code = codeRaw.replace(/\s+/g, " ").trim();
   return { code, title };
 }
 
@@ -80,26 +82,34 @@ export const courseListAdapter: Adapter = {
     const courses = extractCourses(main);
     if (!courses.length) return; // nothing recognizable — leave LearningSuite's page untouched
 
+    const colors = assignCourseColors(courses.map((c) => c.code || c.title));
+    const toggle = createOverlayToggle(() => overlay);
     const grid = h("div", { class: "docket-scope docket-page" }, [
-      h("div", { class: "docket-header" }, [h("div", { class: "docket-large-title" }, ["Courses"])]),
+      h("div", { class: "docket-header" }, [
+        h("h1", { class: "docket-display" }, ["Courses"]),
+        h("div", { class: "docket-lead" }, [`${courses.length} course${courses.length === 1 ? "" : "s"}`]),
+      ]),
       h(
         "div",
-        { class: "docket-course-grid" },
+        { class: "docket-course-grid", role: "list" },
         courses.map((c) =>
-          courseCard({
-            code: c.code || c.title || "Course",
-            title: c.title,
-            accent: accentForCourse(c.code || c.title),
-            href: c.href,
-            onActivate: c.element
-              ? () => {
-                  overlay?.setOriginalHidden(false);
-                  c.element!.click();
-                }
-              : undefined,
-          }),
+          listItem(
+            courseCard({
+              code: c.code || c.title || "Course",
+              title: c.title,
+              accent: colors.get(c.code || c.title) ?? "#0b57d0",
+              href: c.href,
+              onActivate: c.element
+                ? () => {
+                    toggle.reveal();
+                    c.element!.click();
+                  }
+                : undefined,
+            }),
+          ),
         ),
       ),
+      toggle.button,
     ]);
 
     overlay = overlayContent(main, grid, compatibilityMode);

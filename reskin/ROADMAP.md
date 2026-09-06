@@ -1,5 +1,192 @@
 # LearningSuite Reskin — Roadmap
 
+## Eleventh pass: real bugs fixed, a genuine post-gradient visual identity (Sep 2026)
+
+Implements `PASS11_PLAN.md` (that file's own synthesis of three independent design critiques of
+the tenth pass) — real functional/data bugs the tenth pass's shipped build didn't intend, plus a
+from-the-ground-up visual rewrite replacing that pass's gradient/glow signature with opaque
+tonal surfaces and a flat accent, grounded in real apple.com/about.google/Material 3 source
+values. Sequenced correctness before cosmetics, per the plan's own ordering.
+
+**Correctness & data-integrity (Phase 1):**
+
+1. **The Grades page now shows scores.** `assignmentsAdapter.ts`'s `extractRows()` already
+   parsed a score fraction out of each row's text but only used it to compute a `completed`
+   boolean, discarding the fraction itself. `RowData`/`AssignmentCardData` now carry
+   `scoreEarned`/`scorePossible` verbatim; `assignmentCard()` renders a trailing, tabular-nums
+   readout (`"18/20.0"`, or `"—/20.0"` for real ungraded work — an em dash, never a fabricated
+   0). Live-verified on a real 171-row gradebook: `"10.0/10.0"` for graded rows, `"—/10.0"` for
+   ungraded ones.
+2. **Grade Summary no longer flags "nothing graded yet" as a failing red 0%.** Live-verified the
+   real DOM (`.clicky`'s own sibling `.text-sm.text-info` line reads e.g. "0/8 assignments
+   scored") and threaded that verbatim detail through `CourseGrade`. `gradeBadge()` now takes a
+   `hasBeenScored` flag derived from that real count (never a re-derived percentage) and renders
+   a neutral "Not yet graded" chip instead of banding straight to red — a genuinely low but
+   *scored* grade (confirmed live: MATH 113 at 0.58% off 5/171 scored assignments) still bands
+   red correctly, so the two states don't collapse together. The real "N/M assignments scored"
+   line and the page's own explanatory legend paragraph (previously dropped entirely) now render
+   too, plus this adapter finally has a `.docket-toggle-original` escape hatch (see #4).
+3. **"Opens" dates never render as red "Overdue" badges; a completed item never also shows one.**
+   Two distinct real shapes, both confirmed live: on a course's own Assignments/Grades table, an
+   unavailable assignment's status column reads "Opens Sep 9" — a real availability date,
+   separate from the row's own due date; on Combined Schedule, an item listed under its own
+   opening day has that literal word appended to its real title text ("HW 1 - Information
+   Storage Opens"), and that day can be well in the past (daysUntilDue negative) without the
+   item being overdue at all. `dueBadge()` now takes an optional `opensText` and, when given,
+   always renders a neutral "Opens …" chip regardless of the sign of `daysUntilDue`.
+   `assignmentCard()` also now suppresses the urgency badge entirely when `completed === true`
+   (confirmed live: a graded-and-completed quiz past its due date showed a green check *and* a
+   red "Overdue by 4 days" on the same row).
+4. **Every adapter now has a real, two-way escape hatch back to the native page.**
+   `courseListAdapter.ts`/`gradeSummaryAdapter.ts` had none at all — `overlayContent()` hides
+   every child of the container it's given, so Course List's native term tabs, "Refresh," and
+   "Combined Schedule" shortcut were unreachable short of a full Compatibility Mode reload. New
+   `lib/dom.ts` `createOverlayToggle()` is a single stateful toggle (every adapter's own button
+   previously only ever called `setOriginalHidden(true)`, with no way to call it with `false`
+   again) shared by all six adapters, relabeling itself between "View original LearningSuite
+   page" and "← Back to redesigned view," and repositioned to the end of each view instead of
+   the first tab stop after the page title.
+5. **Course List and Grade Summary agree on section numbers.** `courseListAdapter.ts`'s
+   `splitCodeTitle()` stripped `(003)`-style section numbers; Grade Summary never did — a
+   student in two sections of one course saw identical cards on one page, distinct labels on the
+   other. Stripping removed.
+6. **Every real anchor in a Dashboard day's paragraph survives, not just the first.**
+   `dashboardAdapter.ts`'s `extractDays()` used `querySelector` (singular) to find a paragraph's
+   real link, flattening every other real anchor (e.g. a file download *and* a Zoom recording
+   link in the same entry) into inert text. Now `querySelectorAll`: every real anchor renders as
+   its own independently-clickable row, with any leftover non-anchor text (e.g. an "(Updated on
+   …)" date) rendered as its own separate plain-text row rather than concatenated onto a link's
+   label.
+7. **Course accent colors never collide, and now agree across every page.** New
+   `lib/courseColor.ts` (`assignCourseColors()`) assigns by sorted index into a fixed
+   12-color palette instead of `courseCard.ts`'s old `hash % 7`, so real course loads never
+   collide up to 12 courses and the same course gets the same color on Course List, Grade
+   Summary, and anywhere else that calls it — previously Grade Summary never called the old
+   function at all, so its cards had no course color at all. Old `accentForCourse()` deleted.
+8. **Combined Schedule no longer opens 120 days into the past.** One-time
+   `scrollIntoView({ block: "start" })` on the first day group whose date is `>=` today, guarded
+   by a module-level flag so a later mutation-triggered re-render (which only ever *adds* rows,
+   never replaces them) can't re-trigger it and yank the student back after they've scrolled
+   elsewhere. Live-verified: the page still renders oldest-first in document order (no IA
+   restructuring this pass), but loads scrolled to "Tuesday, September 8" (the nearest real item
+   `>=` today), not "Wednesday, September 2."
+9. **Removed the dead `showUpcomingOnHome` setting** — grep confirmed zero consumers; the
+   stretch goal it was meant to gate (hero-fact course cards) wasn't attempted this pass, so the
+   control was removed rather than left doing nothing.
+
+**Accessibility floor (Phase 2):** every adapter's page title is now a real `<h1>`, day/section
+headers and course-card titles real `<h2>`s (previously every one was a styled `<div>`, and the
+overlay hides LearningSuite's own real headings along with everything else it hides). Every
+grouped list/grid gets `role="list"`, each row/card wrapped `role="listitem"` (new `lib/dom.ts`
+`listItem()`). `assignmentCard()`/`courseCard.ts`'s hrefless fallback both changed `role="button"`
+→ `role="link"` with the Space-key branch removed from their keydown handlers, matching real
+link semantics. A skip link (`adapters/shell.ts`, targeting the real `<main>`) and the settings
+FAB (`position: fixed`, so this doesn't move it visually) both now insert at the front of
+`<body>` instead of the end — on a ~300-row Combined Schedule the FAB used to be close to the
+very last tab stop on the page. `.docket-checkbox` only renders when the source data has a real
+completion concept (`completed !== undefined`) rather than an unlabeled "not done" circle on
+every Dashboard holiday/lesson-note row; when it does render it carries `role="img"` and a
+computed `aria-label`. `.docket-row-title`/`-subtitle` moved from `nowrap` + ellipsis (cut real
+content mid-word) to a 2-line `-webkit-line-clamp`.
+
+**Paint-integrity (Phase 3):** the plan's Phase 3.1 ("the one canvas is not actually one
+canvas" — three different fill colors on one screen in the pass-10 screenshots) was
+live-re-verified against the real account before touching any CSS, per this project's own
+selector-discipline rule, and turned out **not to reproduce** — `getComputedStyle` walked from
+`body` down through `<nav>` and the main content column came back uniformly `--docket-canvas` in
+both themes on Home, Combined Schedule, and a Grades page. Most likely already fixed by the tenth
+pass's own `--docket-sidebar-bg` → `--docket-canvas` alias (see that pass's entry below) landing
+after the screenshots the critique reports were sampling. No fix needed; documented here instead
+of silently dropped. Phase 3.2 (a real dark-mode flash-of-light-theme on every full-page
+navigation — `earlyInject()`'s `document-start` half never set `data-docket-theme`, only
+`applyTheme()` at `DOMContentLoaded` did) is fixed: `index.ts`'s new `earlyApplyTheme()` sets the
+real theme attribute as soon as `html.h-full` lands (normally the same tick), with a bounded
+~400ms poll and a last-known-theme fallback. A new ready-gate
+(`html[data-docket-reskin]:not([data-docket-ready]) main { visibility: hidden }`, lifted by
+`runAdapters()` once it's decided what to show, with its own ~400ms failsafe so a page with no
+matching adapter is never left permanently hidden) closes the matching "native content visible
+for one frame before hide" gap.
+
+**Design-system rewrite (Phase 4) and component rewrites (Phase 5):** the tenth pass's own
+signature — a blue→purple→pink gradient on every interactive fill, a blurred "hero glow" behind
+page titles, translucent shadow-heavy cards — is gone. Both apple.com and about.google's real,
+fetched production CSS use neither a gradient nor (for about.google) any shadow at all sitewide.
+Replaced with:
+- **Opaque tonal surfaces.** `--docket-bg-elevated` (previously a translucent `rgba(...)`
+  overlay measuring ~1.1–1.3:1 contrast against real backgrounds — barely visible in light mode,
+  mud in dark) is now an alias for new, fully opaque `--docket-surface-1/2/3` steps. Every
+  `box-shadow`-for-depth usage across `cards.css`/`layout.css`/`global.css`/`navigation.css`/
+  `schedule.css` replaced with the surface-step difference plus a 1px `--docket-separator`
+  border; one shadow token (`--docket-shadow-float`) survives for chrome that genuinely floats
+  over arbitrary page content (dropdown menus, the settings FAB, the Preferences sheet).
+- **One flat accent, never a gradient**, split into `--docket-accent`/`--docket-on-accent` (real
+  actions/links/focus rings) and `--docket-accent-container`/`--docket-on-accent-container`
+  (the active nav pill, quieter emphasis). `--docket-blue` stays defined as an alias to
+  `--docket-accent` so the ~25 already-correct, live-confirmed sitewide selectors that reference
+  it keep working with zero behavior change. Caught and fixed two real contrast bugs this
+  surfaced: `::selection` and the native "today" calendar marker both hardcoded `color: #fff` on
+  what is now, in dark mode, a *light* accent fill — both switched to `var(--docket-on-accent)`,
+  which is correctly dark in that theme.
+- **Status roles, not raw hues.** New `--docket-status-{overdue,soon,upcoming,done,neutral}-{bg,fg}`
+  container/on-container pairs replace the old same-hue-tint badge construction, which
+  independently-computed contrast checks (and this pass's own live spot-check via
+  `tools/cdp.mjs`, relative-luminance formula against the actual rendered token values) found
+  failing WCAG AA in at least one theme for every prior badge color. One pair
+  (`status-soon-fg` in light mode) needed darkening from its initial Material-3-sourced value
+  (~4.34:1) to `#9c5500` (~5.3:1) after that live check. `gradeBadge()`/`dueBadge()` now select a
+  role rather than a raw color.
+- **Typography capped at 600 weight**, replacing 800-weight/-0.03em headlines neither real
+  reference uses: new `.docket-display/-title-1/-title-2/-lead/-body/-body-sm/-label/-eyebrow`
+  scale (`typography.css`) with a 13px real-content floor (the old 11px `.docket-caption`/12px
+  `.docket-footnote` tier measured ~1.7–3.3:1 contrast). Every component/adapter's old class
+  names migrated (`.docket-large-title`→`.docket-display`, `.docket-headline`→`.docket-title-2`,
+  `.docket-footnote`→`.docket-body-sm`/`.docket-eyebrow` by context). Sitewide native
+  `h1`/`h2`/`h3` (pages with no dedicated adapter) matched to the same scale.
+- **Simplified radius scale** (`xs`6/`sm`10/`md`14/`lg`20/`pill` — 14px is the new default for
+  any card/grouped surface, not the old 20/28px "editorial tile" scale) and **role-specific
+  motion** (`--docket-ease-standard/-enter/-exit` at `--docket-dur-fast/-medium/-slow`,
+  replacing one `cubic-bezier(0.16,1,0.3,1)` used 13+ times sitewide) — both reduced-motion gates
+  already in `tokens.css` are unaffected.
+- **Course cards** wash a flat, opaque `--docket-surface-1` fill with the course's own
+  de-collided color as a 4px top-edge rule (`layout.css`'s `.docket-course-card::before`) instead
+  of the old translucent gradient wash; hover is a state-layer opacity overlay plus an asymmetric
+  corner-radius morph (about.google's own real hover signature on its image tiles), replacing
+  `translateY(-4px)` (which moved the click target out from under the cursor). The leading
+  `.docket-dot` was dropped — the course's color now appears once, at full strength, on the
+  top-edge rule rather than twice.
+- **Navigation** is now an opaque `--docket-surface-1` "island" with a 1px separator border
+  instead of a translucent, blurred material relying on a shadow for edge definition;
+  `backdrop-filter` kept only on chrome that genuinely floats (dropdown menus, the FAB). Active
+  nav pill and top-tab underline both flat now, no gradient.
+- **Page headers** (Course List, Grade Summary) gained a real, truthful `.docket-lead` line
+  ("5 courses") under the display title — only where a real, already-computed count exists;
+  every other page kept a bare title rather than shipping filler copy to fill the pattern.
+
+**Verification:** `npm run typecheck && npm run build && npm test` all pass (42/42 — 7 new,
+covering score plumbing, the neutral "not yet graded" state, "opens" never overdue, a completed
+item's suppressed badge, the checkbox-only-with-a-real-concept rule, the multi-anchor Dashboard
+fix, and `courseColor.ts`'s de-collision guarantee). Live-verified via `tools/cdp.mjs` against the
+real authenticated account (Dark Mode — the account's actual current setting; Light Mode was
+*not* re-verified live this pass, see below) across Grade Summary (real "Not yet graded" chips
+confirmed, real 0.58%/100% still band correctly, escape hatch present), a real course's
+Grades/Assignments page (real scores rendering, "Opens Sep 9"/"Opens Sep 11" neutral chips, a
+completed-and-overdue row's badge correctly suppressed), Combined Schedule (an "Opens" item
+listed 4 days in the past reads "Opens last Wednesday" not "Overdue," page loads scrolled to
+the nearest real day `>=` today), and Course List (5 real courses, 5 distinct accent colors, real
+section numbers, working escape hatch). Contrast for every new token pair was computed
+programmatically against the actual declared hex values (not just reasoned about) via
+`tools/cdp.mjs eval`, relative-luminance formula — all ≥4.5:1 after the one fix above.
+
+**Explicitly deferred** (Phase 6 of `PASS11_PLAN.md` — none attempted this pass): hero-fact
+course cards (cross-adapter data caching), rebuilding Course List's hidden native controls as
+real re-fired elements instead of relying solely on the escape hatch, restructuring Combined
+Schedule's IA into collapsed Overdue/Today/Upcoming sections, sidebar icon simplification (and
+the `Syllabus`/`Library Resources` icon-collision fix that goes with it if icons are kept), and
+the Google Sans Flex font swap. Also not done: a live re-verification of Light Mode specifically
+(the account's own real Preferences toggle was opened but not switched this pass — the
+programmatic contrast check above covers the same token *values*, just not a rendered
+screenshot); flag this if picking the project up next.
+
 ## Tenth pass: a real visual identity, not just Apple-HIG polish (Sep 2026)
 
 Direct response to "make the reskinned site look nothing remotely similar [to the original],

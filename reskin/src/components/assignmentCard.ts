@@ -11,6 +11,12 @@ export interface AssignmentCardData {
   daysUntilDue?: number;
   completed?: boolean;
   courseAccent?: string; // CSS color for the leading dot
+  /** Availability date ("Opens Sep 9") — see dueBadge.ts; never treated as a deadline. */
+  opensText?: string;
+  /** Earned points, copied verbatim — absent (not "0") when nothing has been graded yet. */
+  scoreEarned?: string;
+  /** Possible points, copied verbatim. Score readout only renders when this is present. */
+  scorePossible?: string;
 }
 
 /**
@@ -20,32 +26,52 @@ export interface AssignmentCardData {
  * through LearningSuite's own code, never a reimplementation of it.
  */
 export function assignmentCard(data: AssignmentCardData, onActivate?: () => void): HTMLElement {
-  const badge = dueBadge(data.daysUntilDue);
+  // A completed item doesn't need an urgency scare-badge regardless of its due date — without
+  // this, a graded-and-completed assignment past its due date showed a green completion mark
+  // AND a red "Overdue" badge on the same row, contradicting itself (confirmed live, Sep 2026:
+  // MATH 113's "Syllabus Video Quiz," due Sep 2, Completed, still due-badged "Overdue by 4 days").
+  const badge = data.completed ? null : dueBadge(data.daysUntilDue, data.opensText);
   const dueText = data.dueLabel
     ? `Due ${data.dueLabel}${data.dueTime ? " " + data.dueTime : ""}`
     : undefined;
   const categoryText = data.category
     ? data.category + (data.categoryWeight ? ` (${data.categoryWeight} of grade)` : "")
     : undefined;
+  // Em dash, never a fabricated 0 — this is real, ungraded work, not a zero score.
+  const scoreText = data.scorePossible ? `${data.scoreEarned ?? "—"}/${data.scorePossible}` : undefined;
 
   const row = h(
     "div",
     { class: "docket-row" + (onActivate ? " docket-row-tappable" : "") },
     [
-      h("div", { class: `docket-checkbox${data.completed ? " docket-checkbox-done" : ""}` }),
+      // Only rendered when the source data has a real completion concept (assignment rows) —
+      // `undefined` here means "not a task" (a dashboard holiday/lesson-note), not "not done".
+      data.completed !== undefined
+        ? h("div", {
+            class: `docket-checkbox${data.completed ? " docket-checkbox-done" : ""}`,
+            role: "img",
+            "aria-label": data.completed ? "Completed" : "Not yet completed",
+          })
+        : undefined,
       h("div", { class: "docket-row-main" }, [
         h("div", { class: "docket-row-title" }, [data.title]),
         h("div", { class: "docket-row-subtitle" }, [[categoryText, dueText].filter(Boolean).join(" · ") || undefined]),
       ]),
-      h("div", { class: "docket-row-trailing" }, [badge ?? undefined, onActivate ? h("span", { class: "docket-chevron" }) : undefined]),
+      h("div", { class: "docket-row-trailing" }, [
+        scoreText ? h("span", { class: "docket-score" }, [scoreText]) : undefined,
+        badge ?? undefined,
+        onActivate ? h("span", { class: "docket-chevron" }) : undefined,
+      ]),
     ],
   );
   if (onActivate) {
     row.addEventListener("click", onActivate);
     row.tabIndex = 0;
-    row.setAttribute("role", "button");
+    // A link (activates and navigates), not a button — Enter only, no Space (platform link
+    // convention; Space is reserved for scrolling the page, same as any other real link).
+    row.setAttribute("role", "link");
     row.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
+      if (e.key === "Enter") {
         e.preventDefault();
         onActivate();
       }

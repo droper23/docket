@@ -19,35 +19,28 @@ export interface CourseCardData {
 }
 
 export function courseCard(data: CourseCardData): HTMLElement {
-  const dot = h("div", { class: "docket-dot", style: `background:${data.accent};color:${data.accent}` });
-  const headline = h("div", { class: "docket-headline" }, [data.code]);
-  const footnote = h("div", { class: "docket-footnote" }, [data.title]);
-  // Sep 2026 "look nothing like the original" pass: a plain inline custom-property addition
-  // (no new attribute, no behavior change) so cards.css/layout.css can wash each card's own
-  // gradient in the same accent already computed per-course, instead of a uniform flat tile.
+  const headline = h("h2", { class: "docket-title-2" }, [data.code]);
+  const footnote = h("div", { class: "docket-body-sm" }, [data.title]);
+  // A plain inline custom-property addition (no new attribute, no behavior change) — the
+  // course's own de-collided color (courseColor.ts) appears once, at full strength, as the
+  // card's top-edge accent rule (see layout.css's .docket-course-card::before).
   const cardStyle = `--docket-card-accent:${data.accent}`;
 
   if (data.href) {
-    return h("a", { class: "docket-course-card", href: data.href, style: cardStyle }, [dot, headline, footnote]);
+    return h("a", { class: "docket-course-card", href: data.href, style: cardStyle }, [headline, footnote]);
   }
 
-  const card = h("div", { class: "docket-course-card", role: "link", tabindex: "0", style: cardStyle }, [dot, headline, footnote]);
+  const card = h("div", { class: "docket-course-card", role: "link", tabindex: "0", style: cardStyle }, [headline, footnote]);
   if (data.onActivate) {
     card.addEventListener("click", data.onActivate);
+    // A link (activates and navigates), not a button — Enter only, no Space, per platform
+    // link convention (Space is reserved for scrolling the page).
     card.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
+      if (e.key === "Enter") {
         e.preventDefault();
         data.onActivate!();
       }
     });
   }
   return card;
-}
-
-/** Deterministic accent per course so the same course always gets the same dot color across pages, without a shared palette config to keep in sync. */
-export function accentForCourse(code: string): string {
-  const palette = ["#007aff", "#ff9500", "#34c759", "#af52de", "#ff3b30", "#5ac8fa", "#ffcc00"];
-  let hash = 0;
-  for (let i = 0; i < code.length; i++) hash = (hash * 31 + code.charCodeAt(i)) >>> 0;
-  return palette[hash % palette.length]!;
 }

@@ -136,6 +136,12 @@ function runAdapters(settings: ReskinSettings): void {
   // (settingsPanel.ts/diagnosticsPanel.ts read this same attribute at open time) can
   // suppress motion from one explicit signal — see settings.ts's reducedMotion field.
   document.documentElement.setAttribute("data-docket-reduced-motion", String(settings.reducedMotion));
+  // Lifts global.css's ready-gate (`main { visibility: hidden }` until this is set — see
+  // earlyInject()'s own failsafe timeout for the "no adapter ever runs" case). Safe to set
+  // before the adapter branch below despite hiding native content synchronously inside
+  // mount(): everything from here to the end of this function call runs in one JS task, so
+  // the browser can't paint an intermediate "ready but not yet hidden" frame in between.
+  document.documentElement.setAttribute("data-docket-ready", "true");
 
   if (settings.compatibilityMode) {
     activeAdapter?.unmount();
@@ -215,7 +221,55 @@ function boot(): void {
  * LearningSuite's markup (mountShell, adapters) stays in boot(), deferred to
  * DOMContentLoaded exactly as before.
  */
+/**
+ * Mirrors applyTheme()'s real-signal logic (see its own doc comment for the confirmed-live
+ * failure mode this avoids) but safe to call before boot() — `runAdapters()`'s own
+ * applyTheme() remains the authoritative, continuously-reconciling pass once boot() runs;
+ * this only kills the gap where NO theme attribute is set at all during initial load.
+ */
+function earlyApplyTheme(): boolean {
+  if (!document.documentElement.classList.contains("h-full")) return false;
+  const dark = document.documentElement.classList.contains("dark");
+  document.documentElement.setAttribute("data-docket-theme", dark ? "dark" : "light");
+  setSetting("lastKnownDark", dark);
+  return true;
+}
+
+/**
+ * The document-start half of the issue #7 fix. The bundle now runs before the
+ * parser has built the page (confirmed live via CDP
+ * addScriptToEvaluateOnNewDocument: readyState "loading", document.head null) —
+ * and in that same live check document.documentElement itself was still absent on
+ * the very first task, so an unconditional setAttribute here would throw and take
+ * the whole bundle (including boot()'s DOMContentLoaded registration) down with it.
+ * Poll until the root element appears — nothing can be painted before a root
+ * element exists, so even the first successful tick lands before first paint —
+ * then apply the reskin attribute + full CSS immediately. Everything that touches
+ * LearningSuite's markup (mountShell, adapters) stays in boot(), deferred to
+ * DOMContentLoaded exactly as before.
+ *
+ * `tokens.css`'s un-attributed base block is the LIGHT palette, so before this pass a
+ * dark-mode student saw the viewport paint light first, then snap to dark once boot() ran
+ * `applyTheme()` at DOMContentLoaded — a real flash-of-wrong-theme on every full-page
+ * navigation (LearningSuite navigates between top-level sections with real page loads, not
+ * SPA routing). `earlyApplyTheme()` above sets the real theme attribute as soon as
+ * LearningSuite's own `html.h-full` class lands, which is normally within the same
+ * document-start tick; a short bounded poll covers the rare case it hasn't yet, falling back
+ * to the last real theme this reskin ever observed (same fallback `applyTheme()` itself
+ * uses) rather than leaving the gap open indefinitely.
+ */
 function earlyInject(): void {
+  const pollTheme = (attempt: number): void => {
+    if (earlyApplyTheme()) return;
+    if (attempt >= 20) {
+      // ~400ms of polling with nothing from LearningSuite yet — fall back rather than leave
+      // no theme attribute set at all.
+      document.documentElement.setAttribute("data-docket-theme", getSetting("lastKnownDark", true) ? "dark" : "light");
+      return;
+    }
+    setTimeout(() => pollTheme(attempt + 1), 20);
+  };
+
   const tick = (): void => {
     if (document.getElementById("docket-reskin-styles")) return; // already in
     if (!document.documentElement) {
@@ -224,6 +278,15 @@ function earlyInject(): void {
     }
     document.documentElement.setAttribute("data-docket-reskin", "true");
     injectStyles();
+    pollTheme(0);
+    // Failsafe for global.css's ready-gate (`main { visibility: hidden }` until
+    // `data-docket-ready` is set, normally by runAdapters() at the end of boot()): a native
+    // page with no matching adapter must still become visible, never fail permanently hidden.
+    setTimeout(() => {
+      if (!document.documentElement.hasAttribute("data-docket-ready")) {
+        document.documentElement.setAttribute("data-docket-ready", "true");
+      }
+    }, 400);
   };
   if (document.documentElement) tick();
   else setTimeout(tick, 0);

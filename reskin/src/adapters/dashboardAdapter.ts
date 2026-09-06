@@ -1,7 +1,7 @@
 import type { Adapter } from "./types.js";
 import { looksLikeDashboardPage } from "../core/pageDetector.js";
-import { overlayContent, markProcessed, isProcessed, h } from "../lib/dom.js";
-import type { Overlay } from "../lib/dom.js";
+import { overlayContent, markProcessed, isProcessed, h, listItem, createOverlayToggle } from "../lib/dom.js";
+import type { Overlay, OverlayToggle } from "../lib/dom.js";
 import { assignmentCard } from "../components/assignmentCard.js";
 import { icons } from "../components/icons.js";
 import { diagnostics } from "../core/diagnostics.js";
@@ -44,10 +44,26 @@ function extractDays(main: Element): DashboardDay[] {
 
     const items: DashboardItem[] = [];
     for (const p of Array.from(list.querySelectorAll("p.mb-2.text-sm.break-words"))) {
-      const link = p.querySelector("a.cursor-pointer") as HTMLElement | null;
-      const text = (link ?? p).textContent?.replace(/\s+/g, " ").trim() ?? "";
-      if (!text) continue;
-      items.push(link ? { text, activate: () => link.click() } : { text });
+      // A paragraph commonly holds more than one real anchor (e.g. a file download AND a Zoom
+      // recording link) — `querySelector` (singular) used to keep only the first, flattening
+      // every other real anchor into inert plain text. Every real anchor gets its own row now.
+      const anchors = Array.from(p.querySelectorAll("a.cursor-pointer")) as HTMLElement[];
+      if (!anchors.length) {
+        const text = p.textContent?.replace(/\s+/g, " ").trim() ?? "";
+        if (text) items.push({ text });
+        continue;
+      }
+      for (const link of anchors) {
+        const text = link.textContent?.replace(/\s+/g, " ").trim() ?? "";
+        if (text) items.push({ text, activate: () => link.click() });
+      }
+      // Any text in the paragraph outside the anchors themselves (e.g. an "(Updated on …)"
+      // date) — captured separately so it's never silently dropped or concatenated onto one
+      // link's own label.
+      const clone = p.cloneNode(true) as HTMLElement;
+      clone.querySelectorAll("a.cursor-pointer").forEach((a) => a.remove());
+      const metaText = clone.textContent?.replace(/\s+/g, " ").trim() ?? "";
+      if (metaText) items.push({ text: metaText });
     }
     if (!items.length) continue;
     days.push({ dateText: bar.textContent?.trim() ?? "", items });
@@ -67,6 +83,7 @@ let processedBars: HTMLElement[] = [];
 
 let overlay: Overlay | null = null;
 let dayList: HTMLElement | null = null;
+let toggle: OverlayToggle | null = null;
 
 export const dashboardAdapter: Adapter = {
   id: "dashboard",
@@ -94,11 +111,11 @@ export const dashboardAdapter: Adapter = {
     const sections = orderedKeys.map((key) => {
       const d = accumulated.get(key)!;
       return h("div", { class: "docket-section" }, [
-        h("div", { class: "docket-day-header" }, [h("div", { class: "docket-headline" }, [d.dateText])]),
+        h("div", { class: "docket-day-header" }, [h("h2", { class: "docket-title-2" }, [d.dateText])]),
         h(
           "div",
-          { class: "docket-group" },
-          d.items.map((item) => assignmentCard({ title: item.text }, item.activate)),
+          { class: "docket-group", role: "list" },
+          d.items.map((item) => listItem(assignmentCard({ title: item.text }, item.activate))),
         ),
       ]);
     });
@@ -111,13 +128,12 @@ export const dashboardAdapter: Adapter = {
         {},
         sections.length ? sections : [h("div", { class: "docket-empty" }, [icons.checklist(), h("span", {}, ["Nothing scheduled."])])],
       );
-      // No docket-large-title here (unlike every other adapter's view): confirmed live the
+      // No docket-display here (unlike every other adapter's view): confirmed live the
       // page's own real `<h1>Dashboard</h1>` sits one level above this column, outside what
       // scheduleColumn hides, so it's already visible and already styled by the sitewide h1
       // rule — adding a second "Dashboard" title here just duplicated it.
-      const backToNative = h("button", { class: "docket-toggle-original" }, ["← Back to original view"]);
-      backToNative.addEventListener("click", () => overlay?.setOriginalHidden(true));
-      const view = h("div", { class: "docket-scope docket-page", style: "padding-top: 0;" }, [backToNative, dayList]);
+      toggle = createOverlayToggle(() => overlay, "View original LearningSuite page", "← Back to redesigned view");
+      const view = h("div", { class: "docket-scope docket-page", style: "padding-top: 0;" }, [dayList, toggle.button]);
       overlay = overlayContent(scheduleColumn, view, compatibilityMode);
     }
     diagnostics.transformCount += days.reduce((n, d) => n + d.items.length, 0);
@@ -126,6 +142,7 @@ export const dashboardAdapter: Adapter = {
     overlay?.remove();
     overlay = null;
     dayList = null;
+    toggle = null;
     accumulated.clear();
     orderedKeys = [];
     for (const bar of processedBars) bar.removeAttribute("data-docket-dashboardday");
