@@ -4,11 +4,22 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { setupDom } from "./testUtil.js";
-import { looksLikeCourseListPage, looksLikeAssignmentsPage, courseIdFromUrl, isScheduleUrl } from "../src/core/pageDetector.js";
+import {
+  looksLikeCourseListPage,
+  looksLikeAssignmentsPage,
+  looksLikeGradesPage,
+  looksLikeGradeSummaryPage,
+  looksLikeDashboardPage,
+  courseIdFromUrl,
+  isScheduleUrl,
+} from "../src/core/pageDetector.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const courseListHtml = readFileSync(join(__dirname, "fixtures/course-list.html"), "utf8");
 const assignmentsHtml = readFileSync(join(__dirname, "fixtures/assignments.html"), "utf8");
+const gradesHtml = readFileSync(join(__dirname, "fixtures/grades.html"), "utf8");
+const gradeSummaryHtml = readFileSync(join(__dirname, "fixtures/grade-summary.html"), "utf8");
+const dashboardHtml = readFileSync(join(__dirname, "fixtures/dashboard.html"), "utf8");
 
 test("looksLikeCourseListPage: true on a course-list-shaped page with no cid- in the URL", () => {
   setupDom(courseListHtml, "https://learningsuite.byu.edu/top/course-list");
@@ -58,4 +69,49 @@ test("courseIdFromUrl extracts LearningSuite's own opaque courseID", () => {
 test("isScheduleUrl matches Combined Schedule's confirmed URL shape", () => {
   setupDom("<main></main>", "https://learningsuite.byu.edu/.sess123/student/top/schedule");
   assert.equal(isScheduleUrl(), true);
+});
+
+test("looksLikeGradesPage: true on the Grades page's identical-row-shape sub-view", () => {
+  setupDom(gradesHtml, "https://learningsuite.byu.edu/cid-abc123/student/gradebook");
+  assert.equal(looksLikeGradesPage(), true);
+});
+
+test("looksLikeGradesPage: false on the real Assignments page (same row shape, different active tab)", () => {
+  setupDom(assignmentsHtml, "https://learningsuite.byu.edu/cid-abc123/student/assignments");
+  assert.equal(looksLikeGradesPage(), false);
+});
+
+test("looksLikeGradesPage: false without a courseId in the URL", () => {
+  setupDom(gradesHtml, "https://learningsuite.byu.edu/top/schedule");
+  assert.equal(looksLikeGradesPage(), false);
+});
+
+test("looksLikeGradeSummaryPage: true on the real Grade Summary grid", () => {
+  setupDom(gradeSummaryHtml, "https://learningsuite.byu.edu/student/top/summary");
+  assert.equal(looksLikeGradeSummaryPage(), true);
+});
+
+test("looksLikeGradeSummaryPage: false once the URL itself is course-scoped", () => {
+  setupDom(gradeSummaryHtml, "https://learningsuite.byu.edu/cid-abc123/student/home");
+  assert.equal(looksLikeGradeSummaryPage(), false);
+});
+
+test("looksLikeGradeSummaryPage: false on Course List, which shares the same URL shape but not the heading or grid", () => {
+  setupDom(courseListHtml, "https://learningsuite.byu.edu/top/course-list");
+  assert.equal(looksLikeGradeSummaryPage(), false);
+});
+
+test("looksLikeDashboardPage: true on a course Dashboard", () => {
+  setupDom(dashboardHtml, "https://learningsuite.byu.edu/cid-abc123/student/home");
+  assert.equal(looksLikeDashboardPage(), true);
+});
+
+test("looksLikeDashboardPage: false on the real Assignments page, which shares the course-scoped URL shape", () => {
+  setupDom(assignmentsHtml, "https://learningsuite.byu.edu/cid-abc123/student/assignments");
+  assert.equal(looksLikeDashboardPage(), false);
+});
+
+test("looksLikeDashboardPage: false without a courseId in the URL", () => {
+  setupDom(dashboardHtml, "https://learningsuite.byu.edu/top/course-list");
+  assert.equal(looksLikeDashboardPage(), false);
 });

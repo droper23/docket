@@ -1,5 +1,234 @@
 # LearningSuite Reskin — Roadmap
 
+## Tenth pass: a real visual identity, not just Apple-HIG polish (Sep 2026)
+
+Direct response to "make the reskinned site look nothing remotely similar [to the original],
+instead taking inspiration from the Apple pages and About Google." The prior nine passes'
+Apple-HIG work (dark canvas, SF-style type, translucent materials) had converged on something
+that reads as a competent, generic dark SaaS dashboard — real progress over native
+LearningSuite, but with no signature of its own, and structurally still "sidebar + top bar +
+flat card grid" regardless of color. This pass is CSS-only (plus one small, purely additive
+inline-style change in `courseCard.ts` — see below), deliberately: every adapter/detector/
+event-handling code path is untouched, so there is no new functional-risk surface, only a
+visual one, verified live against the real authenticated account (`tools/cdp.mjs`, same
+methodology as every prior pass) in both the account's real Dark Mode and (toggled live via
+its own real Preferences control, then restored) Light Mode.
+
+1. **A signature accent — one gradient sweep, used everywhere a flat brand-blue used to be.**
+   New `--docket-accent-gradient` (`tokens.css`, blue → purple → pink, light/dark variants)
+   replaces the flat `--docket-blue` fill on the active sidebar pill, the active top-tab
+   underline (via `border-image`, since `border-color` can't take a gradient), and every
+   primary button (`.goBtn`/`.bg-action`/`button.bg-primary-dark`). A flat single-color pill
+   is indistinguishable from any other app's default `background: blue`; a deliberate
+   multi-hue sweep is the kind of specific, ownable choice both apple.com's keynote/product
+   pages and about.google's own four-color identity actually make. Verified live in both
+   themes (screenshots below) — no selector changes, same elements, just a different `fill`.
+2. **Page titles became headlines, not app-chrome labels.** `.docket-large-title` went from
+   34px/700-weight to a `clamp(32px, 5.2vw, 48px)`/800-weight/-0.03em ladder (`typography.css`)
+   — apple.com and about.google both treat a page's own title as the biggest, boldest thing
+   on it; Apple HIG's own 34px Large Title is sized for app chrome next to a nav bar, not for
+   a page that has no competing chrome above it. Native `<h1>/<h2>/<h3>` (pages with no
+   dedicated adapter — Announcements, Class Info, etc.) got the matching bump in `global.css`
+   (700→800 weight, larger sizes) so they don't read as a visibly older design generation next
+   to the adapter-rendered pages. `responsive.css`'s old fixed 28px mobile override is now
+   redundant (the `clamp()` already scales down) and was removed.
+3. **A hero glow behind every page title.** New `.docket-header::before` (`layout.css`): a
+   soft, blurred radial gradient positioned behind `.docket-large-title`, `isolation: isolate`
+   on the header so its negative z-index can never render behind unrelated DOM (confirmed:
+   this only ever touches `.docket-header`'s own stacking context). The specific device
+   apple.com's own product pages use above a headline, scoped only to the pages this reskin
+   fully renders (Home, Course List, Assignments, Grades, Grade Summary) — pages still
+   rendered by native markup alone (no wrapping container to hang it from) don't get one, and
+   weren't forced into one.
+4. **Course cards wash their own course color instead of sitting on flat gray.** Confirmed
+   live each course already gets a deterministic accent color (`accentForCourse()` in
+   `courseCard.ts`, previously only visible as a small leading dot). `courseCard()` now also
+   sets `--docket-card-accent` as an inline custom property on the card element itself (a
+   plain style-attribute addition — no new attribute, no behavior change, `href`/`onActivate`
+   navigation untouched) so `layout.css` can wash a soft gradient of that same color through
+   the card background (`color-mix`, with a flat-color fallback for engines without it),
+   radius bumped to a new `--docket-radius-xl` (28px), and a hover lift
+   (`translateY(-4px)` + expanded shadow) replacing the old flat background-color swap. Cards
+   that carry no course-color data (Grade Summary's own cards) fall back to the plain accent
+   blue wash — no data was invented to force every card into the new treatment.
+5. **The sidebar became a floating rounded "island," not a flush native rail.** Confirmed live
+   (re-checked this pass, matches the third pass's own finding) that `<nav>`'s column width is
+   set by its parent `.bg-left-nav` wrapper, not by `<nav>` itself — so giving the real `<nav>`
+   element a `margin` (`navigation.css`) insets it within that same reserved column with zero
+   risk of resizing or reflowing the main content area. Bigger radius (`--docket-radius-lg`),
+   padding, and per-item radius (999px pill instead of 8px rectangle) match the same
+   editorial-not-utility scale as everything else this pass. Deliberately did NOT touch
+   `flex-direction` (a documented constraint from an earlier pass — the nav's own native class
+   controls row-vs-column behavior across viewport widths; overriding it here isn't this
+   pass's to make).
+6. **The masthead — the one piece of chrome on every single page — got its first color
+   signature.** Confirmed live `header` computes `position: static`, so a `::after` gradient
+   hairline along its bottom edge (`global.css`, same accent sweep as everywhere else) cannot
+   disturb any sticky/fixed behavior. Previously a stark flat bar with zero color of its own on
+   every page in the app.
+7. **Radius/weight consistency pass on the surfaces this didn't touch directly**: the Grade
+   Summary grid and native `<table>` (Grade Scale, etc.) moved from `--docket-radius-md` to
+   `--docket-radius-lg`; the Preferences dialog sheet from `--docket-radius-lg` to
+   `--docket-radius-xl`; `.docket-group`/`.docket-row` padding and radius increased to match;
+   `.docket-badge` made bolder (700 weight) — all so the bigger, rounder, bolder language
+   introduced above reads as one coherent system rather than one redesigned surface next to
+   several unchanged smaller-radius ones.
+
+Explicitly scoped away from a full DOM/adapter rewrite: the underlying shape (sidebar + top
+bar + content column) is inherent to skinning LearningSuite's own real markup in place, and a
+CSS-only pass cannot turn a vertical app nav into apple.com's own horizontal marketing nav
+without either fabricating a replacement (this project's own spec explicitly forbids that) or
+restructuring real, working navigation DOM (adapter-shaped risk this pass deliberately did not
+take on, per the brief's own "don't break any Learning Suite functionality" constraint). What
+changed here is everything CSS *can* own: color identity, type scale, corner language, and
+elevation — confirmed live this is now visually distinct from both native LearningSuite (no
+shared color, radius, or type scale left) and from the prior passes' own "generic dark SaaS"
+ceiling.
+
+`npm run build && npm run typecheck && npm test` all pass (34/34, unchanged — no
+adapter/detector logic touched, so no test surface changed). Bundle 184.6 → 191.6 KB (CSS
+only). Live-verified via `tools/cdp.mjs` against the real account, both the account's actual
+Dark Mode and a live toggle to Light Mode through its own real Preferences control (then
+restored back to Dark, the account's original setting, via the same real control — confirmed
+via a fresh page load after save, not just an in-memory check): Home/Course List (course
+grid), Grade Summary, Combined Schedule (Today & Upcoming), a real course's Grades page, and a
+real course's Dashboard — all in `tools/shots/pass10-*.png` (gitignored, per prior passes'
+convention). Settings panel (Shadow DOM, unaffected by any of this pass's page-level CSS)
+spot-checked to confirm it still opens and reads correctly.
+
+**Explicitly deferred, not attempted this pass:** a real mobile/narrow-viewport screenshot
+pass (the sidebar-margin and `clamp()` title changes were reasoned through against documented
+constraints from prior passes rather than screenshotted at a narrow width this session —
+tooling gap, `tools/cdp.mjs` has no viewport-resize command; worth adding before the next pass
+touches responsive.css again); Announcements/Class Info/Groups/Email/Exams/Prioritizer/
+Copyright Resources were not individually re-screenshotted this pass (they inherit the h1/h2/
+h3, button, table, and masthead changes for free, same as every prior sitewide-selector pass,
+but weren't visually re-confirmed page-by-page); a second, more ambitious pass at the sidebar
+shape itself (e.g., a real horizontal top-nav conversion) if a future pass decides the
+DOM-restructuring risk is worth taking.
+
+## Ninth pass: fixing real bugs, closing the "still looks native" gap structurally, three new full adapters (Sep 2026)
+
+Direct response to a user report describing three things at once: "on the Combined Schedule
+page you can't scroll up to see past assignments, and scrolling down shows what looks like
+the original page just moved lower — all the original stuff is still there"; "many pages have
+random big white boxes"; "the main screen, sidebar, and top bar backgrounds should all be the
+same." The user explicitly asked for the most ambitious of three response options: fix the
+confirmed bugs, add a systemic fix for the white-box problem instead of patching one more
+instance of it, **and** start converting the highest-traffic still-100%-native pages into real
+custom-rendered adapters (this project's biggest lever for genuinely looking different, not
+just recolored) — all verified live via the existing `tools/cdp.mjs` harness against the
+session already saved in `tools/.chrome-audit-profile` (still authenticated; no fresh BYU
+login needed this pass), a real 5-course Fall 2026 account.
+
+1. **Root-caused and fixed the Combined Schedule bug — a real overlay leak, not "ugly."**
+   `lib/dom.ts`'s `overlayContent()` snapshotted-and-hid `container.childNodes` exactly ONCE,
+   at mount time. Confirmed live: LearningSuite keeps appending real DOM nodes to that same
+   container well after the reskin's first mount pass (the Combined Schedule page renders its
+   300+-item semester progressively), and every later-appended native node was never hidden —
+   it rendered fully visible, natively styled, below the enhanced view. Exactly the reported
+   symptom. Fixed inside `overlayContent()` itself (not per-adapter): a `MutationObserver`
+   scoped to the container's own `childList` now folds any newly-appeared sibling into
+   `originalNodes` and hides it immediately — benefits all three existing adapters
+   (home/assignments/courseList) that call this same function, with no adapter having to
+   remember anything. New regression tests in `test/dom.test.ts` (append-after-mount gets
+   hidden; `remove()` un-hides everything it ever hid, including late-appended nodes).
+2. **The "can't scroll up" complaint was a real, deliberate data window, not a scroll trap.**
+   `homeAdapter.ts`'s `WINDOW_DAYS_PAST` was `1` (by design, to avoid a full-semester dump).
+   Now that #1 removed the reason to keep history hidden, widened to `120` — comfortably a
+   full semester back. The existing accumulator already renders the full merged set every
+   pass; ROADMAP's own prior measurement (~6.4k DOM nodes for the full semester) already
+   called that acceptable.
+3. **Sidebar/top-bar/main cohesion, confirmed in code before touching it.** `body`/`header`/
+   `.bg-top-nav` all painted the flat `--docket-canvas` token, but the actual `<nav>` element
+   deliberately used a *different*, translucent `--docket-sidebar-bg` ("macOS sidebar
+   material") — a prior pass's deliberate design choice, and exactly what this user asked to
+   remove. `--docket-sidebar-bg` now just aliases `--docket-canvas` (both themes, and every
+   `data-docket-background` swatch override, since CSS custom properties resolve per-element,
+   not at definition time) — `.docket-nav-enhanced`/`.docket-fab` both reference the token, so
+   both picked up the fix with no selector changes. Verified live: no visible seam between
+   sidebar, top bar, and main content in either theme.
+4. **A confirmed, live-caught instance of the "white box" bug that an earlier pass's fix
+   didn't actually fix.** The compact "instructor lesson-topic chip" rule
+   (`.text-sm .instructorText.font-nunito` in `global.css`, added specifically to avoid this)
+   used `display: inline-block` with no `max-width` — confirmed live on the course Dashboard
+   that an inline-block box's shrink-to-fit width still grows to fit a long sentence on one
+   line before wrapping, so anything longer than a couple words rendered as a wide white slab
+   nearly the width of its column. Added `max-width: 260px` to force real multi-line wrapping;
+   confirmed live it now reads as a genuinely compact note instead of a slab. (The *other*
+   place the same base rule fires — a full announcement body, in the Dashboard's Announcements
+   sidebar widget and on the standalone Announcements page — was checked live and left alone:
+   full-width "paper card" treatment for a whole letter-length message reads fine there,
+   matching Apple Mail's own convention; it's the inline-block sizing on a short chip that was
+   actually broken, not the paper-card idiom itself.)
+5. **Broader live census of every still-unaudited page type** (Groups, Email, Exams, Class
+   Info, Prioritizer, Copyright Resources, course-level Announcements) turned up no further
+   white-box gaps this pass — all read as cohesive, no unstyled native surfaces found. (Not
+   exhaustive: Learning Outcomes, Library Resources' own interior, and the top-level standalone
+   Copyright Resources/Announcements-list pages were not individually screenshotted this pass.)
+6. **Three new full adapters — the actual "genuinely different, not just recolored" lever.**
+   Rather than one more round of CSS patches on native markup, the three highest-traffic pages
+   that were still 100% native got real custom-rendered adapters, following the established
+   `overlayContent` + `h()`-card + `pageDetector` matcher + `registry` pattern:
+   - **`gradesAdapter`** — confirmed live the Grades page's default sub-view renders the
+     *identical* `.bg-base.text-highlight` row grid as the real Assignments page (same
+     BYU-shared table component), so it reuses `assignmentsAdapter.ts`'s own
+     `extractRows`/`buildCard` directly (both now exported) rather than re-deriving the same
+     parsing twice. `pageDetector.ts`'s new `looksLikeGradesPage()` is the positive
+     counterpart of the exclusion `looksLikeAssignmentsPage()` already used
+     (`.bg-top-nav-highlight === "Grades"`) — confirmed live real Assignments (reached via
+     Home > Assignments, active tab "Home") and Grades never collide.
+   - **`gradeSummaryAdapter`** — confirmed live the whole page is one CSS grid
+     (`main .gridColsStyle`), each row a `.contents` div; a header row has no
+     `a[href*='cid-']` and is skipped, every real course row does, with two `.clicky`
+     percentages in confirmed column order (Current progress, Total course progress). Renders
+     as a real card grid (real hrefs, copied verbatim) with color-coded percentage badges —
+     closes an item an earlier pass explicitly deferred ("color-coding by value... requires
+     reading and classifying the number in JS, adapter-shaped risk"), now safe because the
+     adapter already parses the real percentage text as part of its own extraction. New
+     `gradeBadge()` component, reusing the `.docket-badge-{red,yellow,blue,green}` classes
+     already defined (unused) in `cards.css`.
+   - **`dashboardAdapter`** — confirmed live (full-page screenshot, not just the already-known
+     per-day-schedule selectors) the course Dashboard has TWO sibling regions under one shared
+     wrapper: the per-day schedule and an "Announcements" sidebar widget. First draft
+     overlaid the whole page and accidentally hid the Announcements widget too — caught live,
+     fixed by scoping the overlay to `[class~="md:mr-6"]` specifically (an attribute selector,
+     sidestepping the need to escape the literal `:`/`/` in LearningSuite's own Tailwind-style
+     class name), confirmed live the sidebar widget stays visible and untouched. Each day
+     (`.bg-gray1.text-primary-alt.px-4.py-2` + adjacent `.pl-mobile`, both already confirmed
+     by an earlier pass) contains three real entry shapes — a real assignment link
+     (`a.cursor-pointer`, no static href, re-fired on click same as every other hrefless-row
+     adapter), a BYU-calendar event/holiday marker, or an instructor lesson-topic note (a
+     genuinely nested `<p>` inside a `<p>`, only possible because Vue builds it via imperative
+     DOM calls rather than HTML parsing) — all three now render as plain-text rows, only the
+     first kind tappable. Also dropped this view's own would-be "Dashboard" title: confirmed
+     live the page's real, already-visible `<h1>Dashboard</h1>` sits one level above the
+     overlaid column, so a second one was a plain duplicate.
+   `registry.ts` now lists `gradesAdapter`/`gradeSummaryAdapter`/`dashboardAdapter` ahead of
+   the generic pages they'd otherwise collide with, mirroring the disambiguation comments
+   already in `pageDetector.ts`.
+
+`npm run build && npm run typecheck && npm test` all pass (34/34 — 12 new: two `dom.test.ts`
+overlay-leak regressions, one test each for the three new adapters, and seven new
+`pageDetector` matcher cases). Live-verified end-to-end via `tools/cdp.mjs` against the real
+account: Combined Schedule (no more duplicate content, full semester scrollable, screenshots
+`live-09-schedule-mounted.png`/`live-09-schedule-scrolled-bottom2.png`), course Dashboard
+(`live-09-dashboard-fixed2.png`, plus a live click-through into a real native quiz-detail
+modal), Grade Summary (`live-09-gradesummary-newadapter.png`, plus a real-href check), and
+Grades (`live-09-grades-newadapter.png`, plus confirming the real Assignments page still
+mounts its own unchanged adapter). All screenshots gitignored per `tools/shots/`'s existing
+entry, per prior passes' own convention.
+
+**Explicitly deferred, not attempted this pass:** the still-unconfirmed "Course Progress" stat
+panel on the Grades page (searched for live this pass, not found above the row list — flagged
+across multiple prior passes as "still no non-generic hook"; `gradesAdapter` fails soft and
+leaves it native, same as every other not-confidently-extractable element on this project);
+Announcements/Groups/Email/Exams/Class Info/Prioritizer/Copyright Resources converted to full
+adapters (all currently read fine via the sitewide CSS pass — census in item 5 above found no
+active defect, so no adapter conversion was justified this pass); the native quiz/assignment
+detail modal opened by a real click-through (confirmed working, native chrome, unstyled — out
+of scope for this pass, pre-existing on every page that opens it, not new).
+
 ## Eighth pass: live comparison against real LearningSuite, apple.com, and about.google (Sep 2026)
 
 Direct response to "it still has the foundation of the original site and you can tell":

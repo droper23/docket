@@ -17,14 +17,24 @@
  * `flex-direction`) were confirmed live to already compose correctly —
  * only the fill color was ever actually broken.
  */
+/**
+ * Sep 2026 "look nothing like the original" pass: a flush, edge-to-edge sidebar is exactly
+ * the generic-SaaS shape the brief is asking to get away from. `margin` insets the same real
+ * `<nav>` element within its own column (the column's width is set by the parent
+ * `.bg-left-nav` wrapper, not by `<nav>` itself — confirmed in ROADMAP's own third pass — so
+ * this cannot shift or resize the main content area) so canvas shows all the way around it,
+ * reading as a floating rounded "island" (macOS Sonoma's own sidebar treatment) rather than a
+ * flush native rail. Bigger radius/padding/gap to match.
+ */
 .docket-nav-enhanced {
   display: flex !important;
-  gap: 2px;
-  padding: 6px;
+  gap: 4px;
+  padding: 10px;
+  margin: 12px 10px;
   background-color: var(--docket-sidebar-bg) !important;
   backdrop-filter: saturate(180%) blur(20px);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
-  border-radius: var(--docket-radius-md);
+  border-radius: var(--docket-radius-lg);
   box-shadow: var(--docket-shadow), var(--docket-highlight);
   font-family: var(--docket-font);
   overflow-x: auto;
@@ -32,14 +42,14 @@
 .docket-nav-enhanced .docket-nav-item {
   display: flex !important;
   align-items: center !important;
-  gap: 8px;
+  gap: 10px;
   font-family: var(--docket-font) !important;
   font-size: 13px !important;
   font-weight: 590 !important;
   color: var(--docket-label) !important;
   text-decoration: none !important;
-  padding: 8px 12px !important;
-  border-radius: var(--docket-radius-sm) !important;
+  padding: 10px 14px !important;
+  border-radius: 999px !important;
   white-space: nowrap;
   background-color: transparent !important;
   transition: background-color 0.16s cubic-bezier(0.16, 1, 0.3, 1);
@@ -53,8 +63,11 @@
   outline: 2px solid var(--docket-blue) !important;
   outline-offset: -2px;
 }
+/* A flat single-color active pill was indistinguishable from any other flat-blue app on the
+   market; the signature accent sweep (see tokens.css) makes the current section read as a
+   deliberate, designed accent rather than a default `background: blue`. */
 .docket-nav-enhanced .docket-nav-item-active {
-  background-color: var(--docket-blue) !important;
+  background: var(--docket-accent-gradient) !important;
   color: #fff !important;
 }
 /* Matched by real label text in shell.ts's restyleNav() — see icons.ts's navIconByLabel.
@@ -81,11 +94,11 @@
 .docket-top-tabs .docket-top-tab {
   font-family: var(--docket-font) !important;
   font-size: 13px !important;
-  font-weight: 590 !important;
+  font-weight: 700 !important;
   color: var(--docket-label-secondary) !important;
   text-decoration: none !important;
   background: transparent !important;
-  border-bottom: 2px solid transparent !important;
+  border-bottom: 3px solid transparent !important;
   transition: color 0.16s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.16s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .docket-top-tabs .docket-top-tab:hover {
@@ -96,9 +109,13 @@
   outline-offset: 2px;
   border-radius: var(--docket-radius-sm);
 }
+/* Gradient underline (see .docket-nav-item-active above) instead of a flat blue line — the
+   same signature accent, just applied via border-image since border-color can't take a
+   gradient directly. */
 .docket-top-tabs .docket-top-tab-active {
   color: var(--docket-blue) !important;
   border-bottom-color: var(--docket-blue) !important;
+  border-image: var(--docket-accent-gradient) 1;
 }
 
 .docket-floating-bar {

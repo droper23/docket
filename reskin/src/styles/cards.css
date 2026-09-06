@@ -2,16 +2,16 @@
    hairline-divided rows, not Docket's individually-bordered tile cards. */
 .docket-group {
   background: var(--docket-bg-elevated);
-  border-radius: var(--docket-radius-md);
+  border-radius: var(--docket-radius-lg);
   box-shadow: var(--docket-shadow), var(--docket-highlight);
   overflow: hidden;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 .docket-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: 14px;
+  padding: 15px 20px;
   border-bottom: 0.5px solid var(--docket-separator);
   min-height: 44px; /* Apple's minimum touch target */
   transition: background-color 0.16s cubic-bezier(0.16, 1, 0.3, 1);
@@ -53,8 +53,9 @@
   display: inline-flex;
   align-items: center;
   font-size: 12px;
-  font-weight: 600;
-  padding: 2px 9px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  padding: 3px 11px;
   border-radius: 999px;
 }
 .docket-badge-red { background: color-mix(in srgb, var(--docket-red) 16%, transparent); color: var(--docket-red); }

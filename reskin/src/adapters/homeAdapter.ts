@@ -21,7 +21,13 @@ interface ScheduleItem {
 // items for 5 courses), so a window keeps a Today/Upcoming view from becoming a full-semester
 // dump — this reskin re-runs on every debounced mutation pass anyway, unlike the one-shot
 // bookmarklet, so it can afford a narrower window than that script's own.
-const WINDOW_DAYS_PAST = 1;
+//
+// WINDOW_DAYS_PAST was 1 (real user complaint, Sep 2026: "can't scroll up to see past
+// assignments" — a real data-window limit, not a scroll bug). Widened to comfortably cover a
+// full semester back now that the overlay-leak fix (see lib/dom.ts's overlayContent()) means
+// there's no longer a duplicate-content reason to keep the window narrow; ROADMAP.md's own
+// prior live measurement already called the full ~300-item/~6.4k-node semester acceptable.
+const WINDOW_DAYS_PAST = 120;
 const WINDOW_DAYS_FUTURE = 14;
 
 /**

@@ -5,11 +5,37 @@
   /* Deliberately no background here — confirmed live that painting one made this read as a
      mismatched box sitting inside LearningSuite's own page rather than blending with it.
      Individual cards/groups carry their own subtle elevated surface instead. */
-  padding: 28px 22px 60px;
-  max-width: 760px;
+  padding: 40px 28px 72px;
+  /* Widened + more generous side padding (Sep 2026 "look nothing like the original" pass):
+     apple.com/about.google's biggest visible difference from stock SaaS chrome is generous
+     whitespace around a wider content column, not a cramped 760px app column. */
+  max-width: 960px;
   margin: 0 auto;
 }
-.docket-header { margin-bottom: 20px; }
+.docket-header {
+  margin-bottom: 32px;
+  position: relative;
+  /* Contains the glow pseudo-element's negative z-index to this header only, so it can never
+     render behind unrelated DOM earlier in the page (nav, native top bar). */
+  isolation: isolate;
+}
+/* The "hero glow" (Sep 2026 pass) — a soft, blurred multi-hue wash behind every page's own
+   title, the same device apple.com's product pages use above a headline and a softer cousin
+   of about.google's own colorful accent shapes. Purely decorative (pointer-events: none) and
+   scoped to .docket-header only — never applied to LearningSuite's own untouched native
+   headings, which have no equivalent wrapping container to hang it from. */
+.docket-header::before {
+  content: "";
+  position: absolute;
+  top: -60px;
+  left: -40px;
+  width: 340px;
+  height: 220px;
+  background: var(--docket-hero-glow);
+  filter: blur(6px);
+  z-index: -1;
+  pointer-events: none;
+}
 .docket-section { margin: 26px 0 10px; }
 .docket-day-header {
   display: flex; align-items: baseline; gap: 8px;
@@ -21,27 +47,64 @@
 
 .docket-course-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 18px;
 }
+/**
+ * Sep 2026 "look nothing like the original" pass: flat gray tiles read as generic app
+ * chrome. Each card now washes its own course color (already computed per-course by
+ * accentForCourse() and set as the --docket-card-accent custom property directly on this
+ * element by courseCard.ts — a plain style-attribute addition, no behavior change) through a
+ * soft gradient, the way about.google's own colorful tiles and apple.com's product cards
+ * both use color/imagery to tell cards apart rather than a uniform neutral surface. The
+ * flat `background` line first is a deliberate fallback for engines without color-mix.
+ */
 .docket-course-card {
   background: var(--docket-bg-elevated);
-  border-radius: var(--docket-radius-md);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--docket-card-accent, var(--docket-blue)) 20%, var(--docket-bg-elevated)) 0%, var(--docket-bg-elevated) 60%);
+  border-radius: var(--docket-radius-xl);
   box-shadow: var(--docket-shadow), var(--docket-highlight);
-  padding: 16px;
+  padding: 22px;
   text-decoration: none;
   color: inherit;
   display: block;
-  transition: background-color 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.16s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.docket-course-card:hover { background: var(--docket-fill); }
-.docket-course-card .docket-dot { margin-bottom: 10px; }
+.docket-course-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08), 0 16px 32px rgba(0, 0, 0, 0.14), var(--docket-highlight);
+}
+.docket-course-card .docket-dot {
+  width: 14px;
+  height: 14px;
+  margin-bottom: 14px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 18%, transparent);
+}
 /* Real link (real href) or a `role="link" tabindex="0"` div standing in for one when
    LearningSuite gives no static href (see courseCard.ts) — both are keyboard-reachable and
    need the same visible focus signal every other control in this reskin carries. */
 .docket-course-card:focus-visible {
   outline: 2px solid var(--docket-blue);
   outline-offset: 2px;
+}
+
+/* gradeSummaryAdapter.ts's two-stat readout (Current / Total course progress) inside a
+   .docket-course-card — a small labeled row under the course name, not a second card. */
+.docket-grade-stats {
+  display: flex;
+  gap: 14px;
+  margin-top: 10px;
+}
+.docket-grade-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+.docket-grade-stat .docket-footnote {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .docket-toggle-original {

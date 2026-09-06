@@ -7,11 +7,17 @@ import { setupDom } from "./testUtil.js";
 import { courseListAdapter } from "../src/adapters/courseListAdapter.js";
 import { assignmentsAdapter } from "../src/adapters/assignmentsAdapter.js";
 import { homeAdapter } from "../src/adapters/homeAdapter.js";
+import { gradesAdapter } from "../src/adapters/gradesAdapter.js";
+import { gradeSummaryAdapter } from "../src/adapters/gradeSummaryAdapter.js";
+import { dashboardAdapter } from "../src/adapters/dashboardAdapter.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const courseListHtml = readFileSync(join(__dirname, "fixtures/course-list.html"), "utf8");
 const courseListClickableHtml = readFileSync(join(__dirname, "fixtures/course-list-clickable.html"), "utf8");
 const assignmentsHtml = readFileSync(join(__dirname, "fixtures/assignments.html"), "utf8");
+const gradesHtml = readFileSync(join(__dirname, "fixtures/grades.html"), "utf8");
+const gradeSummaryHtml = readFileSync(join(__dirname, "fixtures/grade-summary.html"), "utf8");
+const dashboardHtml = readFileSync(join(__dirname, "fixtures/dashboard.html"), "utf8");
 
 test("courseListAdapter renders one card per real course link, preserving the original href verbatim", () => {
   setupDom(courseListHtml, "https://learningsuite.byu.edu/top/course-list");
@@ -151,5 +157,79 @@ test("homeAdapter reads Combined Schedule items within the lookahead window", ()
     assert.deepEqual(titles, ["Reading: Chapter 3"]);
   } finally {
     homeAdapter.unmount();
+  }
+});
+
+test("gradesAdapter renders the Grades page's identical row shape as a grade list, not an assignment list", () => {
+  setupDom(gradesHtml, "https://learningsuite.byu.edu/cid-abc123/student/gradebook");
+  try {
+    // Confirmed live (Sep 2026): Grades' default sub-view shares assignmentsAdapter's exact
+    // row shape, so the two must be mutually exclusive on the same fixture-shaped DOM.
+    assert.equal(gradesAdapter.matches(), true);
+    assert.equal(assignmentsAdapter.matches(), false, "the identical row shape must not also match Assignments once .bg-top-nav-highlight reads Grades");
+    gradesAdapter.mount(false);
+    assert.equal(document.querySelector(".docket-large-title")?.textContent, "Grades");
+    const titles = Array.from(document.querySelectorAll(".docket-row-title")).map((el) => el.textContent);
+    assert.deepEqual(titles, ["Lab 3: Linked Lists", "Lab 2: Arrays"]);
+  } finally {
+    gradesAdapter.unmount();
+  }
+});
+
+test("gradeSummaryAdapter renders one card per course, skipping the header row, with both progress percentages", () => {
+  setupDom(gradeSummaryHtml, "https://learningsuite.byu.edu/student/top/summary");
+  try {
+    assert.equal(gradeSummaryAdapter.matches(), true);
+    gradeSummaryAdapter.mount(false);
+    const cards = document.querySelectorAll(".docket-course-card");
+    assert.equal(cards.length, 2, "the term/column header row (no cid- link) must be skipped, only real course rows rendered");
+    const hrefs = Array.from(cards).map((c) => c.getAttribute("href")).sort();
+    assert.deepEqual(hrefs, ["/cid-abc123/student/home", "/cid-def456/student/home"]);
+    const badgeTexts = Array.from(document.querySelectorAll(".docket-badge")).map((b) => b.textContent);
+    assert.deepEqual(badgeTexts, ["0%", "0%", "100%", "0.58%"], "both Current and Total progress percentages must carry into the card, in document order");
+  } finally {
+    gradeSummaryAdapter.unmount();
+  }
+});
+
+test("dashboardAdapter renders the per-day schedule as grouped cards without hiding the sibling Announcements widget", () => {
+  setupDom(dashboardHtml, "https://learningsuite.byu.edu/cid-abc123/student/home");
+  try {
+    // Confirmed live: an instructor lesson-topic note is a real `<p>` nested inside the
+    // outer `p.mb-2.text-sm.break-words` — only reachable because Vue builds it via
+    // imperative DOM calls, not HTML parsing (a raw HTML fixture string can't express this;
+    // any HTML parser, jsdom included, auto-closes a `<p>` before a nested block element).
+    // Built here with the same DOM APIs the real page uses, to exercise the real shape.
+    const tueList = document.querySelectorAll(".pl-mobile")[1]!.querySelector(".pb-5")!;
+    const noteP = document.createElement("p");
+    noteP.className = "mb-2 text-sm break-words";
+    const noteDiv = document.createElement("div");
+    noteDiv.className = "default-list default-table instructorText font-nunito break-words";
+    noteDiv.innerHTML = "<p>Recitation Quiz 5.3/5.5: The FUNdamental Theorem</p>";
+    noteP.appendChild(noteDiv);
+    tueList.insertBefore(noteP, tueList.firstChild);
+
+    assert.equal(dashboardAdapter.matches(), true);
+    dashboardAdapter.mount(false);
+    const dayHeadlines = Array.from(document.querySelectorAll(".docket-day-header .docket-headline")).map((el) => el.textContent);
+    assert.deepEqual(dayHeadlines, ["Mon, Sep 7", "Tue, Sep 8"]);
+    const rowTitles = Array.from(document.querySelectorAll(".docket-row-title")).map((el) => el.textContent);
+    assert.deepEqual(rowTitles, ["Labor Day", "Recitation Quiz 5.3/5.5: The FUNdamental Theorem", "Recitation Quiz 9/8"]);
+
+    // The real regression this test guards: overlaying the whole page (not just the
+    // schedule column) hid the sibling Announcements widget along with the native schedule
+    // — confirmed live before this was scoped down to `[class~="md:mr-6"]` specifically.
+    const announcements = document.querySelector(".announcements-widget") as HTMLElement;
+    assert.equal(announcements.hidden, false, "the Announcements sidebar must stay visible — only the schedule column is overlaid");
+
+    let originalClicked = false;
+    const originalLink = document.querySelector("a.cursor-pointer") as HTMLElement;
+    originalLink.addEventListener("click", () => {
+      originalClicked = true;
+    });
+    (Array.from(document.querySelectorAll(".docket-row-title")).find((el) => el.textContent === "Recitation Quiz 9/8")!.closest(".docket-row-tappable") as HTMLElement).click();
+    assert.equal(originalClicked, true, "clicking a real assignment row must re-fire the original element's own click handler");
+  } finally {
+    dashboardAdapter.unmount();
   }
 });

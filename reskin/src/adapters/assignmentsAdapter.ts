@@ -8,7 +8,7 @@ import { diagnostics } from "../core/diagnostics.js";
 import { dueDateLabel } from "../../../src/core/agendaFormatting.js";
 import { daysUntilInSchoolTimeZone } from "../../../src/core/schoolTime.js";
 
-interface RowData {
+export interface RowData {
   el: HTMLElement;
   titleCell: HTMLElement;
   title: string;
@@ -41,7 +41,15 @@ interface RowData {
  * newly-rendered rows once they do (see the `listContainer` append path
  * below).
  */
-function extractRows(main: Element): RowData[] {
+/**
+ * Exported for gradesAdapter.ts: confirmed live (Sep 2026) the Grades page's default
+ * sub-view renders the IDENTICAL `.bg-base.text-highlight` row grid as this page (BYU
+ * reuses the same table component for both, just with an added Statistics-icon column that
+ * doesn't shift the title/due/score cell indices this function already reads) — same row
+ * count semantics, same due/score/completion text shape. Reusing this function directly
+ * avoids re-deriving the same regex parsing twice for what is, live-confirmed, the same DOM.
+ */
+export function extractRows(main: Element): RowData[] {
   const all = Array.from(main.querySelectorAll("*"));
   let currentCategory = "";
   let currentWeight: string | undefined;
@@ -80,7 +88,8 @@ function extractRows(main: Element): RowData[] {
   return results;
 }
 
-function buildCard(overlayRef: () => Overlay | null, r: RowData): HTMLElement {
+/** Exported for gradesAdapter.ts — see extractRows()'s own export comment above. */
+export function buildCard(overlayRef: () => Overlay | null, r: RowData): HTMLElement {
   const { iso, time } = parseAssignmentDueText(r.dueText);
   const daysUntilDue = iso ? daysUntilInSchoolTimeZone(iso) : undefined;
   return assignmentCard(

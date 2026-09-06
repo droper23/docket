@@ -10,4 +10,5 @@ export function setupDom(html: string, url = "https://learningsuite.byu.edu/"): 
   (globalThis as unknown as Record<string, unknown>)["HTMLElement"] = w.HTMLElement;
   (globalThis as unknown as Record<string, unknown>)["Element"] = w.Element;
   (globalThis as unknown as Record<string, unknown>)["Node"] = w.Node;
+  (globalThis as unknown as Record<string, unknown>)["MutationObserver"] = w.MutationObserver;
 }

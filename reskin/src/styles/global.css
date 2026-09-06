@@ -56,6 +56,29 @@ html[data-docket-reskin],
 }
 
 /**
+ * A signature gradient hairline under the masthead (Sep 2026 "look nothing like the
+ * original" pass) — confirmed live `header` computes `position: static`, so this cannot
+ * disturb any sticky/fixed behavior it might otherwise have. The one piece of chrome on
+ * literally every page previously had zero color signature of its own (a stark flat bar);
+ * this is the same accent sweep used for the active nav pill/top-tab underline/buttons,
+ * applied where a visitor sees it before anything else, the way about.google's masthead and
+ * apple.com's own product-page headers both lead with color rather than plain black/white.
+ */
+[data-docket-reskin] header {
+  position: relative;
+}
+[data-docket-reskin] header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--docket-accent-gradient);
+  pointer-events: none;
+}
+
+/**
  * Confirmed live (Sep 2026, both themes): each sidebar row (Dashboard/
  * Announcements/Assignments/...) is wrapped in its own `<div class="navItem
  * ... bg-primary lg:bg-base ...">`, one level inside the `<nav>`
@@ -81,12 +104,17 @@ html[data-docket-reskin],
 [data-docket-reskin] h2,
 [data-docket-reskin] h3 {
   font-family: var(--docket-font) !important;
-  font-weight: 700 !important;
+  /* 700 -> 800, sizes bumped (Sep 2026 "look nothing like the original" pass) — matching
+     .docket-large-title's own headline-not-app-chrome scale, so pages that still render a
+     plain native <h1> (Announcements, Class Info, etc., with no dedicated adapter) get the
+     same editorial-headline feel as the adapter-rendered pages instead of reading as a
+     visibly smaller/older design generation. */
+  font-weight: 800 !important;
   color: var(--docket-label) !important;
 }
-[data-docket-reskin] h1 { font-size: 28px !important; letter-spacing: -0.02em; }
-[data-docket-reskin] h2 { font-size: 22px !important; letter-spacing: -0.01em; }
-[data-docket-reskin] h3 { font-size: 17px !important; }
+[data-docket-reskin] h1 { font-size: 34px !important; letter-spacing: -0.03em; }
+[data-docket-reskin] h2 { font-size: 25px !important; letter-spacing: -0.02em; }
+[data-docket-reskin] h3 { font-size: 18px !important; letter-spacing: -0.01em; }
 
 /**
  * Instructor-authored rich text (a Content page's file list, syllabus body text, etc.)
@@ -122,11 +150,22 @@ html[data-docket-reskin],
  * background (still needed: instructor content still carries inline `color:#000000`), but
  * sized down to read as an inline note instead of a standalone page.
  */
+/**
+ * Confirmed live (course Dashboard, Sep 2026 real-usage pass): `display: inline-block` alone
+ * does NOT keep this chip actually chip-sized — an inline-block box's shrink-to-fit width
+ * still grows to fit as much of a long lesson-topic sentence as fits on one line before
+ * wrapping, so anything longer than a couple words rendered as a wide white slab nearly the
+ * width of its column — precisely the "random big white box" complaint, just on a rule that
+ * already thought it had fixed this. A `max-width` forces real multi-line wrapping instead
+ * of one long line, so this reads as a compact inline note regardless of the instructor's
+ * actual sentence length.
+ */
 [data-docket-reskin] .text-sm .instructorText.font-nunito {
   border-radius: var(--docket-radius-sm);
   padding: 8px 10px;
   box-shadow: none;
   display: inline-block;
+  max-width: 260px;
 }
 
 /**
@@ -214,15 +253,20 @@ html[data-docket-reskin],
    full pills, and unlike a card or row, a single free-floating action button reads as more
    confidently "designed" at 999px than at the small-radius-rectangle scale meant for
    surfaces containing other content. */
+/* Flat single-color CTAs (Sep 2026 pass): moved to the same signature gradient sweep as the
+   active nav pill/top-tab underline (tokens.css) rather than a flat brand blue — every
+   generic dashboard's own primary-button color. `background-color` stays as a fallback for
+   engines that don't parse the gradient function used. */
 [data-docket-reskin] .goBtn,
 [data-docket-reskin] .bg-action,
 [data-docket-reskin] button.bg-primary-dark {
   font-family: var(--docket-font) !important;
   border-radius: 999px !important;
   background-color: var(--docket-blue) !important;
+  background: var(--docket-accent-gradient) !important;
   color: #fff !important;
   border: none !important;
-  font-weight: 600 !important;
+  font-weight: 700 !important;
 }
 [data-docket-reskin] .goBtn:hover,
 [data-docket-reskin] .bg-action:hover,
@@ -280,7 +324,7 @@ html[data-docket-reskin],
 [data-docket-reskin] table {
   border-collapse: separate;
   border-spacing: 0;
-  border-radius: var(--docket-radius-md);
+  border-radius: var(--docket-radius-lg);
   overflow: hidden;
   box-shadow: var(--docket-shadow), var(--docket-highlight);
   background-color: var(--docket-bg-elevated);
@@ -330,7 +374,7 @@ html[data-docket-reskin],
  */
 [data-docket-reskin] .gridColsStyle {
   background-color: var(--docket-bg-elevated);
-  border-radius: var(--docket-radius-md) !important;
+  border-radius: var(--docket-radius-lg) !important;
   box-shadow: var(--docket-shadow), var(--docket-highlight);
   padding: 8px 16px;
   overflow: hidden;
@@ -384,7 +428,7 @@ html[data-docket-reskin],
   -webkit-backdrop-filter: saturate(180%) blur(20px);
 }
 [data-docket-reskin] .popupWrapper .minMax {
-  border-radius: var(--docket-radius-lg) !important;
+  border-radius: var(--docket-radius-xl) !important;
   background-color: var(--docket-canvas) !important;
   box-shadow: var(--docket-shadow);
 }

@@ -53,6 +53,21 @@ export function looksLikeCourseListPage(doc: Document = document): boolean {
 }
 
 /**
+ * Grade Summary — confirmed live (Sep 2026) at the same URL shape as Course List (no `cid-`
+ * in the URL, a top-level page), so this reuses the exact `main h1` disambiguator
+ * `looksLikeCourseListPage()` already uses to EXCLUDE this page ("Course Grade Summary" vs.
+ * "Course List") — just as the positive match instead. `.gridColsStyle` (the page's own CSS
+ * grid, confirmed unique to this page across every other censused page type) is required too
+ * so this can never fire on a page that merely happens to have "grade" in its heading.
+ */
+export function looksLikeGradeSummaryPage(doc: Document = document): boolean {
+  if (courseIdFromUrl()) return false;
+  const mainTitle = doc.querySelector("main h1")?.textContent?.trim() ?? "";
+  if (!/grade/i.test(mainTitle)) return false;
+  return doc.querySelectorAll("main .gridColsStyle").length > 0;
+}
+
+/**
  * Assignments-page detection, same signature assignmentsExtractorSource()
  * relies on (it only checks the URL for a courseId, then a DOM content
  * check to confirm it landed on the right page — the literal path segment
@@ -76,6 +91,34 @@ export function looksLikeAssignmentsPage(doc: Document = document): boolean {
   const activeTab = doc.querySelector(".bg-top-nav-highlight")?.textContent?.trim();
   if (activeTab === "Grades") return false;
   return doc.querySelectorAll("main .bg-base.text-highlight").length > 0;
+}
+
+/**
+ * Grades page (its default "Assignments" sub-view, `/student/gradebook`) — confirmed live
+ * (Sep 2026) it renders the identical `main .bg-base.text-highlight` row grid as the real
+ * Assignments page (see gradesAdapter.ts), so the DOM shape alone can't tell them apart. The
+ * real, live-confirmed disambiguator is the same one `looksLikeAssignmentsPage()` already
+ * uses to exclude this page — LearningSuite's own active top-tab, `.bg-top-nav-highlight`,
+ * reads exactly "Grades" here and "Home" on real Assignments — just used here as the
+ * positive match instead of the exclusion.
+ */
+export function looksLikeGradesPage(doc: Document = document): boolean {
+  if (!courseIdFromUrl()) return false;
+  const activeTab = doc.querySelector(".bg-top-nav-highlight")?.textContent?.trim();
+  if (activeTab !== "Grades") return false;
+  return doc.querySelectorAll("main .bg-base.text-highlight").length > 0;
+}
+
+/**
+ * Course Dashboard — confirmed live (Sep 2026, real account): a course-scoped page
+ * (`cid-{id}/student/home`) whose own `main h1` reads exactly "Dashboard". Deliberately just
+ * the course-scope + title check, no further DOM-shape requirement: dashboardAdapter.ts's
+ * own `mount()` already no-ops safely (fail-soft, matching every other adapter) if the page
+ * happens to have zero extractable schedule days that pass.
+ */
+export function looksLikeDashboardPage(doc: Document = document): boolean {
+  if (!courseIdFromUrl()) return false;
+  return (doc.querySelector("main h1")?.textContent?.trim() ?? "") === "Dashboard";
 }
 
 /** Combined Schedule List view: confirmed via URL, cross-checked against the same `.listViewDay` markup scheduleExtractorSource() reads. */

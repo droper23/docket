@@ -40,6 +40,21 @@
   --docket-radius-sm: 8px;
   --docket-radius-md: 12px;
   --docket-radius-lg: 20px;
+  /* A bigger, editorial radius (Sep 2026 "look nothing like the original" pass) — apple.com's
+     own product cards and about.google's tiles both round far past the 20px "app chrome"
+     scale above; used for hero surfaces (course cards, the page-header glow container) that
+     should read as a marketing-page tile, not a settings row. */
+  --docket-radius-xl: 28px;
+
+  /* A signature multi-hue sweep (Sep 2026 pass) — apple.com's keynote/product-page gradients
+     and about.google's own four-color palette both lean on a visible color transition rather
+     than a single flat brand blue; used sparingly (the hero glow behind a page's
+     .docket-large-title, and the active nav pill) so it reads as a deliberate accent, not a
+     wash over everything. Light/dark values differ only in how saturated/bright the stops are
+     — both sweep blue -> purple -> pink, the same hue family as --docket-blue/--docket-purple
+     so it never fights the rest of the palette. */
+  --docket-accent-gradient: linear-gradient(135deg, #007aff 0%, #af52de 55%, #ff375f 100%);
+  --docket-hero-glow: radial-gradient(closest-side, rgba(0, 122, 255, 0.16), rgba(175, 82, 222, 0.12) 55%, transparent 75%);
 
   --docket-blue: #007aff;
   --docket-red: #ff3b30;
@@ -65,7 +80,13 @@
   /* An overlay tint, not a solid color — cards read as "slightly raised" against whatever
      --docket-canvas resolves to, without needing a second hardcoded shade to keep in sync. */
   --docket-bg-elevated: rgba(0, 0, 0, 0.045);
-  --docket-sidebar-bg: rgba(246, 246, 246, 0.78); /* macOS sidebar material */
+  /* Was a distinct translucent "sidebar material" (rgba(246,246,246,0.78)) — real user
+     feedback (Sep 2026): the sidebar/top-bar/main backgrounds should all be the SAME, not
+     three subtly different panels. Now just an alias for --docket-canvas so the actual
+     <nav> element (.docket-nav-enhanced in navigation.css) paints the identical flat color
+     as body/header/.bg-top-nav; navigation.css keeps its own box-shadow/hairline for edge
+     definition instead of relying on a color difference to read as a separate panel. */
+  --docket-sidebar-bg: var(--docket-canvas);
   --docket-label: rgba(0, 0, 0, 0.92);
   --docket-label-secondary: rgba(60, 60, 67, 0.6);
   --docket-label-tertiary: rgba(60, 60, 67, 0.3);
@@ -102,7 +123,10 @@
 
   --docket-canvas: #000000;
   --docket-bg-elevated: rgba(255, 255, 255, 0.08);
-  --docket-sidebar-bg: rgba(255, 255, 255, 0.06);
+  --docket-accent-gradient: linear-gradient(135deg, #0a84ff 0%, #bf5af2 55%, #ff375f 100%);
+  --docket-hero-glow: radial-gradient(closest-side, rgba(10, 132, 255, 0.28), rgba(191, 90, 242, 0.2) 55%, transparent 75%);
+  /* No longer a separate dark-mode-only override (see the :root definition's comment) —
+     --docket-sidebar-bg just aliases --docket-canvas, which this block already redefines. */
   --docket-label: rgba(255, 255, 255, 0.92);
   --docket-label-secondary: rgba(235, 235, 245, 0.6);
   --docket-label-tertiary: rgba(235, 235, 245, 0.3);

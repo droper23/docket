@@ -67,20 +67,49 @@ export interface Overlay {
  * new node, toggle `.hidden` on old ones. Nothing is ever deleted, so
  * Compatibility Mode / the emergency disable path is just calling
  * `overlay.remove()`.
+ *
+ * Confirmed live (Sep 2026, Combined Schedule): LearningSuite keeps
+ * appending real DOM nodes to `container` well after this first mount pass
+ * (the page renders its schedule progressively) — a one-time snapshot here
+ * left every later-appended native node fully visible, unhidden, below the
+ * enhanced view (reported as "the original page just moved lower, all the
+ * original stuff is still there"). A `MutationObserver` scoped to exactly
+ * this container's own childList (no `subtree` — only direct children ever
+ * need catching) now folds any newly-appeared sibling into `originalNodes`
+ * and applies the current hidden state to it immediately, so a later
+ * LearningSuite render can never leak through again. This only ever sets
+ * the `.hidden` attribute, never adds/removes a child itself, so it cannot
+ * observe its own writes or fight the body-level observer in lib/observe.ts.
  */
 export function overlayContent(container: Element, enhanced: Node, compatibilityMode: boolean): Overlay {
   const originalNodes = Array.from(container.childNodes);
   container.insertBefore(enhanced, container.firstChild);
-  const setOriginalHidden = (hidden: boolean) => {
-    for (const n of originalNodes) {
-      if (n instanceof HTMLElement) n.hidden = hidden;
-    }
+  let hidden = !compatibilityMode;
+  const applyHidden = (n: ChildNode) => {
+    if (n instanceof HTMLElement) n.hidden = hidden;
   };
-  setOriginalHidden(!compatibilityMode);
+  const setOriginalHidden = (h: boolean) => {
+    hidden = h;
+    for (const n of originalNodes) applyHidden(n);
+  };
+  setOriginalHidden(hidden);
+
+  const observer = new MutationObserver((records) => {
+    for (const record of records) {
+      for (const node of Array.from(record.addedNodes) as ChildNode[]) {
+        if (node === enhanced || originalNodes.includes(node)) continue;
+        originalNodes.push(node);
+        applyHidden(node);
+      }
+    }
+  });
+  observer.observe(container, { childList: true });
+
   return {
     originalNodes,
     setOriginalHidden,
     remove() {
+      observer.disconnect();
       enhanced.parentNode?.removeChild(enhanced);
       setOriginalHidden(false);
     },

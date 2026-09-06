@@ -19,15 +19,19 @@ export interface CourseCardData {
 }
 
 export function courseCard(data: CourseCardData): HTMLElement {
-  const dot = h("div", { class: "docket-dot", style: `background:${data.accent}` });
+  const dot = h("div", { class: "docket-dot", style: `background:${data.accent};color:${data.accent}` });
   const headline = h("div", { class: "docket-headline" }, [data.code]);
   const footnote = h("div", { class: "docket-footnote" }, [data.title]);
+  // Sep 2026 "look nothing like the original" pass: a plain inline custom-property addition
+  // (no new attribute, no behavior change) so cards.css/layout.css can wash each card's own
+  // gradient in the same accent already computed per-course, instead of a uniform flat tile.
+  const cardStyle = `--docket-card-accent:${data.accent}`;
 
   if (data.href) {
-    return h("a", { class: "docket-course-card", href: data.href }, [dot, headline, footnote]);
+    return h("a", { class: "docket-course-card", href: data.href, style: cardStyle }, [dot, headline, footnote]);
   }
 
-  const card = h("div", { class: "docket-course-card", role: "link", tabindex: "0" }, [dot, headline, footnote]);
+  const card = h("div", { class: "docket-course-card", role: "link", tabindex: "0", style: cardStyle }, [dot, headline, footnote]);
   if (data.onActivate) {
     card.addEventListener("click", data.onActivate);
     card.addEventListener("keydown", (e) => {

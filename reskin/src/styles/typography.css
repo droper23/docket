@@ -4,7 +4,11 @@
   color: var(--docket-label);
   -webkit-font-smoothing: antialiased;
 }
-.docket-large-title { font-size: 34px; font-weight: 700; letter-spacing: 0.01em; margin: 0 0 4px; }
+/* Sep 2026 "look nothing like the original" pass: apple.com/about.google both treat a page
+   title as a marketing headline, not an app-chrome label — much larger, heavier, and tighter
+   tracked than Apple HIG's own 34px Large Title. clamp() keeps it from overrunning narrow
+   viewports (responsive.css's old fixed 28px override is now redundant and removed there). */
+.docket-large-title { font-size: clamp(32px, 5.2vw, 48px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; margin: 0 0 4px; }
 .docket-title { font-size: 22px; font-weight: 700; margin: 0 0 2px; }
 .docket-headline { font-size: 17px; font-weight: 600; margin: 0; }
 .docket-body { font-size: 15px; font-weight: 400; line-height: 1.45; margin: 0; }
