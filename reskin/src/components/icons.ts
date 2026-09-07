@@ -37,6 +37,7 @@ export const icons = {
   home: () => svgIcon("M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10"),
   document: () => svgIcon("M6 3h9l5 5v13H6zM14 3v5h5"),
   examDoc: () => svgIcon("M6 3h9l5 5v13H6zM14 3v5h5M9 14l2 2 4-4"),
+  clipboard: () => svgIcon("M9 4h6a1 1 0 011 1v1H8V5a1 1 0 011-1zM6 6h12v15H6zM9 11h6M9 15h6"),
 };
 
 /**
@@ -45,6 +46,11 @@ export const icons = {
  * adapters/shell.ts — several distinct destinations reuse the same icon on purpose where
  * they're the same real-world concept (e.g. "Schedule" and "Combined Schedule" both get the
  * calendar glyph); anything not in this table gets no icon at all rather than a guessed one.
+ * Syllabus and Library Resources previously both mapped to `book` — confirmed live (Sep 2026)
+ * these render as literally the same glyph on the same sidebar, no visual way to tell the two
+ * destinations apart at a glance. Syllabus now gets its own `clipboard` glyph (a course outline,
+ * not a library book) regardless of the broader open question of whether sidebar icons stay at
+ * all (see PASS12_PLAN.md Phase 4.5).
  */
 export const navIconByLabel: Record<string, keyof typeof icons> = {
   Dashboard: "dashboard",
@@ -68,5 +74,5 @@ export const navIconByLabel: Record<string, keyof typeof icons> = {
   "Copyright Resources": "copyright",
   Content: "document",
   Exams: "examDoc",
-  Syllabus: "book",
+  Syllabus: "clipboard",
 };

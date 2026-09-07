@@ -31,39 +31,55 @@ interface DashboardDay {
  * `.instructorText.font-nunito`, already given the compact-chip treatment in global.css).
  * All three read out as a plain-text row here; only the real assignment case gets a working
  * click-through.
+ *
+ * Confirmed live (Sep 2026, MATH 113 Dashboard, Tue Sep 8): a date bar is followed by exactly
+ * two `div.pl-mobile.sm:pl-0` siblings every day — "Column 1" and "Column 2" — even on days
+ * where Column 2 has no real content (an empty div). Reading only `bar.nextElementSibling`
+ * silently drops Column 2's items entirely on the days that do have them (that day's real BYU
+ * Devotional calendar entry, in this account). Both columns must be walked and merged into one
+ * flat list — the "Column N" grouping only exists for the native page's own desktop layout, not
+ * because the items mean anything different from each other.
  */
 function extractDays(main: Element): DashboardDay[] {
   const bars = Array.from(main.querySelectorAll(".bg-gray1.text-primary-alt.px-4.py-2")) as HTMLElement[];
   const days: DashboardDay[] = [];
   for (const bar of bars) {
     if (isProcessed(bar, "dashboardday")) continue;
-    const list = bar.nextElementSibling;
     markProcessed(bar, "dashboardday");
     processedBars.push(bar);
-    if (!list || !(list instanceof HTMLElement) || !list.classList.contains("pl-mobile")) continue;
+
+    const columns: HTMLElement[] = [];
+    let sib = bar.nextElementSibling;
+    while (sib instanceof HTMLElement && sib.classList.contains("pl-mobile")) {
+      columns.push(sib);
+      sib = sib.nextElementSibling;
+    }
+    if (!columns.length) continue;
 
     const items: DashboardItem[] = [];
-    for (const p of Array.from(list.querySelectorAll("p.mb-2.text-sm.break-words"))) {
-      // A paragraph commonly holds more than one real anchor (e.g. a file download AND a Zoom
-      // recording link) — `querySelector` (singular) used to keep only the first, flattening
-      // every other real anchor into inert plain text. Every real anchor gets its own row now.
-      const anchors = Array.from(p.querySelectorAll("a.cursor-pointer")) as HTMLElement[];
-      if (!anchors.length) {
-        const text = p.textContent?.replace(/\s+/g, " ").trim() ?? "";
-        if (text) items.push({ text });
-        continue;
+    for (const list of columns) {
+      for (const p of Array.from(list.querySelectorAll("p.mb-2.text-sm.break-words"))) {
+        // A paragraph commonly holds more than one real anchor (e.g. a file download AND a Zoom
+        // recording link) — `querySelector` (singular) used to keep only the first, flattening
+        // every other real anchor into inert plain text. Every real anchor gets its own row now.
+        const anchors = Array.from(p.querySelectorAll("a.cursor-pointer")) as HTMLElement[];
+        if (!anchors.length) {
+          const text = p.textContent?.replace(/\s+/g, " ").trim() ?? "";
+          if (text) items.push({ text });
+          continue;
+        }
+        for (const link of anchors) {
+          const text = link.textContent?.replace(/\s+/g, " ").trim() ?? "";
+          if (text) items.push({ text, activate: () => link.click() });
+        }
+        // Any text in the paragraph outside the anchors themselves (e.g. an "(Updated on …)"
+        // date) — captured separately so it's never silently dropped or concatenated onto one
+        // link's own label.
+        const clone = p.cloneNode(true) as HTMLElement;
+        clone.querySelectorAll("a.cursor-pointer").forEach((a) => a.remove());
+        const metaText = clone.textContent?.replace(/\s+/g, " ").trim() ?? "";
+        if (metaText) items.push({ text: metaText });
       }
-      for (const link of anchors) {
-        const text = link.textContent?.replace(/\s+/g, " ").trim() ?? "";
-        if (text) items.push({ text, activate: () => link.click() });
-      }
-      // Any text in the paragraph outside the anchors themselves (e.g. an "(Updated on …)"
-      // date) — captured separately so it's never silently dropped or concatenated onto one
-      // link's own label.
-      const clone = p.cloneNode(true) as HTMLElement;
-      clone.querySelectorAll("a.cursor-pointer").forEach((a) => a.remove());
-      const metaText = clone.textContent?.replace(/\s+/g, " ").trim() ?? "";
-      if (metaText) items.push({ text: metaText });
     }
     if (!items.length) continue;
     days.push({ dateText: bar.textContent?.trim() ?? "", items });

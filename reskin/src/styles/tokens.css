@@ -99,11 +99,11 @@
   --docket-status-neutral-bg: #f1f3f4;
   --docket-status-neutral-fg: #3c4043;
 
-  /* Raw system hues — reserved for the checkbox-done fill and the native instructor-view
-   * banner (see global.css's .bg-attention rule); never for status/grade badge text, which
-   * uses the container/on-container pairs above instead. */
+  /* Raw system hue — reserved for the checkbox-done fill; never for status/grade badge text,
+   * which uses the container/on-container pairs above instead. The native instructor-view
+   * banner (global.css's .bg-attention rule) reuses --docket-status-soon-bg/fg rather than a
+   * dedicated color of its own — see that rule's own comment. */
   --docket-green: #146c2e;
-  --docket-yellow-banner-bg: rgba(234, 138, 0, 0.14);
 
   color-scheme: light dark;
 }
@@ -144,7 +144,6 @@
   --docket-status-neutral-fg: #c4c7c5;
 
   --docket-green: #30d158;
-  --docket-yellow-banner-bg: rgba(255, 214, 10, 0.16);
 }
 
 /* Background tint overrides (Settings > Background) — same six curated choices in both

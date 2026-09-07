@@ -12,19 +12,37 @@
  * must call this against the same extracted code list so a course reads as the same color on
  * every page.
  */
+/**
+ * Ordered by hue-distance dispersion (a farthest-point-first walk over the 12 hues' positions
+ * on the color wheel), not just "no two entries share the exact same hex" — the previous order
+ * guaranteed the latter but not the former. Confirmed live (Sep 2026, real 5-course account):
+ * red (index 1, ~5° hue) and the old index-4 orange (~16° hue) are only ~11° apart — both
+ * warm, similarly dark/saturated — and rendered close enough that both independent reviewers
+ * had to sample pixels to be sure the real course-card top-edge rule wasn't reusing one color.
+ * A hash-free, index-based assignment (see assignCourseColors() below) means WHICH hues land in
+ * a typical student's small N is entirely a function of this array's order, not of the colors
+ * themselves — reordering the same 12 hex values, greedily maximizing the minimum pairwise hue
+ * distance among the first k for every k = 1..12, keeps every common course-load size (most
+ * students have 4-8 courses) maximally spread without inventing new colors. The two closest
+ * hues overall (index 10 orange ~16° and index 11 teal's near-duplicate, cyan at index 6 ~185°
+ * vs. teal ~187°) fall out at the END of this order — only relevant once a student has 10+
+ * concurrent enrollments, the one case a 12-color fixed palette can't fully avoid some
+ * closeness in. Extend `test/components.test.ts`'s dispersion check before reordering this
+ * array again.
+ */
 const PALETTE = [
   "#0b57d0", // blue
   "#b3261e", // red
   "#146c2e", // green
   "#7b3ff2", // purple
+  "#5c6b00", // olive
+  "#a30059", // pink
+  "#00696d", // cyan
+  "#946200", // amber
+  "#5b5fc7", // indigo
+  "#8e4a00", // brown
   "#c4370a", // orange
   "#0e7c86", // teal
-  "#946200", // amber
-  "#a30059", // pink
-  "#5b5fc7", // indigo
-  "#5c6b00", // olive
-  "#8e4a00", // brown
-  "#00696d", // cyan
 ];
 
 export function assignCourseColors(codes: string[]): Map<string, string> {

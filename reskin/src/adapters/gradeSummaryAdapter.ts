@@ -70,9 +70,9 @@ function hasBeenScored(detail: string | undefined): boolean {
   return !!m && Number(m[1]) > 0;
 }
 
-function statBlock(label: string, percent: string | undefined, detail: string | undefined): HTMLElement | null {
+function statBlock(label: string, percent: string | undefined, detail: string | undefined, isTermProgress = false): HTMLElement | null {
   if (!percent) return null;
-  const badge = gradeBadge(percent, hasBeenScored(detail));
+  const badge = gradeBadge(percent, hasBeenScored(detail), isTermProgress);
   if (!badge) return null;
   const children: (Node | string)[] = [h("span", { class: "docket-eyebrow" }, [label]), badge];
   // The real "N/M assignments scored" context the native page has and the pre-pass-11 build
@@ -84,7 +84,7 @@ function statBlock(label: string, percent: string | undefined, detail: string | 
 
 function courseGradeCard(c: CourseGrade, accent: string): HTMLElement {
   const current = statBlock("Current", c.currentPercent, c.currentDetail);
-  const total = statBlock("Total", c.totalPercent, c.totalDetail);
+  const total = statBlock("Total", c.totalPercent, c.totalDetail, true);
   const children: (Node | string)[] = [h("h2", { class: "docket-title-2" }, [c.title])];
   if (current || total) {
     children.push(h("div", { class: "docket-grade-stats" }, [current ?? undefined, total ?? undefined]));

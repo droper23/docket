@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { setupDom } from "./testUtil.js";
-import { overlayContent } from "../src/lib/dom.js";
+import { overlayContent, createOverlayToggle } from "../src/lib/dom.js";
 
 /**
  * Regression test for the Combined Schedule "original page just moved lower" bug (Sep 2026):
@@ -51,4 +51,44 @@ test("overlayContent.remove() restores every node it ever hid, including late-ap
   overlay.remove();
   assert.equal(late.hidden, false, "remove() must un-hide late-appended nodes too");
   assert.equal(main.querySelector("p")!.hidden, false);
+});
+
+/**
+ * Regression test for the inverted-toggle bug (Sep 2026): createOverlayToggle()'s first click
+ * used to call setOriginalHidden(true) — the value the overlay already had at mount — so
+ * nothing became visible even though the button's own label claimed the view had changed.
+ * "Revealed" must mean the native content is actually shown (hidden === false).
+ */
+test("createOverlayToggle's first click actually reveals native content", () => {
+  setupDom("<main><p>original item</p></main>");
+  const main = document.querySelector("main")!;
+  const enhanced = document.createElement("div");
+  const overlay = overlayContent(main, enhanced, false);
+  const original = main.querySelector("p")!;
+  assert.equal(original.hidden, true, "native content starts hidden under the overlay");
+
+  const toggle = createOverlayToggle(() => overlay);
+  toggle.button.click();
+  assert.equal(original.hidden, false, "first click must reveal the native content");
+  assert.equal(toggle.button.textContent, "← Back to redesigned view");
+
+  toggle.button.click();
+  assert.equal(original.hidden, true, "second click must hide native content again");
+  assert.equal(toggle.button.textContent, "View original LearningSuite page");
+
+  overlay.remove();
+});
+
+test("createOverlayToggle.reveal() shows native content and updates the label", () => {
+  setupDom("<main><p>original item</p></main>");
+  const main = document.querySelector("main")!;
+  const enhanced = document.createElement("div");
+  const overlay = overlayContent(main, enhanced, false);
+
+  const toggle = createOverlayToggle(() => overlay);
+  toggle.reveal();
+  assert.equal(main.querySelector("p")!.hidden, false, "reveal() must show native content");
+  assert.equal(toggle.button.textContent, "← Back to redesigned view");
+
+  overlay.remove();
 });

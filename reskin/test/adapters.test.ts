@@ -10,6 +10,8 @@ import { homeAdapter } from "../src/adapters/homeAdapter.js";
 import { gradesAdapter } from "../src/adapters/gradesAdapter.js";
 import { gradeSummaryAdapter } from "../src/adapters/gradeSummaryAdapter.js";
 import { dashboardAdapter } from "../src/adapters/dashboardAdapter.js";
+import { formatIsoDate } from "../src/lib/parseDueText.js";
+import { dueDateLabel } from "../../src/core/agendaFormatting.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const courseListHtml = readFileSync(join(__dirname, "fixtures/course-list.html"), "utf8");
@@ -160,6 +162,66 @@ test("homeAdapter reads Combined Schedule items within the lookahead window", ()
   }
 });
 
+test("homeAdapter splits a single anchor's blank-line-separated real content into a title and a meta line (Sep 2026 concatenated-title bug)", () => {
+  const tomorrow = new Date(Date.now() + 86_400_000);
+  const md = `${tomorrow.getMonth() + 1}/${tomorrow.getDate()}`;
+  // Confirmed live (EC EN 224, real account): a single real anchor's own textContent carries
+  // several blank-line-separated logical lines — LearningSuite's native `truncate` CSS clips
+  // this to one line; collapsing all whitespace instead runs every line together.
+  const html = `<main>
+    <div class="listViewDay">
+      <div>${md} - Some Day</div>
+      <div class="flex-4"><a class="cursor-pointer block truncate">Chapter 2.1
+
+04-Information Storage.pdf&nbsp;&nbsp;Download&nbsp;(Updated on 09/01/2026)
+
+Zoom Recording&nbsp;(05/01/26)</a></div>
+      <div>EC EN 224</div>
+    </div>
+  </main>`;
+  setupDom(html, "https://learningsuite.byu.edu/.sess1/student/top/schedule");
+  try {
+    homeAdapter.mount(false);
+    const title = document.querySelector(".docket-row-title")!.textContent;
+    assert.equal(title, "Chapter 2.1", "only the first real line becomes the title, not the whole run-on string");
+    const subtitle = document.querySelector(".docket-row-subtitle")!.textContent;
+    assert.match(subtitle!, /04-Information Storage\.pdf Download \(Updated on 09\/01\/2026\)/, "the remaining real content must survive, not be dropped");
+    assert.match(subtitle!, /Zoom Recording \(05\/01\/26\)/);
+  } finally {
+    homeAdapter.unmount();
+  }
+});
+
+test("assignmentsAdapter formats an 'Opens' date with the same shared wording Combined Schedule uses, not the raw scraped text (Sep 2026 cross-page inconsistency bug)", () => {
+  // Confirmed live: the identical real assignment (MATH 113's Video Quiz 7.2) read "Opens
+  // Wednesday" on Combined Schedule (homeAdapter.ts, via dueDateLabel()) and "Opens Sep 9" here
+  // — the raw regex-captured status text passed straight through with no shared formatting.
+  const target = new Date(Date.now() + 10 * 86_400_000);
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const opensRaw = `${monthNames[target.getMonth()]} ${target.getDate()}`;
+  const expectedIso = formatIsoDate(target);
+  const expectedLabel = dueDateLabel(expectedIso);
+
+  const html = `<main>
+    <div class="lineHeight"><div class="cursor-pointer"><span></span><span>Video Quizzes</span><span>of Grade: 5%</span></div></div>
+    <div class="bg-base text-highlight">
+      <div></div>
+      <div>Video Quiz 7.2</div>
+      <div>Sep 16 1:59 pm MDT</div>
+      <div>Opens ${opensRaw}</div>
+      <div>/10.0</div>
+    </div>
+  </main>`;
+  setupDom(html, "https://learningsuite.byu.edu/cid-abc123/student/assignments");
+  try {
+    assignmentsAdapter.mount(false);
+    const badge = document.querySelector(".docket-badge")!;
+    assert.equal(badge.textContent, `Opens ${expectedLabel}`, "must use the same shared dueDateLabel() wording homeAdapter.ts uses, not the raw scraped date text");
+  } finally {
+    assignmentsAdapter.unmount();
+  }
+});
+
 test("gradesAdapter renders the Grades page's identical row shape as a grade list, not an assignment list", () => {
   setupDom(gradesHtml, "https://learningsuite.byu.edu/cid-abc123/student/gradebook");
   try {
@@ -168,7 +230,9 @@ test("gradesAdapter renders the Grades page's identical row shape as a grade lis
     assert.equal(gradesAdapter.matches(), true);
     assert.equal(assignmentsAdapter.matches(), false, "the identical row shape must not also match Assignments once .bg-top-nav-highlight reads Grades");
     gradesAdapter.mount(false);
-    assert.equal(document.querySelector(".docket-display")?.textContent, "Grades");
+    // .docket-title-1, not .docket-display — Grades is a course-scoped, one-level-deep page
+    // (see PASS12_PLAN.md Phase 4.2 and gradesAdapter.ts's own comment on this).
+    assert.equal(document.querySelector(".docket-title-1")?.textContent, "Grades");
     const titles = Array.from(document.querySelectorAll(".docket-row-title")).map((el) => el.textContent);
     assert.deepEqual(titles, ["Lab 3: Linked Lists", "Lab 2: Arrays"]);
   } finally {
@@ -186,13 +250,18 @@ test("gradeSummaryAdapter renders one card per course, skipping the header row, 
     const hrefs = Array.from(cards).map((c) => c.getAttribute("href")).sort();
     assert.deepEqual(hrefs, ["/cid-abc123/student/home", "/cid-def456/student/home"]);
     const badgeTexts = Array.from(document.querySelectorAll(".docket-badge")).map((b) => b.textContent);
-    // DANCE 280 (0/8 assignments scored) must read as neutral "Not yet graded," never a
-    // failing red 0% — see gradeBadge.ts. MATH 113 (5/171 scored) has genuinely been graded,
-    // so its real 0.58% still bands red: "nothing scored yet" and "scored and doing badly"
-    // must not collapse into the same signal.
+    // DANCE 280 (0/8 assignments scored) must read as neutral "Not yet graded" for both
+    // columns — see gradeBadge.ts. MATH 113's Current (100%, genuinely 5/5 scored) still bands
+    // by performance; MATH 113's Total (0.58%, "% of ALL possible points in the class," per
+    // LearningSuite's own legend) must NOT band red just because it's numerically low — that
+    // number is guaranteed to look catastrophic for nearly the whole semester by construction
+    // regardless of real standing (confirmed live, Sep 2026 false-alarm bug), so "Total" always
+    // renders neutral.
     assert.deepEqual(badgeTexts, ["Not yet graded", "Not yet graded", "100%", "0.58%"]);
+    const doneBadges = document.querySelectorAll(".docket-badge-done");
+    assert.equal(doneBadges.length, 1, "MATH 113's genuinely-scored Current 100% must still band as a real performance signal");
     const overdueBadges = document.querySelectorAll(".docket-badge-overdue");
-    assert.equal(overdueBadges.length, 1, "MATH 113's genuinely-scored 0.58% must still band red");
+    assert.equal(overdueBadges.length, 0, "Total course progress must never band red, however low the raw percentage");
   } finally {
     gradeSummaryAdapter.unmount();
   }
@@ -235,7 +304,15 @@ test("dashboardAdapter renders the per-day schedule as grouped cards without hid
     const dayHeadlines = Array.from(document.querySelectorAll(".docket-day-header .docket-title-2")).map((el) => el.textContent);
     assert.deepEqual(dayHeadlines, ["Mon, Sep 7", "Tue, Sep 8"]);
     const rowTitles = Array.from(document.querySelectorAll(".docket-row-title")).map((el) => el.textContent);
-    assert.deepEqual(rowTitles, ["Labor Day", "Recitation Quiz 5.3/5.5: The FUNdamental Theorem", "Recitation Quiz 9/8"]);
+    assert.deepEqual(rowTitles, [
+      "Labor Day",
+      "Recitation Quiz 5.3/5.5: The FUNdamental Theorem",
+      "Recitation Quiz 9/8",
+      // Regression check for the Column-2 data-loss bug (Sep 2026): a day's real second
+      // "Column 2" sibling (a BYU calendar/Devotional entry here) was silently dropped when
+      // extraction only ever read `bar.nextElementSibling` — see extractDays()'s doc comment.
+      "Devotional: President and Sister Reese",
+    ]);
 
     // The real regression this test guards: overlaying the whole page (not just the
     // schedule column) hid the sibling Announcements widget along with the native schedule

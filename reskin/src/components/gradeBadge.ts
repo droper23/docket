@@ -16,19 +16,30 @@ import { h } from "../lib/dom.js";
  * same thing, and telling a student their un-started course is failing is a real, alarming
  * false positive. Defaults to `true` so any other caller (there are none today) keeps the old
  * behavior unless it explicitly says otherwise.
+ *
+ * `isTermProgress` (confirmed live, Sep 2026, real Grade Summary page, MATH 113): "Total course
+ * progress" is earned points over ALL possible points in the class, per LearningSuite's own
+ * legend text — every not-yet-due assignment counts as a zero by construction, so this number
+ * is mathematically guaranteed to look catastrophic ("Total 0.71%," banded red) for nearly the
+ * entire semester regardless of how the student is actually doing (this same account's "Current
+ * progress" was a genuine 100%). It isn't a performance signal at all, just a term-progress one
+ * — LearningSuite's own native page renders it as plain, unstyled text for exactly this reason.
+ * Always neutral when true, regardless of value.
  */
-export function gradeBadge(percentLabel: string | undefined, hasBeenScored = true): HTMLElement | null {
+export function gradeBadge(percentLabel: string | undefined, hasBeenScored = true, isTermProgress = false): HTMLElement | null {
   if (!percentLabel) return null;
   if (!hasBeenScored) {
     return h("span", { class: "docket-badge docket-badge-neutral" }, ["Not yet graded"]);
   }
-  const value = parseFloat(percentLabel);
   let role = "neutral";
-  if (!Number.isNaN(value)) {
-    if (value >= 90) role = "done";
-    else if (value >= 80) role = "upcoming";
-    else if (value >= 70) role = "soon";
-    else role = "overdue";
+  if (!isTermProgress) {
+    const value = parseFloat(percentLabel);
+    if (!Number.isNaN(value)) {
+      if (value >= 90) role = "done";
+      else if (value >= 80) role = "upcoming";
+      else if (value >= 70) role = "soon";
+      else role = "overdue";
+    }
   }
   return h("span", { class: `docket-badge docket-badge-${role}` }, [percentLabel]);
 }

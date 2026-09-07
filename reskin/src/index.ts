@@ -187,19 +187,33 @@ function boot(): void {
   injectStyles();
   ensureStylesLast();
 
-  const settings = loadSettings();
+  let currentSettings = loadSettings();
 
-  mountShell(settings, (next) => {
-    // Nav on/off and Compatibility Mode need a clean remount; a full reload
-    // is the simplest safe way to get one, matching LearningSuite's own
-    // full-page-reload navigation model (learningsuite-handoff.md §1.1) —
-    // this is not a workaround, it's the same transition the site already
-    // uses for its own top-level navigation.
-    void next;
-    location.reload();
+  mountShell(currentSettings, (next) => {
+    // Nav on/off and Compatibility Mode genuinely need a clean remount (they change which
+    // adapters run and how LearningSuite's own nav markup is rewritten) — a full reload is
+    // the simplest safe way to get one, matching LearningSuite's own full-page-reload
+    // navigation model (learningsuite-handoff.md §1.1). Appearance/background/reduced-motion
+    // are pure CSS/attribute toggles with no adapter-remount dependency at all — reloading for
+    // those discarded scroll position and, on Combined Schedule specifically, reset
+    // homeAdapter.ts's own module-level accumulator and scrolledToToday flag, yanking a
+    // student previewing background colors back to today's position (confirmed live, Sep
+    // 2026). Applied live instead, via the exact same functions runAdapters() already calls on
+    // every pass — `data-docket-theme`/`data-docket-background` were already
+    // live-toggleable attributes elsewhere in the codebase; this just stops throwing that away
+    // with an unconditional reload.
+    const needsRemount = next.useCompanionNav !== currentSettings.useCompanionNav || next.compatibilityMode !== currentSettings.compatibilityMode;
+    currentSettings = next;
+    if (needsRemount) {
+      location.reload();
+      return;
+    }
+    applyTheme(next.appearance);
+    applyBackground(next);
+    document.documentElement.setAttribute("data-docket-reduced-motion", String(next.reducedMotion));
   });
 
-  runAdapters(settings);
+  runAdapters(currentSettings);
   observeMutations(document.body, () => runAdapters(loadSettings()));
   // The body observer above only sees childList/subtree changes — it never fires when the
   // user flips LearningSuite's own Dark Mode toggle, which only changes the `class`

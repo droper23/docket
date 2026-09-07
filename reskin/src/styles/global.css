@@ -285,16 +285,21 @@ html[data-docket-reskin],
 /* Native instructor-view banner (confirmed live: `section.bg-attention`, a solid saturated
    yellow rgb(255,243,130) sitting directly under the header on every page for an account
    with instructor access) — the highest-visibility untouched native color found in the
-   Sep 2026 pass. Remapped to a translucent tinted-alert fill matching Apple's own
-   system-yellow banner convention (Mail/Calendar's own permission/storage banners), not a
-   solid block; its embedded link gets the same treatment as every other genuinely
-   interactive element (see the text-tint tier above). */
+   Sep 2026 pass. A prior version of this rule used a bespoke translucent yellow tint
+   (`--docket-yellow-banner-bg`) over the page's own dark canvas — confirmed live (Sep 2026)
+   that this reads as a muddy, low-contrast olive-brown in dark mode, not a legible warning.
+   This is exactly the "attention" semantic the status-badge system's `soon` container/
+   on-container pair already exists for (see tokens.css) — reusing it here means the banner
+   gets the same contrast-checked, opaque, theme-correct treatment every due-soon badge does,
+   instead of a one-off color computed for this element alone. */
 [data-docket-reskin] .bg-attention {
-  background-color: var(--docket-yellow-banner-bg) !important;
-  color: var(--docket-label) !important;
+  background-color: var(--docket-status-soon-bg) !important;
+  color: var(--docket-status-soon-fg) !important;
+  border-color: transparent !important;
 }
 [data-docket-reskin] .bg-attention a {
-  color: var(--docket-blue) !important;
+  color: var(--docket-status-soon-fg) !important;
+  text-decoration: underline;
 }
 
 /* Native `<table>` (e.g. Grade Scale) gets zero elevation/structure by default — raw grid

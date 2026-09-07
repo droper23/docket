@@ -1,15 +1,26 @@
 /**
  * Embedded directly into each panel's own Shadow DOM (see components/settingsPanel.ts
- * and diagnosticsPanel.ts) — a Shadow root's styles can't leak into LearningSuite's page
- * and LearningSuite's styles can't leak in either, so this file intentionally repeats a
- * few tokens from tokens.css rather than depending on it being in scope.
+ * and diagnosticsPanel.ts).
  *
- * Dark/light is resolved ONLY from the `data-docket-theme` attribute the host element
- * carries (set explicitly at mount time in settingsPanel.ts/diagnosticsPanel.ts from the
- * exact same value src/index.ts's applyTheme() just computed) — never from this file's own
- * `prefers-color-scheme` query, which could disagree with what the page around the panel is
- * actually showing (defect: the panel rendering light while the page is dark, or vice
- * versa). Same pattern for `data-docket-reduced-motion`.
+ * Consumes the real page's own design tokens via `var(--docket-token, fallback)` rather than
+ * hardcoding a separate palette — confirmed live (Sep 2026) that CSS custom properties are
+ * excluded from what `:host { all: initial; }` resets below, and DO inherit into a shadow
+ * tree from the shadow host's own inherited value: `getComputedStyle()` on an element inside
+ * this very shadow root already resolves `--docket-accent`/`--docket-surface-2`/etc. to the
+ * exact values `document.documentElement` carries, with no manual JS threading required. Each
+ * `var()` below still keeps a literal fallback (this file's own previous hardcoded value, where
+ * reasonable) for the narrow case where the reskin's own stylesheet somehow isn't in scope yet.
+ * A prior version of this file used a bespoke iOS-era palette instead (`rgba(242,242,247,0.82)`
+ * translucent glass, `#007aff` system blue, `#34c759` system green) — confirmed live that this
+ * was the one screenshot in a full-page audit that still read as a visibly older-generation
+ * product than the opaque, flat-accent pages around it.
+ *
+ * Dark/light is resolved from BOTH the inherited tokens above (which already flip per-theme at
+ * `document.documentElement`) AND the `data-docket-theme` attribute the host element carries
+ * (set explicitly at mount time in settingsPanel.ts/diagnosticsPanel.ts from the exact same
+ * value src/index.ts's applyTheme() just computed) — the attribute still matters for the one
+ * thing that ISN'T a custom property, `prefers-color-scheme`-independent behavior is otherwise
+ * automatic once the real tokens are in scope. Same pattern for `data-docket-reduced-motion`.
  */
 :host { all: initial; }
 * { box-sizing: border-box; }
@@ -18,33 +29,27 @@
   background: rgba(0, 0, 0, 0.32);
   display: flex; align-items: center; justify-content: center;
   z-index: 2147483000;
-  /* Inter first — the bundled face (registered document-wide by the reskin's main <style>;  
-   * @font-face registrations reach into shadow roots) so panels match the page on every OS. */
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  font-family: var(--docket-font, "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif);
 }
 .sheet {
   width: min(420px, 92vw);
   max-height: 86vh;
   overflow-y: auto;
-  background: var(--sheet-bg, rgba(242,242,247,0.82));
-  backdrop-filter: saturate(180%) blur(24px);
-  -webkit-backdrop-filter: saturate(180%) blur(24px);
-  color: var(--sheet-label, rgba(0,0,0,0.92));
-  border: 0.5px solid var(--sheet-border, rgba(0,0,0,0.06));
-  border-radius: 18px;
-  box-shadow: 0 24px 70px rgba(0,0,0,0.32), 0 2px 8px rgba(0,0,0,0.12);
-}
-:host([data-docket-theme="dark"]) .sheet {
-  --sheet-bg: rgba(28,28,30,0.78);
-  --sheet-label: rgba(255,255,255,0.92);
-  --sheet-border: rgba(255,255,255,0.08);
+  /* Opaque, not translucent glass — matches every other surface in the app (see tokens.css's
+     own comment: the one surviving shadow token is explicitly reserved for genuinely floating
+     chrome INCLUDING this sheet, but that's a shadow, not a blur-backed material). */
+  background: var(--docket-surface-2, #f1f3f4);
+  color: var(--docket-label, #1f1f1f);
+  border: 1px solid var(--docket-separator, #dadce0);
+  border-radius: var(--docket-radius-lg, 20px);
+  box-shadow: var(--docket-shadow-float, 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 8px rgba(0, 0, 0, 0.15));
 }
 .sheet-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 16px 18px 10px; font-size: 17px; font-weight: 700;
 }
 .sheet-close {
-  border: none; background: rgba(120,120,128,0.16); color: inherit;
+  border: none; background: var(--docket-fill, #eceef0); color: inherit;
   width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 15px;
 }
 /* A Shadow DOM root inherits none of the page's own focus styling (or global.css's own
@@ -56,55 +61,72 @@
 .switch:focus-visible,
 select:focus-visible,
 button.seg:focus-visible {
-  outline: 2px solid #007aff;
+  outline: 2px solid var(--docket-accent, #0b57d0);
   outline-offset: 2px;
 }
-.group { margin: 10px 14px 16px; background: rgba(120,120,128,0.08); border-radius: 12px; overflow: hidden; box-shadow: inset 0 0 0 0.5px rgba(120,120,128,0.14); }
+/* Same grouped-list idiom as the page's own `.docket-group` (cards.css) — a bordered,
+   rounded, hairline-divided card, not a translucent chrome-gray fill. */
+.group {
+  margin: 10px 14px 16px;
+  background: var(--docket-surface-1, #f8f9fa);
+  border: 1px solid var(--docket-separator, #dadce0);
+  border-radius: var(--docket-radius-md, 14px);
+  overflow: hidden;
+}
 .row {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 11px 14px; font-size: 14px; border-bottom: 0.5px solid rgba(120,120,128,0.25);
+  padding: 11px 14px; font-size: 14px; border-bottom: 1px solid var(--docket-separator, #dadce0);
   min-height: 44px;
 }
 .row:last-child { border-bottom: none; }
 .row-col { flex-direction: column; align-items: stretch; gap: 10px; }
 .row-label { font-weight: 500; }
 /* Settings > Background: macOS-System-Settings-style swatch strip (see
-   settingsPanel.ts backgroundRow()). Selection ring uses the system accent —
-   the same affordance the Appearance pane's highlight-color row uses. */
+   settingsPanel.ts backgroundRow()). Selection ring uses the app's own real accent, not a
+   separate iOS system blue — the same affordance the Appearance pane's highlight-color row
+   uses elsewhere in the app. */
 .swatch-row { display: flex; gap: 8px; }
 .swatch {
   width: 34px; height: 34px; border-radius: 50%; border: none; cursor: pointer;
   background: var(--swatch, #f2f2f7);
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.12);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: inset 0 0 0 1px var(--docket-separator, rgba(0, 0, 0, 0.08));
+  transition: transform var(--docket-dur-fast, 120ms) ease, box-shadow var(--docket-dur-fast, 120ms) ease;
 }
 .swatch:hover { transform: scale(1.06); }
 .swatch:active { transform: scale(0.96); }
 .swatch[data-selected="true"] {
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08), 0 0 0 2.5px var(--sheet-bg, rgba(242,242,247,0.82)), 0 0 0 4.5px #007aff;
+  box-shadow:
+    inset 0 0 0 1px var(--docket-separator, rgba(0, 0, 0, 0.08)),
+    0 0 0 2.5px var(--docket-surface-2, #f1f3f4),
+    0 0 0 4.5px var(--docket-accent, #0b57d0);
 }
 :host([data-docket-reduced-motion="true"]) .swatch { transition-duration: 0.001ms; }
-.row-detail { font-size: 12px; opacity: 0.55; margin-top: 2px; }
+.row-detail { font-size: 12px; opacity: 0.7; margin-top: 2px; }
 select, button.seg {
-  font: inherit; border-radius: 8px; border: none; background: rgba(120,120,128,0.16);
+  font: inherit; border-radius: var(--docket-radius-sm, 8px); border: none;
+  background: var(--docket-fill, #eceef0);
   color: inherit; padding: 5px 9px; cursor: pointer;
 }
 .switch {
   width: 42px; height: 26px; border-radius: 999px; border: none; cursor: pointer;
-  background: rgba(120,120,128,0.32); position: relative; flex-shrink: 0;
-  transition: background-color 0.15s ease;
+  background: var(--docket-fill, rgba(120, 120, 128, 0.32)); position: relative; flex-shrink: 0;
+  transition: background-color var(--docket-dur-fast, 120ms) ease;
 }
 .switch::after {
   content: ""; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px;
-  border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-  transition: transform 0.15s ease;
+  border-radius: 50%; background: var(--docket-on-accent, #fff); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform var(--docket-dur-fast, 120ms) ease;
 }
-.switch[data-on="true"] { background: #34c759; }
+/* Same accent used for a checked radio/checkbox elsewhere in the app (navigation.css) — a
+   toggle's "on" state is that same "selected control" language, not a separate iOS system
+   green (--docket-green is reserved specifically for a completed-assignment checkbox fill, a
+   distinct semantic — see cards.css's .docket-checkbox-done). */
+.switch[data-on="true"] { background: var(--docket-accent, #0b57d0); }
 .switch[data-on="true"]::after { transform: translateX(16px); }
 :host([data-docket-reduced-motion="true"]) .switch,
 :host([data-docket-reduced-motion="true"]) .switch::after {
   transition-duration: 0.001ms;
 }
-.diag-ok { color: #34c759; }
-.diag-warn { color: #ff9500; }
-.footer-note { padding: 4px 18px 16px; font-size: 11px; opacity: 0.5; }
+.diag-ok { color: var(--docket-green, #146c2e); }
+.diag-warn { color: var(--docket-status-soon-fg, #9c5500); }
+.footer-note { padding: 4px 18px 16px; font-size: 11px; color: var(--docket-label-secondary, #444746); }

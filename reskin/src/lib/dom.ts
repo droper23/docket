@@ -150,7 +150,7 @@ export function createOverlayToggle(
   const btn = h("button", { class: "docket-toggle-original" }, [revealLabel]);
   const setRevealed = (next: boolean): void => {
     revealed = next;
-    overlayRef()?.setOriginalHidden(next);
+    overlayRef()?.setOriginalHidden(!next);
     btn.textContent = next ? hideLabel : revealLabel;
   };
   btn.addEventListener("click", () => setRevealed(!revealed));

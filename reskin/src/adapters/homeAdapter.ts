@@ -11,6 +11,9 @@ import { diagnostics } from "../core/diagnostics.js";
 
 interface ScheduleItem {
   title: string;
+  /** Real secondary content the anchor's own text carried after a blank-line break — see
+   * `extractItems()`'s doc comment below. */
+  meta?: string;
   courseCode?: string;
   dateIso: string;
   anchor: HTMLElement;
@@ -59,11 +62,31 @@ function extractItems(main: Element): ScheduleItem[] {
     if (!titleCell || !headerEl) continue;
     const date = parseSlashDate(headerEl.textContent?.trim() ?? "");
     if (!date || date < minDate || date > maxDate) continue;
-    const rawTitle = a.textContent?.replace(/\s+/g, " ").trim() ?? "";
-    if (!rawTitle) continue;
-    const opensMatch = rawTitle.match(/^(.*?)\s+Opens$/i);
-    const title = opensMatch ? opensMatch[1]! : rawTitle;
-    results.push({ title, courseCode: courseCell?.textContent?.trim() || undefined, dateIso: formatIsoDate(date), anchor: a as HTMLElement, opens: !!opensMatch });
+    // Confirmed live (Sep 2026, real EC EN 224 row): a single real anchor's own text — not
+    // multiple sibling anchors — can carry more than one logical line, blank-line-separated in
+    // its raw textContent (e.g. "Chapter 2.1\n\n04-Information Storage.pdf  Download (Updated on
+    // 09/01/2026)\n\nZoom Recording (05/01/26)"). LearningSuite's own native row keeps this as
+    // one anchor and lets a `truncate` CSS class clip it to one line; collapsing all whitespace
+    // (this adapter's old behavior) instead runs every line together into one unbroken title.
+    // Split on the blank-line boundary first, so only the first real line becomes the title and
+    // the rest survive as a separate, still-visible meta line (see assignmentCard.ts's `meta`).
+    const rawSegments = (a.textContent ?? "")
+      .split(/\n\s*\n+/)
+      .map((s) => s.replace(/\s+/g, " ").trim())
+      .filter(Boolean);
+    if (!rawSegments.length) continue;
+    const firstLine = rawSegments[0]!;
+    const opensMatch = firstLine.match(/^(.*?)\s+Opens$/i);
+    const title = opensMatch ? opensMatch[1]! : firstLine;
+    const meta = rawSegments.slice(1).join(" · ") || undefined;
+    results.push({
+      title,
+      meta,
+      courseCode: courseCell?.textContent?.trim() || undefined,
+      dateIso: formatIsoDate(date),
+      anchor: a as HTMLElement,
+      opens: !!opensMatch,
+    });
   }
   results.sort((x, y) => x.dateIso.localeCompare(y.dateIso));
   return results;
@@ -137,6 +160,7 @@ export const homeAdapter: Adapter = {
               assignmentCard(
                 {
                   title: item.title,
+                  meta: item.meta,
                   category: item.courseCode,
                   daysUntilDue: daysUntilInSchoolTimeZone(item.dateIso),
                   opensText: item.opens ? dueDateLabel(item.dateIso) : undefined,

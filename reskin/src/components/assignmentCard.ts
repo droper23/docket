@@ -13,6 +13,12 @@ export interface AssignmentCardData {
   courseAccent?: string; // CSS color for the leading dot
   /** Availability date ("Opens Sep 9") — see dueBadge.ts; never treated as a deadline. */
   opensText?: string;
+  /** Secondary real content the source anchor carried alongside its title (e.g. a file name,
+   * "Download," an "(Updated on …)" stamp, a Zoom-recording label) — LearningSuite's own native
+   * row keeps this on the same line and lets its own `truncate` CSS clip it; folding it into
+   * `title` verbatim instead produces one long run-on line, so it's surfaced here as its own
+   * subtitle segment instead of being dropped or concatenated into the title. */
+  meta?: string;
   /** Earned points, copied verbatim — absent (not "0") when nothing has been graded yet. */
   scoreEarned?: string;
   /** Possible points, copied verbatim. Score readout only renders when this is present. */
@@ -37,6 +43,7 @@ export function assignmentCard(data: AssignmentCardData, onActivate?: () => void
   const categoryText = data.category
     ? data.category + (data.categoryWeight ? ` (${data.categoryWeight} of grade)` : "")
     : undefined;
+  const metaText = data.meta || undefined;
   // Em dash, never a fabricated 0 — this is real, ungraded work, not a zero score.
   const scoreText = data.scorePossible ? `${data.scoreEarned ?? "—"}/${data.scorePossible}` : undefined;
 
@@ -55,7 +62,7 @@ export function assignmentCard(data: AssignmentCardData, onActivate?: () => void
         : undefined,
       h("div", { class: "docket-row-main" }, [
         h("div", { class: "docket-row-title" }, [data.title]),
-        h("div", { class: "docket-row-subtitle" }, [[categoryText, dueText].filter(Boolean).join(" · ") || undefined]),
+        h("div", { class: "docket-row-subtitle" }, [[categoryText, dueText, metaText].filter(Boolean).join(" · ") || undefined]),
       ]),
       h("div", { class: "docket-row-trailing" }, [
         scoreText ? h("span", { class: "docket-score" }, [scoreText]) : undefined,

@@ -229,15 +229,38 @@
  * rows and nav items) is enough to make the one piece of chrome that's on every screen stop
  * reading as unstyled Bootstrap.
  */
+/**
+ * Confirmed live (Sep 2026, real 5-course account): the padding+negative-margin version of
+ * this pill ("padding: 4px 12px; margin: -4px -12px" — visually neutral for POSITION only)
+ * shrank the button's own content box by the padding amount on every affected page. This
+ * button's course-name child is a `min-w-0` flex-shrink item with no fixed width of its own,
+ * so that shrunk content box came entirely out of its available room — "MATH 113 – Calculus 2"
+ * (164.9px needed, confirmed against the real unstyled page) truncated to "MATH 113 – Calc…" in
+ * a masthead element present on every single course-scoped page. A `::before` pseudo-element
+ * gives the same hover-pill footprint without touching the real button's own box model at all.
+ */
+/* `z-index: 0` (not just `position: relative`) is required so this button establishes its
+   OWN local stacking context — without it, a `z-index: -1` on the `::before` below escapes to
+   the nearest ANCESTOR stacking context instead, painting the hover pill behind unrelated
+   ancestor content (confirmed live: it rendered fully invisible, behind the header bar's own
+   background) rather than merely behind this button's own text. */
 [data-docket-reskin] .header-coursedropdown-trigger,
 [data-docket-reskin] .header-userdropdown-trigger {
-  border-radius: var(--docket-radius-pill) !important;
-  padding: 4px 12px !important;
-  margin: -4px -12px !important;
-  transition: background-color var(--docket-dur-fast) var(--docket-ease-standard);
+  position: relative;
+  z-index: 0;
 }
-[data-docket-reskin] .header-coursedropdown-trigger:hover,
-[data-docket-reskin] .header-userdropdown-trigger:hover {
+[data-docket-reskin] .header-coursedropdown-trigger::before,
+[data-docket-reskin] .header-userdropdown-trigger::before {
+  content: "";
+  position: absolute;
+  inset: -4px -12px;
+  z-index: -1;
+  border-radius: var(--docket-radius-pill);
+  transition: background-color var(--docket-dur-fast) var(--docket-ease-standard);
+  pointer-events: none;
+}
+[data-docket-reskin] .header-coursedropdown-trigger:hover::before,
+[data-docket-reskin] .header-userdropdown-trigger:hover::before {
   background-color: var(--docket-fill) !important;
 }
 [data-docket-reskin] .header-coursedropdown-trigger:focus-visible,

@@ -118,6 +118,12 @@ export function extractRows(main: Element): RowData[] {
 export function buildCard(reveal: () => void, r: RowData): HTMLElement {
   const { iso, time } = parseAssignmentDueText(r.dueText);
   const daysUntilDue = iso ? daysUntilInSchoolTimeZone(iso) : undefined;
+  // Confirmed live (Sep 2026): the same real assignment (MATH 113's "Video Quiz 7.2") showed
+  // "Opens Wednesday" on Combined Schedule (homeAdapter.ts, via dueDateLabel()) and "Opens Sep
+  // 9" here — the raw regex-captured text passed straight through with no shared formatting.
+  // Both pages now run the same real date through the identical dueDateLabel() wording, so the
+  // same day always reads the same way regardless of which page it's viewed from.
+  const opensIso = r.opensText ? parseAssignmentDueText(r.opensText).iso : undefined;
   return assignmentCard(
     {
       title: r.title,
@@ -127,7 +133,7 @@ export function buildCard(reveal: () => void, r: RowData): HTMLElement {
       dueTime: time,
       daysUntilDue,
       completed: r.completed,
-      opensText: r.opensText,
+      opensText: opensIso ? dueDateLabel(opensIso) : r.opensText,
       scoreEarned: r.scoreEarned,
       scorePossible: r.scorePossible,
     },
@@ -170,7 +176,11 @@ export const assignmentsAdapter: Adapter = {
       listContainer = h("div", { class: "docket-group", role: "list" }, cards);
       toggle = createOverlayToggle(() => overlay);
       const view = h("div", { class: "docket-scope docket-page" }, [
-        h("div", { class: "docket-header" }, [h("h1", { class: "docket-display" }, ["Assignments"])]),
+        // .docket-title-1, not .docket-display — this page is course-scoped (one level deep
+        // inside a course, per pageDetector.ts's looksLikeAssignmentsPage()); see
+        // gradesAdapter.ts's identical comment for the full rationale (PASS12_PLAN.md Phase
+        // 4.2) and the one discrepancy against that plan's own text.
+        h("div", { class: "docket-header" }, [h("h1", { class: "docket-title-1" }, ["Assignments"])]),
         listContainer,
         toggle.button,
       ]);

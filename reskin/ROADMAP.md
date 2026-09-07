@@ -1,5 +1,162 @@
 # LearningSuite Reskin — Roadmap
 
+## Twelfth pass: three independent design critiques, real correctness bugs, settings-panel
+## token migration (Sep 2026)
+
+Implements the correctness/settings-panel portion of `PASS12_PLAN.md` (that file's own synthesis
+of three independent AI design critiques of the eleventh pass, each given the same live
+screenshot set and told to rethink Apple/Google design language from the ground up). Every item
+below was live-verified this pass against the real authenticated account (`tools/cdp.mjs`,
+commit `ebdd323`'s profile) in both Dark and Light mode, not just confirmed against source — see
+each item for what was actually observed. Sequenced correctness before visual polish, per the
+plan's own ordering; Phase 5 (information architecture) was explicitly NOT attempted — see
+"Explicitly deferred" below.
+
+**Correctness & data-integrity (Phase 1 — all six items live-verified):**
+
+1. **Course Dashboard no longer silently drops a day's second "Column 2" content.**
+   `dashboardAdapter.ts`'s `extractDays()` read only `bar.nextElementSibling` per date bar.
+   Live-verified (MATH 113, Tue Sep 8): a date bar is followed by exactly two real
+   `div.pl-mobile` siblings every day ("Column 1"/"Column 2," even when Column 2 is empty) —
+   Column 2 held a real BYU Devotional calendar entry that never rendered. Now walks every
+   consecutive `.pl-mobile` sibling, not just the first, merging their items into one list.
+2. **The "View original LearningSuite page" escape hatch actually works now.**
+   `lib/dom.ts`'s `createOverlayToggle()` called `setOriginalHidden(next)` where `next` was the
+   *new* revealed-state, but `setOriginalHidden(true)` HIDES native content — so the first click
+   was a no-op (button label flipped, nothing became visible) and the second click stacked native
+   content underneath the still-visible enhanced view. Fixed to `setOriginalHidden(!next)`.
+   Live-verified end to end on Course List: first click now reveals native content below the
+   enhanced view with the label correctly reading "← Back to redesigned view"; second click hides
+   it again. New tests in `test/dom.test.ts` cover both the button and `.reveal()`.
+3. **Combined Schedule no longer runs a multi-line real anchor into one unbroken title.**
+   `reskinned-schedule.png` showed *"Chapter 2.1 04-Information Storage.pdf Download (Updated on
+   09/01/2026) Zoom Recording (05/01/26)"* as one line. Live-inspected the real DOM: this is
+   **one** anchor (not several, as `PASS12_PLAN.md` assumed from screenshot evidence alone) whose
+   own `textContent` carries blank-line-separated logical lines that LearningSuite's native
+   `truncate` CSS just clips to one line. `homeAdapter.ts`'s `extractItems()` now splits on that
+   blank-line boundary, keeping only the first line as the title and surfacing the rest as a new
+   `meta` field (`assignmentCard.ts`) rendered as a secondary subtitle segment instead of being
+   run together or dropped.
+4. **Grade Summary's "Total course progress" no longer reads as a failing red 0%.**
+   Live-verified real MATH 113 data: "Current 100%" (correct, 5/5 graded) sat directly next to
+   "Total 0.71%" in a red "failing" badge — Total counts every not-yet-due assignment as a zero by
+   construction (per the page's own legend text), so it's guaranteed to look catastrophic for
+   nearly the whole semester regardless of real standing. `gradeBadge()` takes a new
+   `isTermProgress` flag; `gradeSummaryAdapter.ts` passes it for the Total column only, which now
+   always renders neutral regardless of value. Current progress is unaffected.
+5. **Course accent colors are perceptually distinct, not just distinct hex values.**
+   Live-verified on the real 5-course account: index-1 red (`#b3261e`) and the old index-4 orange
+   (`#c4370a`) rendered close enough on the course-card top-edge rule that both review agents had
+   to sample pixels to be sure. `lib/courseColor.ts`'s `PALETTE` is reordered (same 12 hex values,
+   not new ones) via a farthest-point-first walk over hue distance, so every common course-load
+   size (a real account's first 4-8 slots) stays maximally spread; the two closest hues in the set
+   now fall at positions 10-11, only relevant at 10+ concurrent courses. New test in
+   `test/components.test.ts` asserts a real minimum hue-distance floor for every prefix length,
+   not just hex distinctness.
+6. **The masthead course/term switcher no longer truncates on every course-scoped page.**
+   Live-measured: `"MATH 113 – Calculus 2"` needs ~165px and rendered in full natively, but
+   truncated to `"MATH 113 – Calc…"` under the reskin with ~146px available — a **root-caused**
+   regression, not the font-substitution guess `PASS12_PLAN.md` proposed (live-tested: swapping
+   the page's font back to the native stack only changed the available width by ~4px). The actual
+   cause: `navigation.css`'s hover-pill treatment on `.header-coursedropdown-trigger` used
+   `padding: 4px 12px; margin: -4px -12px` — visually neutral for *position* but not for the
+   button's own *content box*, which the flex-shrink course-name child absorbed entirely. Replaced
+   with a `::before` pseudo-element (needs `z-index: 0` on the button itself to scope the pseudo's
+   `z-index: -1` to a local stacking context — a first attempt without it rendered the hover pill
+   behind the whole header bar). Live-verified: full course name now renders with room to spare,
+   hover pill still visible.
+7. **The Student View banner is a real, legible "attention" treatment, not muddy olive.**
+   Live-inspected `section.bg-attention`'s actual computed style (two reviewers disagreed on its
+   exact prior appearance — resolved by direct observation, not by guessing which was right): a
+   prior fix already existed (`--docket-yellow-banner-bg`, a translucent tint) but rendered as a
+   low-contrast olive-brown on the dark canvas. Reused the existing `--docket-status-soon`
+   container/on-container pair instead (the same "attention" role every due-soon badge already
+   uses) rather than inventing a bespoke color a second time; the bespoke token is removed.
+   Live-verified legible in both themes.
+
+**Cross-page consistency (Phase 2, partial):**
+
+8. **The same real assignment's "Opens" date now reads identically on every page.**
+   Live-confirmed: MATH 113's "Video Quiz 7.2" read "Opens Wednesday" on Combined Schedule
+   (`homeAdapter.ts`, via the shared `dueDateLabel()`) and "Opens Sep 9" on Assignments
+   (`assignmentsAdapter.ts`, the raw regex-captured text passed through unformatted).
+   `assignmentsAdapter.ts` now parses that captured text into an ISO date
+   (`parseAssignmentDueText()`, already handled a bare "Mon D" shape) and runs it through the same
+   `dueDateLabel()` homeAdapter.ts uses. Live-verified: both pages now read "Opens Wednesday" for
+   the identical real item.
+9. **Cosmetic settings apply live; only structural ones reload.** `index.ts`'s `boot()` called
+   `location.reload()` unconditionally for every settings change — live-confirmed this discarded
+   scroll position and reset Combined Schedule's own accumulator/scroll-to-today flag even for a
+   background-color preview. Now compares the new settings against the current ones: Appearance/
+   Background/Reduce Motion apply live via the same `applyTheme()`/`applyBackground()`/attribute
+   calls `runAdapters()` already uses every pass; only `useCompanionNav`/`compatibilityMode`
+   changes (which genuinely need a clean adapter remount) still reload. Live-verified: changing
+   the background swatch while scrolled 1500px into a 69-row Combined Schedule kept the scroll
+   position and every rendered row; toggling Companion Navigation still reloads as before.
+
+**Settings panel design-system migration (Phase 3):** `panel.css` was the one surface left behind
+by four passes of token rewrites — hardcoded translucent glass (`rgba(242,242,247,0.82)` +
+`backdrop-filter: blur(24px)`), iOS system blue (`#007aff`) for focus rings/selection instead of
+the app's real accent, iOS system green (`#34c759`) for the toggle-on state, and a heavier shadow
+than the rest of the app's one surviving shadow token. Live-verified before rewriting: CSS custom
+properties DO inherit into this Shadow DOM root from the host element's own computed style with
+**no JS threading required at all** (`getComputedStyle()` on an element inside the shadow root
+already resolved `--docket-accent`/`--docket-surface-2` to the exact page-level values) — the
+file's own prior comment ("a Shadow root's styles can't leak in") was only half true, exactly as
+`PASS12_PLAN.md` predicted, and this pass confirmed it live rather than trusting the spec-level
+reasoning alone. `panel.css` now consumes `var(--docket-token, fallback)` throughout: opaque
+`--docket-surface-2` background (no more blur), `--docket-accent` for focus rings/selected-swatch
+ring/switch-on state (reserving `--docket-green` for its existing completed-checkbox semantic
+specifically), `--docket-status-soon-fg` for the diagnostics warning color, `--docket-shadow-float`
+for the one surviving shadow. Live-verified in both themes: the panel now reads as the same opaque
+design language as every other surface in the app.
+
+**Type scale (Phase 4, partial):** `.docket-display` is now 700 weight (was 600) — live-compared
+against fresh apple.com/design.google captures, both render their biggest headline visibly heavier
+than a flat 600 cut at this size. Assignments and Grades (both genuinely course-scoped,
+one-level-deep pages per `pageDetector.ts`'s own `cid-`-in-URL requirement) downgraded from
+`.docket-display` to the already-defined-but-unused `.docket-title-1`, fixing a marketing-hero-
+scaled headline sitting directly above a dense data grid. Course List/Combined Schedule/Grade
+Summary keep `.docket-display`: confirmed against `pageDetector.ts` that all three are
+cross-course, root-level pages in this app's own URL structure — despite `PASS12_PLAN.md`'s own
+Phase 4.2 text also naming "Grade Summary" for the downgrade, which doesn't match this codebase's
+real page hierarchy (flagged rather than silently followed).
+
+**Small fixes:** `components/icons.ts`'s `navIconByLabel` mapped both "Syllabus" and "Library
+Resources" to the identical `book` glyph (flagged, unfixed, since `PASS11_PLAN.md`'s own Phase 6)
+— Syllabus now gets a distinct `clipboard` glyph, independent of the still-open icon-removal
+question below.
+
+**Explicitly deferred this pass** (not attempted, or not confirmed feasible — tracked here rather
+than silently dropped):
+
+- **Phase 2.1-2.3, 2.5** (Combined Schedule's lost native filter panel/view-switcher/"+Item"
+  button; the per-row Statistics icon; Assignments' collapsible category accordion; the "actionable
+  now" native green Begin-button signal) — all real, live-confirmed functional-parity gaps, but
+  each is IA-shaped work (a new control surface or a category-disclosure rebuild), not a
+  same-shape fix like the items above. Reachable via the now-actually-working escape hatch (#2)
+  in the meantime.
+- **Phase 4.1** (renaming/extending the token system from a 3-step to Material 3's full 5-step
+  surface-container model) — a real rename-and-extend per the plan, but touches every surface
+  selector in the app for a depth-relationship benefit (`.docket-group` vs. `.docket-course-card`
+  currently sharing one token) that's real but lower-urgency than this pass's correctness bugs.
+- **Phase 4.3** (widen course-card color from a 4px top-edge rule to a fuller header band) and
+  **4.4** (a "Compact rows" density toggle) — both genuinely additive, low-DOM-risk, but net-new
+  surface area (a new settings row + storage key for 4.4) sized for their own pass rather than a
+  tail-end addition to this one.
+- **Phase 4.5's icon-removal question** (keep vs. drop sidebar icons) — a genuine three-way
+  disagreement among the three reviewers about which real Apple product is the correct reference
+  class (Reminders/Mail's sidebar icons vs. neither marketing page pairing icons with nav labels).
+  Left as an explicit open question for whoever picks this up next, not resolved by a drive-by
+  change.
+- **All of Phase 5** (the cross-course "hero fact" home surface; sidebar/top-tab redundancy
+  spike; Combined Schedule's collapsed Overdue/Today/This Week/Later sections) — per the plan's
+  own explicit staging, this is spike-first, highest-DOM-risk work sequenced last, and this pass's
+  time went to the larger Phase 1-3 correctness/settings-panel set instead. `tools/cdp.mjs` also
+  still has no viewport-resize command, a real prerequisite the plan flagged before attempting
+  5.3's narrow-viewport nav spike.
+- A CDP viewport-resize command for `tools/cdp.mjs` (flagged again — see Phase 5 note above).
+
 ## Eleventh pass: real bugs fixed, a genuine post-gradient visual identity (Sep 2026)
 
 Implements `PASS11_PLAN.md` (that file's own synthesis of three independent design critiques of

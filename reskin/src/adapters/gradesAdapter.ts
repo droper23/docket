@@ -50,7 +50,16 @@ export const gradesAdapter: Adapter = {
       listContainer = h("div", { class: "docket-group", role: "list" }, cards);
       toggle = createOverlayToggle(() => overlay);
       const view = h("div", { class: "docket-scope docket-page" }, [
-        h("div", { class: "docket-header" }, [h("h1", { class: "docket-display" }, ["Grades"])]),
+        // .docket-title-1, not .docket-display: this page is course-scoped (one level deep
+        // inside a course, per pageDetector.ts's looksLikeGradesPage() requiring a real cid- in
+        // the URL) — a marketing-hero-scaled headline immediately above a dense grade table
+        // read as oversized for what follows it (PASS12_PLAN.md Phase 4.2). Course List/
+        // Combined Schedule/Grade Summary stay at .docket-display: confirmed against
+        // pageDetector.ts that all three are cross-course, root-level pages in this app's own
+        // URL structure, not course-scoped — despite PASS12_PLAN.md's Phase 4.2 text also
+        // naming "Grade Summary" for this downgrade, which doesn't match this codebase's real
+        // page hierarchy.
+        h("div", { class: "docket-header" }, [h("h1", { class: "docket-title-1" }, ["Grades"])]),
         listContainer,
         toggle.button,
       ]);
