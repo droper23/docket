@@ -140,7 +140,12 @@ export function computeInitials(name: string): string {
 function restyleMasthead(): void {
   const topLink = document.querySelector("#_topLink");
   if (topLink && !topLink.querySelector(".docket-wordmark")) {
-    topLink.appendChild(h("span", { class: "docket-wordmark docket-scope", "aria-hidden": "true" }, ["BYU Learning Suite"]));
+    topLink.appendChild(
+      h("span", { class: "docket-wordmark docket-scope", "aria-hidden": "true" }, [
+        h("span", { class: "docket-wordmark-brand" }, ["BYU"]),
+        h("span", { class: "docket-wordmark-suite" }, ["Learning Suite"]),
+      ]),
+    );
   }
 
   const trigger = document.querySelector(".header-userdropdown-trigger");

@@ -293,16 +293,36 @@
   min-width: 44px;
   min-height: 100%;
 }
+/* Live-measured (Sep 2026): this row's own native height is a bare 36px with zero vertical
+   padding — every child (the course dropdown, the wordmark, the avatar chip) has to fit and
+   self-center inside that, which reads as visibly cramped once a real text wordmark and an
+   avatar circle are added on top of what used to be a small icon. Padding only (native's own
+   `border-b` and flex children stay exactly as they are; each child already centers itself
+   within whatever height this row ends up with, so this alone gives every child more room
+   without needing to touch their own sizing individually. */
 [data-docket-reskin] .bg-header {
   position: relative;
+  padding: 8px 0;
 }
 [data-docket-reskin] .docket-wordmark {
   font-family: var(--docket-font);
-  font-weight: 600;
-  font-size: 15px;
+  font-size: 16px;
   letter-spacing: -0.01em;
   color: var(--docket-label);
   white-space: nowrap;
+}
+/* A flat single-weight string read as a generic placeholder label, not a brand mark — split
+   into a two-part lockup (bold accent "BYU" + a lighter, secondary-toned product name) the way
+   a real product wordmark pairs an org mark with a suite name, reusing only tokens already used
+   elsewhere (no new colors introduced for this). */
+[data-docket-reskin] .docket-wordmark-brand {
+  font-weight: 800;
+  color: var(--docket-accent);
+}
+[data-docket-reskin] .docket-wordmark-suite {
+  font-weight: 500;
+  color: var(--docket-label-secondary);
+  margin-left: 5px;
 }
 /* Below the native site's own `md` breakpoint (confirmed live: this is exactly where
    LearningSuite already hides the BYU logo and the stacked text, leaving only the small icon —

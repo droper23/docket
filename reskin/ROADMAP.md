@@ -1,5 +1,40 @@
 # LearningSuite Reskin — Roadmap
 
+## Fourteenth pass: masthead polish and a clearer info-row distinction (Sep 2026)
+
+Direct response to two user-reported visual complaints against the thirteenth pass's live
+account, both live-verified before and after (Dark and Light, plus the 768–1023px breakpoint via
+the same same-origin-iframe viewport-emulation technique the prior verification session
+developed).
+
+1. **The masthead read as cramped.** Live-measured: `.bg-header` (the real row holding the
+   course dropdown, wordmark, and avatar) has a bare native height of 36px with zero vertical
+   padding of its own — reasonable for the small icon LearningSuite used to render there, visibly
+   tight once a real text wordmark and an avatar chip sit in the same band. `navigation.css` now
+   gives `.bg-header` `padding: 8px 0` — additive only (native's own `border-b` and every child's
+   internal centering logic are untouched, so this doesn't require touching each child
+   individually); live-confirmed this also resolved a few pixels of incidental vertical
+   misalignment between the wordmark and the course dropdown/avatar that came along with the
+   cramped baseline.
+2. **The wordmark read as a generic placeholder label.** It was one flat 600-weight text run —
+   `shell.ts`'s `restyleMasthead()` now splits it into two real child spans instead: bold, accent-
+   colored "BYU" (`--docket-accent`, `font-weight: 800`) plus a lighter, secondary-toned "Learning
+   Suite" (`--docket-label-secondary`, `500`) — a real org-mark/product-name lockup instead of one
+   undifferentiated string, reusing only tokens already used elsewhere (no new colors). Also
+   bumped the base size 15px → 16px now that the row has room for it.
+3. **Combined Schedule's informational rows (`kind: "info"`/`"calendar"`) needed a stronger cue
+   than muted color alone.** `cards.css`'s existing `.docket-row-info .docket-row-title` rule gets
+   `font-style: italic` — the same rows this project's twelfth/thirteenth passes already mute via
+   `--docket-label-secondary`/badge suppression, now also visually distinct at a glance while
+   scanning a dense list, not just on close reading.
+
+`npm run typecheck && npm run build && npm test` all pass, 59/59 (no test surface changed — this
+pass is masthead/card CSS plus one DOM-structure tweak to an already-untested decorative span).
+Live-verified against the real account: header padding/wordmark lockup confirmed in Dark and
+Light at the default width and at 768–1023px (no collision with the hamburger/course dropdown at
+the narrower width); italicized info rows confirmed legible in both themes alongside due-badged
+rows for contrast.
+
 ## Thirteenth pass: four user-reported UX fixes — live-toggling schedule checkboxes, masthead wordmark, due/info distinction, banner-to-FAB (Sep 2026)
 
 Direct response to four specific user complaints, each brainstormed via two independent spec
