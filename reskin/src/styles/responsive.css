@@ -6,6 +6,14 @@
   .docket-nav-enhanced { font-size: 12px; }
 }
 
+/* Below a real phone's own portrait width, two columns leaves each card too narrow for a
+   real course title ("EC EN 224 (001)") to fit on one line — both the title and the subtitle
+   wrap, producing ragged, uneven card heights across the row (confirmed live, Sep 2026 UX
+   audit, iPhone-width Course List). A single column reads cleanly instead. */
+@media (max-width: 420px) {
+  .docket-course-grid { grid-template-columns: 1fr; }
+}
+
 /* A wider threshold than the block above, live-measured (Sep 2026 UX audit): a real phone
    viewport in this project's own screenshot tooling reports innerWidth ~500px (browser-chrome
    overhead on a 390px device width), and the row-squeeze bug below still reproduced there —
@@ -14,9 +22,13 @@
   /* .docket-row-trailing (score + badge + chevron) is flex-shrink:0 by design — at this width
      that squeezed .docket-row-main's real column width down far enough to mid-word-truncate the
      (already 2-line-clamped) subtitle, e.g. "Due tomorrow 1:59 pm MDT" clipping to "1:5…". Wrapping
-     the trailing group onto its own line below gives the title/subtitle the row's full width instead. */
-  .docket-row { flex-wrap: wrap; }
-  .docket-row-trailing {
+     the trailing group onto its own line below gives the title/subtitle the row's full width instead.
+     Scoped with :has(.docket-badge) — a badgeless row (chevron only, e.g. an info-only schedule
+     item) doesn't need the squeeze this exists to fix, and wrapping it anyway left an orphaned
+     chevron floating alone on its own line below a wide empty gap (confirmed live, Sep 2026 UX
+     audit, mobile Combined Schedule). */
+  .docket-row:has(.docket-row-trailing .docket-badge) { flex-wrap: wrap; }
+  .docket-row-trailing:has(.docket-badge) {
     flex-basis: 100%;
     justify-content: flex-end;
     margin-top: 6px;

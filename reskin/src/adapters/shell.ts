@@ -8,6 +8,50 @@ let navEl: Element | null = null;
 let topTabsEl: Element | null = null;
 let fabBar: HTMLElement | null = null;
 let skipLink: HTMLElement | null = null;
+let fabAutoHideAttached = false;
+
+/**
+ * Below LearningSuite's own `lg` breakpoint (1024px — see `.docket-wordmark`'s media queries
+ * above for the same confirmed cutoff) the sidebar collapses to a hamburger and the floating
+ * settings bar loses the dead column it normally sits in, landing directly on top of scrolled
+ * list content instead (confirmed live, Sep 2026 UX audit). Fading it out while the page is
+ * actively being scrolled down, and back in on scroll-up or once scrolling stops, keeps it from
+ * blocking content without removing the control.
+ *
+ * Confirmed live: the page does NOT scroll via `window`/`document.documentElement` — the real
+ * content pane is an inner `overflow-auto` div LearningSuite renders itself (a generic Tailwind
+ * class combination, not a stable selector worth hardcoding). `scroll` doesn't bubble, so a
+ * listener on `document` only ever sees it by registering for the CAPTURE phase (the `true`
+ * below) — that's what lets this find the real scrolling element on any page without having to
+ * name it, the same "don't guess a selector" discipline this file's own comments follow
+ * elsewhere, just applied to an event target instead of a CSS selector.
+ */
+function initFabAutoHide(): void {
+  if (fabAutoHideAttached) return;
+  fabAutoHideAttached = true;
+  const narrow = window.matchMedia("(max-width: 1023px)");
+  const lastY = new WeakMap<EventTarget, number>();
+  let settleTimer: number | undefined;
+  document.addEventListener(
+    "scroll",
+    (e) => {
+      if (!fabBar || !narrow.matches) return;
+      const target = e.target === document ? (document.scrollingElement ?? document.documentElement) : e.target;
+      if (!target) return;
+      const y = target instanceof Element ? target.scrollTop : window.scrollY;
+      const delta = y - (lastY.get(target) ?? 0);
+      lastY.set(target, y);
+      if (delta > 4 && y > 80) {
+        fabBar.classList.add("docket-floating-bar-hidden");
+      } else if (delta < -4 || y <= 80) {
+        fabBar.classList.remove("docket-floating-bar-hidden");
+      }
+      window.clearTimeout(settleTimer);
+      settleTimer = window.setTimeout(() => fabBar?.classList.remove("docket-floating-bar-hidden"), 900);
+    },
+    { passive: true, capture: true },
+  );
+}
 
 /**
  * Boundary-safe path comparison: `current` is considered "on" `link` if they're equal, or
@@ -210,6 +254,7 @@ export function mountShell(settings: ReskinSettings, onSettingsSaved: (s: Reskin
   // Schedule can render ~300 rows) appending it at the end of <body> put it near the very
   // last tab stop. Inserted at the front instead so it's reachable early.
   document.body.insertBefore(fabBar, document.body.firstChild);
+  initFabAutoHide();
 
   for (const stale of document.querySelectorAll(".docket-skip")) stale.remove();
   const main = document.querySelector("main");

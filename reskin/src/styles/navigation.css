@@ -114,6 +114,20 @@
   z-index: 2147483000;
   display: flex;
   gap: 8px;
+  transition: opacity var(--docket-dur-medium) var(--docket-ease-standard), transform var(--docket-dur-medium) var(--docket-ease-standard);
+}
+/**
+ * On desktop this sits in the sidebar's own dead column and never touches real content. At
+ * narrow widths the sidebar collapses and there is no dead column left — the bar was found
+ * live (Sep 2026 UX audit, mobile Combined Schedule) sitting directly on top of scrolled list
+ * text, blocking both reading and tapping it. Fading it out while actively scrolling down (see
+ * `initFabAutoHide` in shell.ts) keeps it out of the way of the content it would otherwise
+ * cover, while scrolling up or coming to rest brings it straight back.
+ */
+.docket-floating-bar-hidden {
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
 }
 .docket-fab {
   width: 44px; height: 44px;

@@ -1,5 +1,87 @@
 # LearningSuite Reskin — Roadmap
 
+## Sixteenth pass: mobile FAB overlap, orphaned chevron, course-grid density, dashboard hierarchy (Sep 2026)
+
+Same two-independent-critique methodology as the fifteenth pass, this time reading live
+screenshots at desktop (1440px), tablet (834px), and mobile (390px) across Course List, Combined
+Schedule, and a course Dashboard. Every finding was checked against real DOM/computed-style before
+acting — one significant false positive caught this way, several real bugs confirmed and fixed.
+
+**False positive, caught live before "fixing" working code:** both critiques flagged the sidebar's
+active-item highlight as too weak next to the top tab bar's solid pill. Live `getComputedStyle`
+check found `document.querySelector('nav')` had no `docket-nav-enhanced` class at all — the
+account's on-device `useCompanionNav` setting (persisted from an earlier session in this project's
+own audit Chrome profile, unrelated to the shipped default of `true`) was off, so the screenshots
+were showing LearningSuite's own native sidebar, not this project's actual nav treatment. Restored
+the setting to its default and re-screenshotted: the real `docket-nav-item-active` pill (icon +
+filled accent-container background) reads clearly. No code change — a reminder that this profile's
+persisted settings can silently diverge from shipped defaults between sessions, worth checking
+first the same way a stale selector claim would be.
+
+Real, confirmed issues fixed:
+
+1. **The floating settings/eye FAB (`.docket-floating-bar`) covered live schedule content on
+   mobile.** It's positioned in the sidebar's own dead column, which only exists above
+   LearningSuite's own `lg` (1024px) breakpoint — below that the sidebar collapses to a hamburger
+   and the FAB has nothing to sit over but scrolled list content (confirmed live: it visibly
+   obscured a Combined Schedule row's title on a real 390px screenshot). `shell.ts` now attaches a
+   scroll listener (`initFabAutoHide`) that fades the bar out while actively scrolling down and
+   back in on scroll-up or once scrolling settles (900ms), gated to `<1024px` via `matchMedia` so
+   desktop is untouched. The real content pane turned out to be an inner LearningSuite-rendered
+   `overflow-auto` div, not `window`/`document.documentElement` — since `scroll` doesn't bubble,
+   the listener is registered on `document` with `capture: true`, which sees it regardless of
+   which element actually scrolls, without hardcoding that div's own generic, non-durable Tailwind
+   class list as a selector. Verified live via direct `scrollTop` changes + a `getComputedStyle`/
+   classList check (the hidden state is inherently sub-second/transient, a poor fit for a static
+   screenshot).
+2. **A schedule row with no due badge left an orphaned chevron floating alone on its own line.**
+   The fourteenth/fifteenth passes' `responsive.css` rule wraps `.docket-row-trailing` onto its own
+   line below 560px to stop the trailing badge from squeezing the title — but it fired
+   unconditionally, so a badgeless row (an "info"-kind item, chevron only) got the same forced
+   wrap with nothing to show on it, reading as a broken/empty row. Scoped both the wrap and the
+   trailing-group rule with `:has(.docket-badge)` so a chevron-only trailing group stays inline;
+   confirmed live on Combined Schedule mobile.
+3. **Course List cards mid-wrapped both their title and subtitle at real phone width (390px),
+   producing ragged, uneven card heights** in the existing 2-column mobile grid. Added a
+   `max-width: 420px` breakpoint dropping to a single column — confirmed live, both lines now fit
+   on one row per card.
+4. **Course List's desktop/tablet grid left roughly 70% of a 1440px viewport as flat dead space**
+   below a short 4-column, 1-2-row grid (5 real courses) — both critiques' top-ranked finding, and
+   confirmed by direct inspection. No due-count/grade data is available in this page's own DOM to
+   fill the space with real content without cross-page fetching (out of scope — pages are read
+   independently, per this project's whole architecture), so instead widened the grid tiles
+   (`minmax(240px,1fr)` → `minmax(280px,1fr)`, card padding 22px → 26px, gap 18px → 20px): larger,
+   more confident cards read as a deliberate short-list layout instead of a cramped grid that
+   happened to run out of content. Confirmed live at 1440px (now 3 columns) and 834px tablet.
+5. **A course Dashboard's per-day content feed read as flat, undifferentiated text** — both
+   critiques' other top-ranked finding ("data soup"). Live DOM tracing (`.embededFile_Name`/
+   `.ck_embededFile`/`.embededFile_Download` — real, confirmed classes from LearningSuite's own
+   CKEditor file-embed widget) found `dashboardAdapter.ts`'s `extractDays()` already correctly
+   separates a paragraph's real anchor(s) from its surrounding text into distinct `DashboardItem`s
+   — the rows were already granular. What was missing: every item rendered as a bare, undifferentiated
+   `assignmentCard`, none of them passing the `kind: "info"` this component's own `infoLike` styling
+   exists for (italic, muted — already proven live on Combined Schedule). Only a genuine assignment/
+   quiz deadline link (`item.activate` set) is really "due"; everything else — a lesson-topic label,
+   a file's own "(Updated on …)" stamp, a Zoom-recording link — is exactly the plain-note case. Now
+   `kind: item.activate ? undefined : "info"`. Confirmed live: real deadline links stay bold with a
+   chevron, everything else is now visibly muted/italic instead of all reading with equal weight.
+   **Known remaining gap, not attempted this pass:** a day-entry whose native paragraph bundles
+   multiple real concepts (a chapter label + a file attachment + a recording link) with no anchor
+   carrying LearningSuite's own `.cursor-pointer` class still renders as a single multi-line item
+   rather than three separate rows — full separation would need `extractDays` to walk that
+   paragraph's own inner structure, which live inspection found genuinely inconsistent (some
+   entries: clean sibling `<p>` tags; others: nested/merged in ways that need more live DOM capture
+   than this pass budgeted for). Flagged rather than guessed at.
+
+`npm run typecheck && npm run build && npm test` all pass, 59/59 (no new tests — this pass's logic
+change, dashboardAdapter's `kind` mapping, is exercised by existing render-path coverage; the rest
+is CSS/token tuning and a scroll-position listener with no new branching worth a unit test over the
+live verification above). `tools/cdp.mjs` gained a `resize` command (device-metrics override,
+matching `shot --full`'s existing pattern) to support desktop/tablet/mobile screenshot comparison
+without a separate tool. Live-verified against the real account (Chrome via CDP, real BYU CAS
+login): Combined Schedule, Course List, and a course Dashboard, each at 1440px/834px/390px, Dark
+theme (Light not re-verified this pass — no theme-conditional code changed).
+
 ## Fifteenth pass: full visual UX audit — badge urgency ladder, course color on the agenda, mobile row wrap (Sep 2026)
 
 Two independent vision-model critiques (Apple/Linear/Notion-referenced and Arc/Raycast/modern-LMS-

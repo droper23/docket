@@ -25,8 +25,15 @@
 
 .docket-course-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 18px;
+  /* 280px (was 240px) — a real account's Course List is typically a handful of cards, and the
+     narrower tiles left a huge block of empty canvas below a short 1-2 row grid on a wide
+     desktop viewport (both design critics in the Sep 2026 UX audit flagged this independently
+     as the single biggest "unfinished-looking page" problem). Larger, more generously-padded
+     cards read as a deliberate, considered layout for a short list instead of a cramped grid
+     that happens to run out of content — the empty space below is now Apple/about.google-style
+     intentional whitespace around a few substantial cards, not leftover void around small ones. */
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
 }
 /**
  * Flat, opaque surface — replaces the old translucent-overlay gradient wash (a 20%-hue mix
@@ -41,7 +48,7 @@
   background: var(--docket-surface-1);
   border: 1px solid var(--docket-separator);
   border-radius: var(--docket-radius-md);
-  padding: 22px;
+  padding: 26px;
   text-decoration: none;
   color: inherit;
   display: block;

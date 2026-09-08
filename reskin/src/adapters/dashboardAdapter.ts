@@ -131,7 +131,22 @@ export const dashboardAdapter: Adapter = {
         h(
           "div",
           { class: "docket-group", role: "list" },
-          d.items.map((item) => listItem(assignmentCard({ title: item.text }, item.activate))),
+          d.items.map((item) =>
+            listItem(
+              assignmentCard(
+                // Real clickable items (a real assignment/quiz deadline link — see extractDays's
+                // own doc comment) are the only ones this adapter treats as an actual due item; a
+                // file note, "(Updated on …)" stamp, or Zoom-recording label has no click-through
+                // and is exactly the plain topic/note case `kind: "info"` exists for — muting it
+                // (assignmentCard.ts's own `infoLike` styling) is what actually gives the day's
+                // list any visual hierarchy instead of every line reading as equally bold
+                // (confirmed live, Sep 2026 UX audit: a course Dashboard's feed with no
+                // distinction between a lesson note and a real deadline read as flat text soup).
+                { title: item.text, kind: item.activate ? undefined : "info" },
+                item.activate,
+              ),
+            ),
+          ),
         ),
       ]);
     });

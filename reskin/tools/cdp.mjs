@@ -139,6 +139,18 @@ async function cmdShot(path, full) {
   console.log(`wrote ${path}`);
 }
 
+async function cmdResize(width, height, mobile) {
+  await withCdp(async (cdp) => {
+    await cdp.send("Emulation.setDeviceMetricsOverride", {
+      width: Number(width),
+      height: Number(height),
+      deviceScaleFactor: 2,
+      mobile: !!mobile,
+    });
+  });
+  console.log(`resized to ${width}x${height}${mobile ? " (mobile)" : ""}`);
+}
+
 async function cmdOpen(url) {
   await withCdp(async (cdp) => {
     await cdp.send("Page.navigate", { url });
@@ -253,6 +265,9 @@ switch (command) {
     break;
   case "shot":
     await cmdShot(rest[0], rest.includes("--full"));
+    break;
+  case "resize":
+    await cmdResize(rest[0], rest[1], rest.includes("--mobile"));
     break;
   case "hover":
     await cmdHover(rest[0], rest[1]);
