@@ -6,6 +6,26 @@
   .docket-nav-enhanced { font-size: 12px; }
 }
 
+/* A wider threshold than the block above, live-measured (Sep 2026 UX audit): a real phone
+   viewport in this project's own screenshot tooling reports innerWidth ~500px (browser-chrome
+   overhead on a 390px device width), and the row-squeeze bug below still reproduced there —
+   480px alone would have missed it. */
+@media (max-width: 560px) {
+  /* .docket-row-trailing (score + badge + chevron) is flex-shrink:0 by design — at this width
+     that squeezed .docket-row-main's real column width down far enough to mid-word-truncate the
+     (already 2-line-clamped) subtitle, e.g. "Due tomorrow 1:59 pm MDT" clipping to "1:5…". Wrapping
+     the trailing group onto its own line below gives the title/subtitle the row's full width instead. */
+  .docket-row { flex-wrap: wrap; }
+  .docket-row-trailing {
+    flex-basis: 100%;
+    justify-content: flex-end;
+    margin-top: 6px;
+    /* Aligns under the title text, past the checkbox column — matches .docket-row-body's own
+       38px content-start convention elsewhere in this file's sibling, cards.css. */
+    padding-left: 38px;
+  }
+}
+
 /* Touch targets stay >=44px regardless of viewport per Apple HIG, spec §18/§30. */
 @media (pointer: coarse) {
   .docket-row { min-height: 48px; }

@@ -1,5 +1,72 @@
 # LearningSuite Reskin — Roadmap
 
+## Fifteenth pass: full visual UX audit — badge urgency ladder, course color on the agenda, mobile row wrap (Sep 2026)
+
+Two independent vision-model critiques (Apple/Linear/Notion-referenced and Arc/Raycast/modern-LMS-
+referenced) reviewed live screenshots (Combined Schedule, Course List, Assignments desktop + 390px
+mobile), then every finding was checked against the real DOM/CSS before acting on it — several
+critique claims turned out to be false positives from reading a static screenshot, confirmed and
+rejected live rather than "fixed":
+
+- **"Today"/"Tomorrow" section headers looked inconsistently styled (one underlined, one not).**
+  Live `getComputedStyle` check: `textDecorationLine` is `"none"` on every `.docket-title-2` day
+  header, "Today" included — both critiques and the initial visual read of the screenshot were
+  wrong. No code change; not a real inconsistency.
+- **A "stray unstyled vertical line" near the masthead's "ALL COURSES" dropdown.** Live DOM check:
+  it's LearningSuite's own real `md:border-l`/`sm:border-r`/`border-gray3` divider, already
+  correctly remapped by `global.css`'s sitewide `[class*="border-gray"]` rule to
+  `--docket-separator` (confirmed via computed `borderRight`) — a deliberate, correctly-themed
+  native element, not a leftover. No code change.
+
+Real, confirmed issues fixed:
+
+1. **`dueBadge.ts`'s own doc comment had described five urgency bands for several passes without
+   the code ever implementing more than three** (overdue / "soon" for both today AND tomorrow /
+   "upcoming" for 2-7 days) — both critiques independently flagged that "Due today" and "Due
+   tomorrow" rendered as the identical color. Now genuinely five bands: overdue (red, unchanged),
+   today (existing "soon" amber, unchanged), tomorrow (new `--docket-status-tomorrow-*`, one step
+   more muted), within 7 days (new `--docket-status-week-*`, pale amber), else neutral. Contrast
+   verified >=4.5:1 (WCAG AA) both themes via the same relative-luminance formula this project's
+   own `soon-fg` comment already documents.
+2. **`assignmentCard.ts`'s `courseAccent` field existed in the interface (a "CSS color for the
+   leading dot" comment) but was never actually read anywhere in the render body** — a half-wired
+   feature. `homeAdapter.ts` (Combined Schedule) now calls the same `assignCourseColors()`
+   `courseListAdapter.ts`/`gradeSummaryAdapter.ts` already use (deterministic, collision-free,
+   same color per course on every page) and passes each item's color through; `.docket-row` grew a
+   3px left-border accent stripe (transparent by default, so pages with no course-color context —
+   `assignmentsAdapter.ts`, already single-course — are pixel-identical to before). Fixes both
+   critiques' "the multi-course agenda can't be scanned by color the way Course List can" finding.
+3. **Interactive vs. decorative checkboxes were visually identical** (both a plain circle) despite
+   one being a real click target (`assignmentCard.ts`'s `onToggleComplete` path, since the
+   thirteenth pass) and the other purely `role="img"`. Added a `:hover` cue scoped to
+   `[role="checkbox"]` only — decorative checkboxes are untouched since the selector never matches
+   them.
+4. **A real mobile-width regression, live-confirmed at a measured 500px `innerWidth`** (this
+   project's own screenshot tooling reports that for a 390px-wide device, browser-chrome overhead
+   included) **on an already-mounted Combined Schedule/agenda card** (i.e. loaded at desktop width,
+   then narrowed — not a fresh narrow load, see the known gap below): `.docket-row-trailing`
+   (score/badge/chevron) is `flex-shrink:0`, which squeezed `.docket-row-main` far enough to
+   mid-word-truncate its own 2-line-clamped subtitle (e.g. "Due tomorrow 1:59 pm MDT" → "1:5…").
+   `responsive.css` now wraps the trailing group onto its own line below 560px.
+
+**Known gap, investigated but not fixed this pass (scope/risk too large for a polish pass):** a
+*fresh* page load of the Assignments tab at ~500px `innerWidth` renders a completely different
+native LearningSuite DOM shape — a "Show Course Homework ID" accordion/table, confirmed via
+`document.querySelector` **before any reskin injection at all** — that `assignmentsAdapter.ts`'s
+selectors don't recognize, so it fails soft to fully native (still dark-canvas-consistent via
+`global.css`'s sitewide pass, just not card-styled). This is distinct from the row-wrap bug above
+(which only affects an *already-mounted* reskin that gets narrowed after the fact). Building a
+second adapter branch for this native compact shape needs its own live DOM capture/selector work,
+same discipline as every other adapter — not attempted here.
+
+`npm run typecheck && npm run build && npm test` all pass, 59/59 (no new tests added — this pass's
+changes are CSS/token/color-plumbing on already-covered render paths, not new branching logic).
+Live-verified against the real account (Chrome browser automation, script injected into an
+authenticated tab via a `window.name`-stash-across-navigation technique — no `--remote-debugging-
+port` available in this session, see the thirteenth pass's own note on the same constraint):
+Combined Schedule (desktop + 500px), Course List, Grade Summary, course Dashboard, and Assignments,
+Dark theme only (Light not re-verified this pass — no theme-conditional code changed, low risk).
+
 ## Fourteenth pass: masthead polish and a clearer info-row distinction (Sep 2026)
 
 Direct response to two user-reported visual complaints against the thirteenth pass's live

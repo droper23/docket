@@ -107,7 +107,16 @@ export function assignmentCard(data: AssignmentCardData, onActivate?: () => void
 
   const row = h(
     "div",
-    { class: "docket-row" + (onActivate ? " docket-row-tappable" : "") + (infoLike ? " docket-row-info" : "") },
+    {
+      class: "docket-row" + (onActivate ? " docket-row-tappable" : "") + (infoLike ? " docket-row-info" : ""),
+      // A left-edge accent stripe, same color/assignment as the course's own card elsewhere
+      // (courseListAdapter.ts/gradeSummaryAdapter.ts's assignCourseColors()) — lets a multi-course
+      // agenda (Combined Schedule) be scanned by color the same way the Course List/Grade Summary
+      // grids already can. `.docket-row`'s own left border defaults to transparent, so omitting
+      // this on pages with no course-color context (assignmentsAdapter.ts, already single-course)
+      // keeps today's exact appearance.
+      style: data.courseAccent ? `--docket-row-accent:${data.courseAccent}` : undefined,
+    },
     [
       checkbox,
       h("div", { class: "docket-row-main" }, [

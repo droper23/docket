@@ -8,6 +8,7 @@ import { parseSlashDate, formatIsoDate } from "../lib/parseDueText.js";
 import { dayLabel, dueDateLabel } from "../../../src/core/agendaFormatting.js";
 import { daysUntilInSchoolTimeZone } from "../../../src/core/schoolTime.js";
 import { diagnostics } from "../core/diagnostics.js";
+import { assignCourseColors } from "../lib/courseColor.js";
 
 interface ScheduleItem {
   title: string;
@@ -197,7 +198,15 @@ export const homeAdapter: Adapter = {
     }
 
     // Always re-render from the FULL accumulated set (see accumulated's doc).
-    const groupedData = groupByDate(mergedItemsSorted());
+    const sortedItems = mergedItemsSorted();
+    // Same per-course color identity as Course List/Grade Summary (courseListAdapter.ts/
+    // gradeSummaryAdapter.ts both call this same function against their own extracted code
+    // list) — a multi-course agenda can now be scanned by color the same way those grids
+    // already can, not just by reading each row's course-code text.
+    const courseColors = assignCourseColors(
+      sortedItems.map((i) => i.courseCode).filter((c): c is string => !!c),
+    );
+    const groupedData = groupByDate(sortedItems);
     const groups = groupedData.map((g) =>
       h("div", { class: "docket-section" }, [
         h("div", { class: "docket-day-header" }, [
@@ -218,6 +227,7 @@ export const homeAdapter: Adapter = {
                   opensText: item.opens ? dueDateLabel(item.dateIso) : undefined,
                   completed: item.completed,
                   kind: item.kind,
+                  courseAccent: item.courseCode ? courseColors.get(item.courseCode) : undefined,
                   onToggleComplete: item.checkboxEl
                     ? () => {
                         item.completed = !item.completed;

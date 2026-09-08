@@ -7,12 +7,14 @@ import { dueCountdown } from "../../../src/core/agendaFormatting.js";
  * produces, just re-colored to Apple's system palette instead of Docket's
  * amber one. Five real bands, not two — a flat "everything past tomorrow
  * is the same gray" badge defeats the entire point of an urgency
- * indicator, since a card due in 2 days and one due in 105 days read
- * identically at a glance:
- *   overdue          -> red
- *   due today/tomorrow -> red-orange
- *   due within 3 days  -> orange
- *   due within 7 days  -> yellow
+ * indicator, since a card due tomorrow and one due in 6 days used to read
+ * identically at a glance (confirmed live, Sep 2026 UX audit — this doc
+ * comment had described five bands for several passes without the code
+ * actually implementing more than three):
+ *   overdue           -> red
+ *   due today         -> strongest amber ("soon")
+ *   due tomorrow      -> amber, one step down ("tomorrow")
+ *   due within 7 days -> pale amber, barely warmer than neutral ("week")
  *   beyond that (or no due date) -> neutral gray
  */
 /**
@@ -32,8 +34,9 @@ export function dueBadge(daysUntilDue: number | undefined, opensText?: string): 
   let role = "neutral";
   if (daysUntilDue !== undefined) {
     if (daysUntilDue < 0) role = "overdue";
-    else if (daysUntilDue <= 1) role = "soon";
-    else if (daysUntilDue <= 7) role = "upcoming";
+    else if (daysUntilDue === 0) role = "soon";
+    else if (daysUntilDue === 1) role = "tomorrow";
+    else if (daysUntilDue <= 7) role = "week";
   }
   return h("span", { class: `docket-badge docket-badge-${role}` }, [label]);
 }

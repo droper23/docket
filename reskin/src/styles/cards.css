@@ -11,8 +11,9 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 15px 20px;
+  padding: 15px 20px 15px 17px;
   border-bottom: 1px solid var(--docket-separator);
+  border-left: 3px solid var(--docket-row-accent, transparent);
   min-height: 44px; /* Apple's minimum touch target */
   transition: background-color var(--docket-dur-fast) var(--docket-ease-standard);
 }
@@ -72,6 +73,8 @@
 }
 .docket-badge-overdue { background: var(--docket-status-overdue-bg); color: var(--docket-status-overdue-fg); }
 .docket-badge-soon { background: var(--docket-status-soon-bg); color: var(--docket-status-soon-fg); }
+.docket-badge-tomorrow { background: var(--docket-status-tomorrow-bg); color: var(--docket-status-tomorrow-fg); }
+.docket-badge-week { background: var(--docket-status-week-bg); color: var(--docket-status-week-fg); }
 .docket-badge-upcoming { background: var(--docket-status-upcoming-bg); color: var(--docket-status-upcoming-fg); }
 .docket-badge-done { background: var(--docket-status-done-bg); color: var(--docket-status-done-fg); }
 .docket-badge-neutral { background: var(--docket-status-neutral-bg); color: var(--docket-status-neutral-fg); }
@@ -103,6 +106,11 @@
    keyboard focus treatment `.docket-row-tappable` already gets — without this it was reachable
    by Tab but gave zero visual signal when focused, same gap that rule's own comment documents. */
 .docket-checkbox[role="checkbox"] { cursor: pointer; }
+/* A hover cue on the interactive checkbox only (never the decorative role="img" one, which has
+   no click handler at all) — without it, a real toggle and a purely-decorative status dot were
+   visually identical, giving no signal about which is actually clickable. */
+.docket-checkbox[role="checkbox"]:hover { border-color: var(--docket-accent); }
+.docket-checkbox[role="checkbox"].docket-checkbox-done:hover { border-color: var(--docket-green); filter: brightness(1.1); }
 .docket-checkbox[role="checkbox"]:focus-visible {
   outline: 2px solid var(--docket-accent);
   outline-offset: 2px;

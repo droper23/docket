@@ -98,6 +98,15 @@
   --docket-status-done-fg: #0d652d;
   --docket-status-neutral-bg: #f1f3f4;
   --docket-status-neutral-fg: #3c4043;
+  /* Two intermediate due-urgency bands, sitting between "soon" (due today, the strongest
+     non-overdue color) and "neutral" (a week+ away) — same warm hue family as "soon", stepped
+     down in saturation rather than shifted to a different hue, so the ladder reads as one
+     continuous gradient of urgency rather than an arbitrary color swap. Contrast verified
+     >=4.5:1 (WCAG AA) the same way soon-fg's own comment documents. */
+  --docket-status-tomorrow-bg: #fbf1de;
+  --docket-status-tomorrow-fg: #8a6019; /* ~4.97:1 on tomorrow-bg */
+  --docket-status-week-bg: #f6f3ea;
+  --docket-status-week-fg: #6e6650; /* ~5.14:1 on week-bg */
 
   /* Raw system hue — reserved for the checkbox-done fill; never for status/grade badge text,
    * which uses the container/on-container pairs above instead. The native instructor-view
@@ -142,6 +151,10 @@
   --docket-status-done-fg: #a8dab5;
   --docket-status-neutral-bg: #2b2b2f;
   --docket-status-neutral-fg: #c4c7c5;
+  --docket-status-tomorrow-bg: #3a2e14;
+  --docket-status-tomorrow-fg: #e8d1a0; /* ~8.89:1 on tomorrow-bg */
+  --docket-status-week-bg: #2f2c1e;
+  --docket-status-week-fg: #c9c0a0; /* ~7.69:1 on week-bg */
 
   --docket-green: #30d158;
 }
