@@ -30,7 +30,7 @@
  * closeness in. Extend `test/components.test.ts`'s dispersion check before reordering this
  * array again.
  */
-const PALETTE = [
+export const PALETTE = [
   "#0b57d0", // blue
   "#b3261e", // red
   "#146c2e", // green
@@ -45,11 +45,26 @@ const PALETTE = [
   "#0e7c86", // teal
 ];
 
-export function assignCourseColors(codes: string[]): Map<string, string> {
+/**
+ * Overrides are keyed by course CODE (e.g. "CS 142" — the same prefix courseListAdapter's own
+ * `splitCodeTitle()` extracts and Settings > Course Colors lets a student pick), but not every
+ * page's own extracted key is that short: gradeSummaryAdapter.ts passes its row's full,
+ * unsplit "CODE - Title" anchor text. Stripping the same " - Title" suffix here (never
+ * splitting on the first " " alone, which would butcher a multi-word code) lets one override
+ * picked once in Settings apply on every page a course appears on, not just the one whose own
+ * extraction happens to key by bare code.
+ */
+function codeKey(raw: string): string {
+  const idx = raw.indexOf(" - ");
+  return (idx >= 0 ? raw.slice(0, idx) : raw).trim();
+}
+
+export function assignCourseColors(codes: string[], overrides: Record<string, string> = {}): Map<string, string> {
   const sorted = [...new Set(codes)].sort();
   const map = new Map<string, string>();
   for (let i = 0; i < sorted.length; i++) {
-    map.set(sorted[i]!, PALETTE[i % PALETTE.length]!);
+    const code = sorted[i]!;
+    map.set(code, overrides[codeKey(code)] || PALETTE[i % PALETTE.length]!);
   }
   return map;
 }

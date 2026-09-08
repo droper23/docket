@@ -5,6 +5,7 @@ import type { Overlay } from "../lib/dom.js";
 import { gradeBadge } from "../components/gradeBadge.js";
 import { assignCourseColors } from "../lib/courseColor.js";
 import { diagnostics } from "../core/diagnostics.js";
+import { loadSettings } from "../core/settings.js";
 
 interface CourseGrade {
   href: string;
@@ -103,7 +104,7 @@ export const gradeSummaryAdapter: Adapter = {
     const courses = extractCourses(main);
     if (!courses.length) return; // nothing recognizable — leave LearningSuite's page untouched
 
-    const colors = assignCourseColors(courses.map((c) => c.title));
+    const colors = assignCourseColors(courses.map((c) => c.title), loadSettings().courseColors);
     // Confirmed live (Sep 2026): a real explanatory footnote — what "Current"/"Total progress"
     // actually mean — sits just below the grid (`.flex.pb-3.text-sm.text-info`, confirmed
     // page-unique, is the first of the two paragraphs; its parent holds both). The pre-pass-11

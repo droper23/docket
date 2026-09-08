@@ -28,6 +28,13 @@ export interface ReskinSettings {
   compatibilityMode: boolean;
   reducedMotion: boolean;
   background: BackgroundChoice;
+  /**
+   * Per-course accent overrides, keyed by course code (see courseColor.ts's `codeKey()`) — a
+   * course with no entry here keeps its automatic palette-by-sorted-index color. Settings >
+   * Course Colors is the only writer; every adapter that calls `assignCourseColors()` reads
+   * this same map so an override applies everywhere that course's accent shows up.
+   */
+  courseColors: Record<string, string>;
 }
 
 export const DEFAULT_SETTINGS: ReskinSettings = {
@@ -36,6 +43,7 @@ export const DEFAULT_SETTINGS: ReskinSettings = {
   compatibilityMode: false,
   reducedMotion: false,
   background: "default",
+  courseColors: {},
 };
 
 const KEY = "settings";

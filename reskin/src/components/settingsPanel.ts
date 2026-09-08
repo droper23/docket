@@ -2,6 +2,8 @@ import panelCss from "../styles/panel.css";
 import { loadSettings, saveSettings, BACKGROUND_CHOICES } from "../core/settings.js";
 import type { Appearance, BackgroundChoice, ReskinSettings } from "../core/settings.js";
 import { openDiagnosticsPanel } from "./diagnosticsPanel.js";
+import { getKnownCourses } from "../core/courseRegistry.js";
+import { assignCourseColors, PALETTE } from "../lib/courseColor.js";
 
 let host: HTMLElement | null = null;
 
@@ -105,6 +107,66 @@ function backgroundRow(initial: BackgroundChoice, onChange: (v: BackgroundChoice
   return row;
 }
 
+/**
+ * Settings > Course Colors: one swatch row per course the student is actually enrolled in
+ * (from courseRegistry.ts's on-device cache, populated by courseListAdapter.ts — the same
+ * curated-palette swatch idiom backgroundRow() above uses, not a raw color picker, so an
+ * override can never pick a color the rest of the app's contrast work didn't already account
+ * for). A course with no override keeps its automatic palette-by-sorted-index color, shown
+ * pre-selected here so the row never looks unset. An explicit "Auto" pill clears the override
+ * and goes back to that automatic assignment.
+ */
+function courseColorRow(label: string, current: string, isOverridden: boolean, onChange: (hex: string | null) => void): HTMLElement {
+  const row = document.createElement("div");
+  row.className = "row row-col";
+  const text = document.createElement("span");
+  text.className = "row-label";
+  text.textContent = label;
+  row.append(text);
+
+  const controls = document.createElement("div");
+  controls.className = "swatch-row-controls";
+
+  const swatches = document.createElement("div");
+  swatches.className = "swatch-row swatch-row-wrap";
+  swatches.setAttribute("role", "radiogroup");
+  swatches.setAttribute("aria-label", `${label} color`);
+  const select = (hex: string | null) => {
+    for (const other of Array.from(swatches.children) as HTMLElement[]) {
+      const match = hex !== null && other.dataset["hex"] === hex;
+      other.dataset["selected"] = String(match);
+      other.setAttribute("aria-checked", String(match));
+    }
+  };
+  for (const hex of PALETTE) {
+    const sw = document.createElement("button");
+    sw.className = "swatch swatch-sm";
+    sw.dataset["hex"] = hex;
+    sw.dataset["selected"] = String(isOverridden && hex === current);
+    sw.style.setProperty("--swatch", hex);
+    sw.setAttribute("role", "radio");
+    sw.setAttribute("aria-checked", String(isOverridden && hex === current));
+    sw.setAttribute("aria-label", hex);
+    sw.addEventListener("click", () => {
+      select(hex);
+      onChange(hex);
+    });
+    swatches.appendChild(sw);
+  }
+
+  const resetBtn = document.createElement("button");
+  resetBtn.className = "seg";
+  resetBtn.textContent = "Auto";
+  resetBtn.addEventListener("click", () => {
+    select(null);
+    onChange(null);
+  });
+
+  controls.append(swatches, resetBtn);
+  row.appendChild(controls);
+  return row;
+}
+
 function diagnosticsRow(): HTMLElement {
   const row = document.createElement("div");
   row.className = "row";
@@ -181,9 +243,40 @@ export function openSettingsPanel(onSave: (settings: ReskinSettings) => void): v
     onSave(next);
   };
 
+  const knownCourses = getKnownCourses();
+  const courseColorTitle = document.createElement("div");
+  courseColorTitle.className = "group-title";
+  courseColorTitle.textContent = "Course Colors";
+  const courseColorDefaults = assignCourseColors(knownCourses.map((c) => c.code));
+  const courseColorSection: HTMLElement[] = knownCourses.length
+    ? [
+        courseColorTitle,
+        group(
+          knownCourses.map((c) => {
+            const label = c.title && c.title !== c.code ? `${c.code} — ${c.title}` : c.code;
+            return courseColorRow(label, settings.courseColors[c.code] ?? courseColorDefaults.get(c.code) ?? PALETTE[0]!, c.code in settings.courseColors, (hex) => {
+              const next = { ...settings.courseColors };
+              if (hex) next[c.code] = hex;
+              else delete next[c.code];
+              persist({ courseColors: next });
+            });
+          }),
+        ),
+      ]
+    : [
+        courseColorTitle,
+        (() => {
+          const note = document.createElement("div");
+          note.className = "footer-note";
+          note.textContent = "Course colors appear here once you've visited Course List.";
+          return note;
+        })(),
+      ];
+
   sheet.append(
     header,
     group([appearanceRow(settings.appearance, (v) => persist({ appearance: v })), backgroundRow(settings.background, (v) => persist({ background: v }))]),
+    ...courseColorSection,
     group([
       switchRow(shadow, "Use Companion navigation", settings.useCompanionNav, (v) => persist({ useCompanionNav: v })),
       switchRow(shadow, "Reduce Motion", settings.reducedMotion, (v) => persist({ reducedMotion: v })),

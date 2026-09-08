@@ -53,12 +53,14 @@
   outline: 2px solid var(--docket-accent) !important;
   outline-offset: -2px;
 }
-/* A flat container fill, not a gradient — the active section reads as a deliberate, quieter
-   accent (not competing with real primary buttons on the same screen), matching Material's
-   own container/on-container role pairing for guaranteed contrast in both themes. */
+/* No filled pill — a colored container block behind the active row read as a literal button
+   sitting under the label (real complaint: the label looked like it had "a button behind it").
+   Text/icon color alone (the same accent every other selected-state indicator in the app
+   uses) carries the active state instead, on the same transparent background every other row
+   already has at rest. */
 .docket-nav-enhanced .docket-nav-item-active {
-  background: var(--docket-accent-container) !important;
-  color: var(--docket-on-accent-container) !important;
+  background: transparent !important;
+  color: var(--docket-accent) !important;
 }
 /* Matched by real label text in shell.ts's restyleNav() — see icons.ts's navIconByLabel.
    Secondary/muted at rest so the label text stays the primary read, full label color when
@@ -71,7 +73,7 @@
   color: var(--docket-label-secondary);
 }
 .docket-nav-enhanced .docket-nav-item-active .docket-nav-icon {
-  color: var(--docket-on-accent-container);
+  color: var(--docket-accent);
 }
 
 /**

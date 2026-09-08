@@ -5,6 +5,8 @@ import type { Overlay } from "../lib/dom.js";
 import { courseCard } from "../components/courseCard.js";
 import { assignCourseColors } from "../lib/courseColor.js";
 import { diagnostics } from "../core/diagnostics.js";
+import { loadSettings } from "../core/settings.js";
+import { recordKnownCourses } from "../core/courseRegistry.js";
 
 interface ParsedCourse {
   code: string;
@@ -82,7 +84,8 @@ export const courseListAdapter: Adapter = {
     const courses = extractCourses(main);
     if (!courses.length) return; // nothing recognizable — leave LearningSuite's page untouched
 
-    const colors = assignCourseColors(courses.map((c) => c.code || c.title));
+    recordKnownCourses(courses.map((c) => ({ code: c.code || c.title, title: c.title || c.code })));
+    const colors = assignCourseColors(courses.map((c) => c.code || c.title), loadSettings().courseColors);
     const toggle = createOverlayToggle(() => overlay);
     const grid = h("div", { class: "docket-scope docket-page" }, [
       h("div", { class: "docket-header" }, [

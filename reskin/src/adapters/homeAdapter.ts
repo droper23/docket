@@ -1,6 +1,6 @@
 import type { Adapter } from "./types.js";
 import { looksLikeScheduleListView } from "../core/pageDetector.js";
-import { overlayContent, markProcessed, isProcessed, h, listItem, createOverlayToggle } from "../lib/dom.js";
+import { overlayContent, markProcessed, isProcessed, h, listItem, createOverlayToggle, findScrollParent } from "../lib/dom.js";
 import type { Overlay, OverlayToggle } from "../lib/dom.js";
 import { assignmentCard } from "../components/assignmentCard.js";
 import { icons } from "../components/icons.js";
@@ -9,6 +9,7 @@ import { dayLabel, dueDateLabel } from "../../../src/core/agendaFormatting.js";
 import { daysUntilInSchoolTimeZone } from "../../../src/core/schoolTime.js";
 import { diagnostics } from "../core/diagnostics.js";
 import { assignCourseColors } from "../lib/courseColor.js";
+import { loadSettings } from "../core/settings.js";
 
 interface ScheduleItem {
   title: string;
@@ -178,8 +179,18 @@ const DIALOG_POLL_TIMEOUT_MS = 15000;
  * Sep 2026: closing an assignment's popup "goes back to the original learningsuite look"). Polls
  * for that same dialog's own "Close" button appearing then disappearing and calls
  * `toggle.conceal()` the moment it's gone, returning to the redesigned view automatically.
+ *
+ * Also restores the student's own scroll position across that reveal/conceal round trip.
+ * `reveal()`'s own `item.anchor.scrollIntoView()` jumps the real scrolling container (see
+ * `findScrollParent`) to wherever that native row happens to sit — often much further down the
+ * page than the enhanced agenda's own current scroll position — and nothing ever reversed that
+ * either, so closing the dialog previously left the student dropped at that unrelated position
+ * instead of back where they were reading (reported bug, Sep 2026: "it jumps to the bottom").
  */
 function openNativeDetail(item: ScheduleItem): void {
+  const scrollParent = findScrollParent(item.anchor);
+  const scrollPos = scrollParent.scrollTop;
+
   toggle?.reveal();
   item.anchor.click();
   item.anchor.scrollIntoView({ block: "center", behavior: "smooth" });
@@ -191,6 +202,7 @@ function openNativeDetail(item: ScheduleItem): void {
     if (open) sawDialog = true;
     else if (sawDialog) {
       toggle?.conceal();
+      scrollParent.scrollTop = scrollPos;
       return;
     }
     elapsed += DIALOG_POLL_MS;
@@ -250,6 +262,7 @@ export const homeAdapter: Adapter = {
     // already can, not just by reading each row's course-code text.
     const courseColors = assignCourseColors(
       sortedItems.map((i) => i.courseCode).filter((c): c is string => !!c),
+      loadSettings().courseColors,
     );
     const groupedData = groupByDate(sortedItems);
     const groups = groupedData.map((g) =>

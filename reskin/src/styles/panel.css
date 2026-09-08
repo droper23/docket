@@ -102,6 +102,19 @@ button.seg:focus-visible {
 }
 :host([data-docket-reduced-motion="true"]) .swatch { transition-duration: 0.001ms; }
 .row-detail { font-size: 12px; opacity: 0.7; margin-top: 2px; }
+/* Settings > Course Colors: same iOS-Settings-style section label as the grouped rows below
+   it, since a list of per-course rows (unlike every other group here) needs its own heading to
+   read as one topic rather than a continuation of Background. */
+.group-title {
+  margin: 14px 14px 6px; padding: 0 4px;
+  font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em;
+  color: var(--docket-label-secondary, #444746);
+}
+/* A smaller swatch than Background's own — a course row packs the full 12-color palette plus
+   an "Auto" reset pill into one row width, so wrapping is expected on a narrow sheet. */
+.swatch-row-wrap { flex-wrap: wrap; }
+.swatch-sm { width: 24px; height: 24px; }
+.swatch-row-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 select, button.seg {
   font: inherit; border-radius: var(--docket-radius-sm, 8px); border: none;
   background: var(--docket-fill, #eceef0);

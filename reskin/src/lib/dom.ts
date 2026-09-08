@@ -51,6 +51,26 @@ export function svgIcon(pathD: string, viewBox = "0 0 24 24"): SVGSVGElement {
   return svg;
 }
 
+/**
+ * Walks up from `el` to find the real scrolling ancestor — confirmed live (Sep 2026, same
+ * finding shell.ts's `initFabAutoHide()` already documents): LearningSuite's content pane
+ * scrolls via an inner `overflow-auto` div it renders itself, never `window`/
+ * `document.documentElement`. Used to save/restore scroll position around a reveal/conceal
+ * pair (see homeAdapter.ts's `openNativeDetail`) — without capturing the real container,
+ * restoring `window.scrollY` would be a no-op and leave the page wherever the native reveal's
+ * own `scrollIntoView` last left it.
+ */
+export function findScrollParent(el: Element): Element {
+  let node: Element | null = el.parentElement;
+  while (node) {
+    if (node.scrollHeight > node.clientHeight && /(auto|scroll)/.test(getComputedStyle(node).overflowY)) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return document.scrollingElement ?? document.documentElement;
+}
+
 /** Marks a node so a future MutationObserver pass never re-processes it — see lib/observe.ts. */
 export function markProcessed(el: Element, key: string): void {
   el.setAttribute(`data-docket-${key}`, "1");
