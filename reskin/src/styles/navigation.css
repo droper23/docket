@@ -18,24 +18,19 @@
  * `flex-direction`) were confirmed live to already compose correctly —
  * only the fill color was ever actually broken.
  *
- * `flex: 1 1 auto` + `align-self: stretch` (rather than a hardcoded viewport-height calc, which
- * would have to guess this row's own top/bottom offsets and drift the moment the masthead
- * height changes) let this panel grow to fill whatever vertical room its real native column
- * (`.bg-left-nav`, already a full-height flex column — confirmed live, Sep 2026, by the fact
- * that column's own background already extends to the viewport bottom natively) gives it,
- * rather than shrink-wrapping to just its 6 rows and leaving a tall dead gap of bare native
- * background below — the mockup reference's own sidebar reads as one continuous panel down to
- * the settings/eye icons at the bottom, not a short card floating near the top. Neither property
- * touches `flex-direction`, so nav's own native `flex-col` still owns which way ITS children lay
- * out — these only change how nav itself sizes within ITS OWN parent. `min-height: 0` is required
- * on any stretched flex child that might need to scroll/clip — without it a flex item's default
- * `min-height: auto` can refuse to shrink below its content size and blow out the column instead.
+ * A pass tried stretching this card to fill nav's own native full-height flex-grow column
+ * (`flex: 1 1 auto; align-self: stretch`), chasing a mockup reference whose sidebar panel ran
+ * almost to the bottom of its (short, ~800px) reference canvas. Live-verified against a real
+ * maximized Safari window (Sep 2026) and reverted: nav's real column is however tall the actual
+ * browser window is, not the mockup's canvas — on a normal-to-large monitor that stretched this
+ * bordered card across a huge dead gap below the 6 real rows, reading as a mostly-empty box
+ * rather than a full panel, and orphaned the settings/eye FAB in the middle of that void. Back
+ * to shrink-wrapping its own content; the FAB stays genuinely floating below it (see
+ * `.docket-floating-bar` below), which is the honest description of that empty space rather
+ * than something this card can safely pretend to own.
  */
 .docket-nav-enhanced {
   display: flex !important;
-  flex: 1 1 auto;
-  align-self: stretch;
-  min-height: 0;
   gap: 4px;
   padding: 10px;
   margin: 12px 10px;
@@ -171,36 +166,26 @@
   outline: 2px solid var(--docket-accent);
   outline-offset: 2px;
 }
+.docket-icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
 /**
- * Above the sidebar's own collapse point (matches `initFabAutoHide`'s `narrow` JS breakpoint,
- * max-width: 1023px, and the point where `.docket-nav-enhanced` above actually has a tall real
- * column to sit inside) the bar sits over the now-full-height nav panel, not over arbitrary
- * scrolled content — the mockup reference's own settings/eye icons there are flush, borderless
- * glyphs matching the nav rows above them, not a shadowed floating circle. Below this width the
- * sidebar collapses and the bar floats over real page content again (see the comment on
- * `.docket-floating-bar-hidden` below), where the circular surface + shadow stay necessary for
- * legibility/affordance against whatever's underneath — so this override is desktop-only, never
- * touching the base rule mobile still relies on. Left/bottom nudge to land inside
- * `.docket-nav-enhanced`'s own 12px margin + 10px padding inset instead of the mobile-tuned
- * 18px/18px, so the icons read as part of that panel's bottom edge rather than floating just
- * outside it.
+ * Real native artifact, not this reskin's own markup: LearningSuite ships a mobile-only
+ * duplicate of the Student View "Back to Instructor View" link as `nav`'s own first child
+ * (`div.bg-left-nav.border-b`, containing an `a.lg\:hidden` — confirmed live, Sep 2026). Its
+ * content collapses to zero height above the `lg` breakpoint as intended, but the wrapper
+ * div's own native `border-b` (a plain `1px solid rgb(109,108,109)`) doesn't collapse with it,
+ * so a stray 1px gray line sat right at the top of the nav card, above "Course List" — invisible
+ * against the old unstyled/near-black nav, but an obvious loose thread now that this card has
+ * its own real background/border. Neutralized only above `lg` (matches the link's own
+ * `lg:hidden`), so the real mobile divider between this link and the rest of the mobile menu is
+ * untouched. `:first-child` keys off real DOM position, not a guessed class name that could
+ * silently stop matching on a future LearningSuite markup change.
  */
 @media (min-width: 1024px) {
-  .docket-floating-bar {
-    left: 22px;
-    bottom: 22px;
-  }
-  .docket-fab {
-    background: transparent;
-    box-shadow: none;
-    color: var(--docket-label-secondary);
-  }
-  .docket-fab:hover {
-    background: var(--docket-fill);
-    color: var(--docket-label);
+  .docket-nav-enhanced > *:first-child {
+    border-bottom: none !important;
   }
 }
-.docket-icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 
 /**
  * Real native form controls, not this reskin's own inserted markup — confirmed live the
