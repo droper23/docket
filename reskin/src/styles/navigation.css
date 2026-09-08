@@ -17,9 +17,25 @@
  * as vertical spacing, since `.docket-nav-enhanced` never overrides
  * `flex-direction`) were confirmed live to already compose correctly —
  * only the fill color was ever actually broken.
+ *
+ * `flex: 1 1 auto` + `align-self: stretch` (rather than a hardcoded viewport-height calc, which
+ * would have to guess this row's own top/bottom offsets and drift the moment the masthead
+ * height changes) let this panel grow to fill whatever vertical room its real native column
+ * (`.bg-left-nav`, already a full-height flex column — confirmed live, Sep 2026, by the fact
+ * that column's own background already extends to the viewport bottom natively) gives it,
+ * rather than shrink-wrapping to just its 6 rows and leaving a tall dead gap of bare native
+ * background below — the mockup reference's own sidebar reads as one continuous panel down to
+ * the settings/eye icons at the bottom, not a short card floating near the top. Neither property
+ * touches `flex-direction`, so nav's own native `flex-col` still owns which way ITS children lay
+ * out — these only change how nav itself sizes within ITS OWN parent. `min-height: 0` is required
+ * on any stretched flex child that might need to scroll/clip — without it a flex item's default
+ * `min-height: auto` can refuse to shrink below its content size and blow out the column instead.
  */
 .docket-nav-enhanced {
   display: flex !important;
+  flex: 1 1 auto;
+  align-self: stretch;
+  min-height: 0;
   gap: 4px;
   padding: 10px;
   margin: 12px 10px;
@@ -53,14 +69,19 @@
   outline: 2px solid var(--docket-accent) !important;
   outline-offset: -2px;
 }
-/* No filled pill — a colored container block behind the active row read as a literal button
-   sitting under the label (real complaint: the label looked like it had "a button behind it").
-   Text/icon color alone (the same accent every other selected-state indicator in the app
-   uses) carries the active state instead, on the same transparent background every other row
-   already has at rest. */
+/* A prior pass tried a solid, fully-saturated accent fill here and reverted it — that read as a
+   literal button sitting under the label (real complaint: "the label looked like it had a button
+   behind it"). This is a different, much lower-contrast treatment (the mockup reference's own
+   active row: a faint accent-tinted wash, not a solid chip) — `color-mix` against the pill's own
+   surface rather than a flat opaque fill, so it reads as a soft selection state (the same idiom
+   macOS's own sidebar uses for the selected row) rather than a button. Text/icon color still
+   carries most of the signal, same as the no-fill version this replaces. */
 .docket-nav-enhanced .docket-nav-item-active {
-  background: transparent !important;
+  background: color-mix(in srgb, var(--docket-accent) 16%, transparent) !important;
   color: var(--docket-accent) !important;
+}
+.docket-nav-enhanced .docket-nav-item-active:hover {
+  background: color-mix(in srgb, var(--docket-accent) 22%, transparent) !important;
 }
 /* Matched by real label text in shell.ts's restyleNav() — see icons.ts's navIconByLabel.
    Secondary/muted at rest so the label text stays the primary read, full label color when
@@ -149,6 +170,35 @@
 .docket-fab:focus-visible {
   outline: 2px solid var(--docket-accent);
   outline-offset: 2px;
+}
+/**
+ * Above the sidebar's own collapse point (matches `initFabAutoHide`'s `narrow` JS breakpoint,
+ * max-width: 1023px, and the point where `.docket-nav-enhanced` above actually has a tall real
+ * column to sit inside) the bar sits over the now-full-height nav panel, not over arbitrary
+ * scrolled content — the mockup reference's own settings/eye icons there are flush, borderless
+ * glyphs matching the nav rows above them, not a shadowed floating circle. Below this width the
+ * sidebar collapses and the bar floats over real page content again (see the comment on
+ * `.docket-floating-bar-hidden` below), where the circular surface + shadow stay necessary for
+ * legibility/affordance against whatever's underneath — so this override is desktop-only, never
+ * touching the base rule mobile still relies on. Left/bottom nudge to land inside
+ * `.docket-nav-enhanced`'s own 12px margin + 10px padding inset instead of the mobile-tuned
+ * 18px/18px, so the icons read as part of that panel's bottom edge rather than floating just
+ * outside it.
+ */
+@media (min-width: 1024px) {
+  .docket-floating-bar {
+    left: 22px;
+    bottom: 22px;
+  }
+  .docket-fab {
+    background: transparent;
+    box-shadow: none;
+    color: var(--docket-label-secondary);
+  }
+  .docket-fab:hover {
+    background: var(--docket-fill);
+    color: var(--docket-label);
+  }
 }
 .docket-icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 

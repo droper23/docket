@@ -117,13 +117,19 @@ export function extractRows(main: Element): RowData[] {
 /** Exported for gradesAdapter.ts — see extractRows()'s own export comment above. */
 export function buildCard(reveal: () => void, r: RowData): HTMLElement {
   const { iso, time } = parseAssignmentDueText(r.dueText);
-  const daysUntilDue = iso ? daysUntilInSchoolTimeZone(iso) : undefined;
   // Confirmed live (Sep 2026): the same real assignment (MATH 113's "Video Quiz 7.2") showed
   // "Opens Wednesday" on Combined Schedule (homeAdapter.ts, via dueDateLabel()) and "Opens Sep
   // 9" here — the raw regex-captured text passed straight through with no shared formatting.
   // Both pages now run the same real date through the identical dueDateLabel() wording, so the
   // same day always reads the same way regardless of which page it's viewed from.
   const opensIso = r.opensText ? parseAssignmentDueText(r.opensText).iso : undefined;
+  // dueBadge.ts colors an "opens" row off `daysUntilDue` too (not just a due row) — it needs the
+  // days until THIS row's own displayed date. A row can carry both a real due date and an opens
+  // date at once (a not-yet-available assignment can still show a future due date in the same
+  // native row); when `opensText` is set that's the date actually badged, so this must be days
+  // until the opens date, not the unrelated due date — using the due-date figure here would
+  // silently badge the wrong date's urgency.
+  const daysUntilDue = opensIso ? daysUntilInSchoolTimeZone(opensIso) : iso ? daysUntilInSchoolTimeZone(iso) : undefined;
   return assignmentCard(
     {
       title: r.title,

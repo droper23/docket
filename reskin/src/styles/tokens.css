@@ -141,20 +141,25 @@
   --docket-on-accent-container: #aecbfa;
   --docket-blue: var(--docket-accent);
 
-  --docket-status-overdue-bg: #4a1512;
-  --docket-status-overdue-fg: #f6aea9;
-  --docket-status-soon-bg: #42320a;
-  --docket-status-soon-fg: #fde293;
-  --docket-status-upcoming-bg: #0f2c52;
-  --docket-status-upcoming-fg: #aecbfa;
-  --docket-status-done-bg: #0e2d1b;
-  --docket-status-done-fg: #a8dab5;
-  --docket-status-neutral-bg: #2b2b2f;
-  --docket-status-neutral-fg: #c4c7c5;
-  --docket-status-tomorrow-bg: #3a2e14;
-  --docket-status-tomorrow-fg: #e8d1a0; /* ~8.89:1 on tomorrow-bg */
-  --docket-status-week-bg: #2f2c1e;
-  --docket-status-week-fg: #c9c0a0; /* ~7.69:1 on week-bg */
+  /* Richer, mid-tone filled pills (bg lightness raised, fg pulled toward a soft cream/tint
+     instead of a bright saturated pastel) — replaces the earlier near-black-container +
+     bright-pastel-text pairing, which read as flat and washed out next to a mockup reference
+     showing solid, book-tab-colored badges. Every pair still clears WCAG AA (>=4.5:1 — verified
+     via the same relative-luminance formula prior passes used; each is currently 5.1–7:1). */
+  --docket-status-overdue-bg: #6b3a34;
+  --docket-status-overdue-fg: #f6cec6;
+  --docket-status-soon-bg: #6f5a32;
+  --docket-status-soon-fg: #f7e3ba;
+  --docket-status-upcoming-bg: #3a4f6e;
+  --docket-status-upcoming-fg: #c9daf2;
+  --docket-status-done-bg: #4c6350;
+  --docket-status-done-fg: #d7e8d3;
+  --docket-status-neutral-bg: #44454a;
+  --docket-status-neutral-fg: #dcdde0;
+  --docket-status-tomorrow-bg: #5c4a29;
+  --docket-status-tomorrow-fg: #ecd8a8; /* ~6.06:1 on tomorrow-bg */
+  --docket-status-week-bg: #4a4530;
+  --docket-status-week-fg: #d9d0ac; /* ~6.21:1 on week-bg */
 
   --docket-green: #30d158;
 }

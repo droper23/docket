@@ -21,13 +21,21 @@ import { dueCountdown } from "../../../src/core/agendaFormatting.js";
  * `opensText`, when given, means this item is an availability date, not a deadline (e.g.
  * assignmentsAdapter.ts's "Opens Sep 9" status column, or homeAdapter.ts's Combined Schedule
  * rows whose own real title ends in the word "Opens" — both confirmed live, Sep 2026). An
- * "opens" item never goes through the urgency ladder below, regardless of the sign of
+ * "opens" item never goes through the due-urgency ladder below, regardless of the sign of
  * `daysUntilDue` — a negative value there means "opened N days ago," not "overdue by N days,"
  * and coloring that red was a real, alarming false positive.
+ *
+ * It still gets a two-way color of its own, using the same `daysUntilDue` value (both callers
+ * pass the days-until-THIS-date, not the days-until-some-other-due-date — see homeAdapter.ts's
+ * `daysUntilInSchoolTimeZone(item.dateIso)` and assignmentsAdapter.ts's opens-aware reordering):
+ * not yet open (`daysUntilDue >= 0`) reuses the "done" role's green, since the item is on its
+ * way to becoming available rather than needing attention yet; already open in the past (or no
+ * date at all) stays neutral gray, same as before.
  */
 export function dueBadge(daysUntilDue: number | undefined, opensText?: string): HTMLElement | null {
   if (opensText) {
-    return h("span", { class: "docket-badge docket-badge-neutral" }, [`Opens ${opensText}`]);
+    const role = daysUntilDue !== undefined && daysUntilDue >= 0 ? "done" : "neutral";
+    return h("span", { class: `docket-badge docket-badge-${role}` }, [`Opens ${opensText}`]);
   }
   const label = dueCountdown(daysUntilDue);
   if (!label) return null;
