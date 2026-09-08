@@ -1,5 +1,139 @@
 # LearningSuite Reskin — Roadmap
 
+## Thirteenth pass: four user-reported UX fixes — live-toggling schedule checkboxes, masthead wordmark, due/info distinction, banner-to-FAB (Sep 2026)
+
+Direct response to four specific user complaints, each brainstormed via two independent spec
+agents before implementation, then live-verified against the real authenticated account (Dark
+mode, desktop viewport, Combined Schedule in Student View). Live verification used a different
+method this session — `tools/cdp.mjs` needs a Chrome running with `--remote-debugging-port=9222`,
+which wasn't available — so the built script was injected by serving `dist/` over a throwaway
+localhost HTTP server, stashing it in `window.name` (which survives a cross-origin navigation)
+via a hand-written scratch `dist/inject.html` page that navigates to learningsuite.byu.edu, then
+eval'd in page context (a direct `fetch()` of `http://127.0.0.1` from the `https://` page hangs
+on mixed content, confirmed live). The scratch page is gitignored, not a build output.
+
+One live-DOM correction to both brainstorm specs before any code: they assumed only genuine due
+items carry native checkboxes. Live inspection shows EVERY Combined Schedule row has one —
+including plain informational lines — so checkbox interactivity is wired whenever a real checkbox
+element is found, independent of `kind`; `kind` only controls badge suppression and muting.
+
+1. **Checking an item off no longer kicks the whole page back to the native look.** Root-caused:
+   the reskinned card had no path to the real native checkbox, so reaching completion state meant
+   the row's own `onActivate` — whose first act is `toggle.reveal()`: revealing the native page
+   WAS the toggle mechanism, which is exactly the reported symptom. `homeAdapter.ts` now finds
+   each row's real native checkbox (a sibling of the title cell, scoped
+   `parentElement.querySelector('input[type="checkbox"]')` — never a hardcoded child index, the
+   row's column count isn't a stable contract) and hands the card an `onToggleComplete` that just
+   calls `checkboxEl.click()`: confirmed live to toggle completion via an in-place Vue re-render,
+   no navigation, no reload — and to work correctly even while an ancestor has `.hidden` set
+   (exactly `overlayContent()`'s own hiding mechanism), so no reveal is ever needed. The card's
+   checkbox (`assignmentCard.ts`) becomes a real control when `onToggleComplete` is given:
+   `role="checkbox"`, `tabIndex=0`, `aria-checked`, a Space-key toggle, and `stopPropagation()`
+   so the row's own `onActivate` never fires; without it (assignments/grades pages) the checkbox
+   is exactly the old decorative `role="img"` mark. Two staleness fixes in `mount()`: a resync
+   pass re-reads `checkboxEl.checked` every pass (`extractItems()` reads each anchor once,
+   guarded by `isProcessed`, so `completed` would otherwise freeze at its first-seen value), and
+   a prune pass deletes accumulated entries whose anchor is no longer `.isConnected`
+   (LearningSuite removes a row from its own DOM once checked complete — its "Completed items"
+   sidebar filter is off by default — which would otherwise leave a permanently stale entry).
+   Live-verified end to end: clicking "Textbook 7.1: 15, 16, 24, 29, 44" (MATH 113)'s card
+   checkbox toggled real completion, the row disappeared from the reskin's own list (native's
+   own hide-completed default), and the page stayed reskinned.
+2. **The masthead got a centered "BYU Learning Suite" wordmark and an initials avatar.**
+   `shell.ts`'s new `restyleMasthead()` inserts a `.docket-wordmark` span into the real
+   `#_topLink` (LearningSuite's own BYU-logo + "Learning Suite" lockup link) and a
+   `.docket-user-avatar` initials chip into `.header-userdropdown-trigger`, computed by new
+   exported `computeInitials()` from the trigger's own already-rendered name text — never
+   fabricated. Both idempotent (guarded against a second insertion by a later debounced mutation
+   pass); `unmountShell()` removes both. `navigation.css` hides the native logo `<img>`s and
+   stacked text via CSS (`display: none`, never removed from the DOM) and centers the wordmark
+   responsively (hidden <768px, inline 768–1023px, absolutely centered ≥1024px). Live-verified:
+   wordmark renders centered with the logos hidden, "DR" chip renders.
+3. **Combined Schedule now visually distinguishes real due items from informational lines.**
+   New `ScheduleItem.kind` is read from real structural markup only — `i.fa-circle` (the native
+   gold dot) → "due", `img.academic-y-logo` (the BYU "Y") → "calendar", neither → "info" —
+   never from wording, same discipline as the "Opens" fix. "info"/"calendar" rows suppress the
+   due-urgency badge entirely and render muted via a new `.docket-row-info` class (reusing the
+   existing `--docket-label-secondary`/`-tertiary` tokens — no new tokens). Live-verified: due
+   items badge ("Due tomorrow" etc.); plain lines ("Appendix D: Trigonometry") render muted
+   with no badge.
+4. **The full-width yellow "Student View / Back to Instructor View" banner became a small
+   eye-icon FAB.** `mountStudentViewBadge()` finds `section.bg-attention`'s one real action (its
+   `a > i.fa-undo` link), appends a new eye-icon button (new `icons.eye()`) to the existing
+   settings-gear `fabBar` that re-fires the real anchor's own `.click()` — the same "re-fire the
+   row's own click" idiom `createOverlayToggle()` already uses; the anchor is never moved (any
+   parent-scoped listener survives) and its `href` never read (any attached handler survives).
+   The banner itself gets `.docket-banner-relocated` (`display: none`); the function fails soft
+   if the banner or its real link isn't found, and `global.css`'s `.bg-attention` treatment —
+   now documented as the fallback path — stays in place for exactly that case, so an instructor
+   is never left with a hidden banner and no way back. Live-verified: banner gone, eye FAB
+   renders next to the settings-gear FAB. (The FAB's own click-through back to instructor view
+   was not exercised this session — the session was left in Student View; the re-fire path is
+   the same idiom the escape-hatch work already verified live.) A small "Back to Instructor
+   View" text link was found to already exist separately in the `.bg-top-nav` strip — a distinct
+   real anchor, pre-existing, left untouched as a second path to the same action.
+
+**Verification:** `npm run typecheck && npm run build && npm test` all pass — 59/59 (11 new:
+homeAdapter's checkbox wiring and icon-based kind classification; assignmentCard's interactive
+click/Space toggle, no-onActivate guarantee, decorative fallback, badge suppression, and muted
+info rows; `computeInitials`'s four edge cases). Bundle → 211.0 KB.
+
+**Follow-up verification session (Sep 2026):** closed out every item this pass's own
+"explicitly deferred" list had left open, live against the real account (Chrome DevTools MCP
+automation this time, not `tools/cdp.mjs`/AppleScript — see note at the end of this entry).
+
+- **Live account state confirmed clean** at session start: "Textbook 7.1: 15, 16, 24, 29, 44"
+  had already been unchecked and the native "Completed items" filter turned back off (done in
+  the gap between sessions) — nothing left to restore.
+- **Keyboard Space toggle** live-confirmed both directions on a real Combined Schedule card: a
+  synthetic Space keydown flips the card synchronously and the real native checkbox follows
+  (`checked` true→false→true), with filter state restored after.
+- **Decorative-checkbox regression** live-confirmed on both real pages the unit test covers:
+  Grades and Assignments each render their 8 checkboxes `role="img"`, no `tabindex`,
+  non-interactive — old (pre-interactive) behavior intact where no `onToggleComplete` is wired.
+- **Masthead breakpoints** live-verified at true emulated viewport widths (a same-origin
+  `<iframe>` sized to the target width and re-injected — real window resize tools/AppleScript
+  bounds edits proved unreliable in this environment, see note below; the iframe gets its own
+  independent viewport regardless). <768px: wordmark absent, no collision with hamburger/course
+  dropdown/avatar. 768–1023px: wordmark renders inline, left-aligned, between the hamburger and
+  course dropdown, full course name still unclipped. ≥1024px: wordmark absolutely centered
+  (confirmed on the real un-emulated window). All three match `navigation.css`'s intent exactly.
+- **Light theme — real bug found and fixed.** Switching Appearance to Light while the account's
+  LearningSuite-side preference is Dark left large native surfaces (the narrow-viewport nav
+  drawer, and every native dropdown/menu) rendering solid dark gray on an otherwise light page —
+  legible per-element `getComputedStyle` checks all said "light," so this was invisible to
+  anything short of an actual rendered screenshot. Root-caused to `global.css`'s own documented,
+  deliberate choice to leave bare `.bg-base` un-themed (native's own `--ba` custom property,
+  gated by a literal `dark` class LearningSuite itself puts on `<html>` — reused verbatim for
+  menus/dropdowns since it "matches gray on both themes"). That assumption only holds when the
+  reskin's own theme tracks LearningSuite's native one; an explicit Appearance override never
+  touched LearningSuite's own class, so the two fell out of sync. Fixed in `index.ts`'s
+  `applyTheme()`: an explicit Light/Dark override now also syncs LearningSuite's native `dark`
+  class to match, closing the gap for every `.bg-base` consumer at once rather than patching
+  each selector. A second bug surfaced live while verifying the first fix: switching back to
+  "System" after an override read the (now self-modified) class back and got stuck on whatever
+  the last override was, never returning to the account's real Dark preference — fixed by a new
+  `nativeThemeClassOverridden` module flag that makes the "system" branch fall back to the
+  value `earlyApplyTheme()` already captured (authoritatively, before any override could ever
+  run) instead of re-trusting a live class read once anything has written to it. Live-verified
+  the full cycle post-fix: System(dark, `--ba:#242424`) → Light(`--ba` unset, native class
+  removed) → System (correctly back to dark, `--ba:#242424` restored) → Dark (unchanged,
+  correctly stays dark) → System (still correctly dark) — every step confirmed via both the
+  `data-docket-theme` attribute and a live `getComputedStyle` read of `--ba`, not just the
+  setting's own stored value. Also spot-checked on Light: schedule cards/badges (due-soon
+  yellow, due-in-2-days blue, neutral "Opens" chips), muted info rows, the masthead wordmark and
+  initials avatar, the Student View eye FAB, and the interactive checkbox's keyboard focus ring
+  (a real blue ring, reached via genuine Tab navigation, not `.focus()` — Chrome's
+  `:focus-visible` heuristic didn't apply to the scripted call) — all legible.
+- **Tooling note:** `mcp__claude-in-chrome__resize_window` reported success but never actually
+  changed the live page's `innerWidth` in this environment. Root-caused mid-session: the target
+  tab was open in a background browser tab (`document.visibilityState === "hidden"`, not the
+  active tab in its window) — resizing and screenshotting both silently no-op/return stale
+  compositor frames for a backgrounded tab. Activating the tab first (AppleScript `set active
+  tab index of window ... to N`) fixed both; the same-origin-iframe viewport-emulation technique
+  above was developed as a resize-independent fallback and is worth reaching for directly next
+  time rather than re-diagnosing the resize gap.
+
 ## Twelfth pass: three independent design critiques, real correctness bugs, settings-panel
 ## token migration (Sep 2026)
 

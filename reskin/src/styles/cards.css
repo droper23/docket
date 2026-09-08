@@ -99,6 +99,21 @@
   border: 1.6px solid var(--docket-label-tertiary);
   display: flex; align-items: center; justify-content: center;
 }
+/* A real checkbox now (assignmentCard.ts's `onToggleComplete` path) needs the same visible
+   keyboard focus treatment `.docket-row-tappable` already gets — without this it was reachable
+   by Tab but gave zero visual signal when focused, same gap that rule's own comment documents. */
+.docket-checkbox[role="checkbox"] { cursor: pointer; }
+.docket-checkbox[role="checkbox"]:focus-visible {
+  outline: 2px solid var(--docket-accent);
+  outline-offset: 2px;
+}
+/* A plain topic/lesson/file-note line or university calendar entry (assignmentCard.ts's
+   `kind: "info" | "calendar"`) isn't actually due on the date it's grouped under — muted down
+   from the same tokens a due row uses (never a new color) so it reads as non-actionable
+   context at a glance, the same distinction Combined Schedule's own native page draws with a
+   gold dot vs. no dot at all. */
+.docket-row-info .docket-row-title { font-weight: 500; color: var(--docket-label-secondary); }
+.docket-row-info .docket-row-subtitle { color: var(--docket-label-tertiary); }
 .docket-checkbox-done { border-color: var(--docket-green); background: var(--docket-green); }
 .docket-checkbox-done::after {
   content: ""; width: 5px; height: 9px;

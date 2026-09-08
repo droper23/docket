@@ -270,6 +270,118 @@
 }
 
 /**
+ * Masthead brand lockup (`#_topLink`, confirmed live real element, a genuine link to the
+ * LearningSuite home page): the native BYU logo image, small LearningSuite icon mark, and
+ * stacked "Learning"/"Suite" text are hidden here — never removed from the DOM, `#_topLink`
+ * itself stays the real click target — and replaced by a single real text wordmark inserted by
+ * shell.ts's restyleMasthead(). Hidden by their own stable component classnames
+ * (`header-byu-logo`/`header-ls-logo`) or the stacked-text div's own component classes, never
+ * the long incidental Tailwind utility chain on their wrapper divs, which is far more likely to
+ * drift on a native LearningSuite update.
+ */
+[data-docket-reskin] #_topLink img.header-byu-logo,
+[data-docket-reskin] #_topLink img.header-ls-logo,
+[data-docket-reskin] #_topLink div.hidden.md\:inline-flex.flex-col {
+  display: none !important;
+}
+/* Hiding the native children can collapse #_topLink's own box toward zero size — this keeps a
+   real hit area for the real home link, matching this codebase's own established 44px touch
+   target (cards.css's .docket-row, responsive.css's own HIG comment). */
+[data-docket-reskin] #_topLink {
+  display: flex;
+  align-items: center;
+  min-width: 44px;
+  min-height: 100%;
+}
+[data-docket-reskin] .bg-header {
+  position: relative;
+}
+[data-docket-reskin] .docket-wordmark {
+  font-family: var(--docket-font);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  color: var(--docket-label);
+  white-space: nowrap;
+}
+/* Below the native site's own `md` breakpoint (confirmed live: this is exactly where
+   LearningSuite already hides the BYU logo and the stacked text, leaving only the small icon —
+   now itself hidden above) there's no room left for a third piece of text next to the
+   hamburger and the course dropdown. */
+@media (max-width: 767px) {
+  [data-docket-reskin] .docket-wordmark { display: none; }
+}
+/* Between `md` and `lg` (matches the hamburger's own `lg:hidden`): left-aligned in normal flow
+   where the old logo/text used to sit — true centering below is only safe once the course
+   dropdown (a flex-grow sibling whose width varies a lot with a real course name's length) has
+   enough room that it can't collide with a centered wordmark. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  [data-docket-reskin] .docket-wordmark { display: inline-block; }
+}
+@media (min-width: 1024px) {
+  [data-docket-reskin] .docket-wordmark {
+    display: inline-block;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    max-width: 38vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none; /* decorative — #_topLink remains the real click target underneath */
+  }
+}
+
+/**
+ * User-dropdown trigger: a resting fill (the hover-pill ::before above only painted on hover,
+ * so at rest this read as bare icon+text+arrow with zero affordance) plus an initials avatar
+ * chip replacing the generic fa-user-circle glyph, computed from the trigger's own real
+ * rendered name text by shell.ts's restyleMasthead()/computeInitials() — reuses the exact
+ * container/on-container token pair the active nav item and the Grade Summary percentage badge
+ * already use (see docket-nav-item-active above / global.css), not a new color.
+ */
+[data-docket-reskin] .header-userdropdown-trigger::before {
+  background-color: var(--docket-surface-2);
+}
+[data-docket-reskin] .header-userdropdown-trigger:hover::before {
+  background-color: var(--docket-fill) !important;
+}
+[data-docket-reskin] .header-userdropdown-trigger .fa-user-circle {
+  display: none;
+}
+[data-docket-reskin] .docket-user-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  margin-right: 8px;
+  background: var(--docket-accent-container);
+  color: var(--docket-on-accent-container);
+  font-family: var(--docket-font);
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+[data-docket-reskin] .header-userdropdown-trigger .fa-caret-down {
+  font-size: 11px;
+  color: var(--docket-label-tertiary);
+  margin-left: 4px;
+}
+
+/* Student View banner (see global.css's .bg-attention rule, kept as the fallback treatment for
+   when shell.ts's mountStudentViewBadge() can't find the real back-link and fails soft):
+   relocated to a small icon on the settings fabBar, so the full-width native bar is hidden here
+   — a plain stylesheet rule rather than overlayContent()'s per-node `.hidden` convention, since
+   this is a single top-level element with the same "exists once or not at all" shape as
+   navEl/topTabsEl/fabBar above, which shell.ts already manages with a marker class rather than
+   the heavier per-adapter overlay machinery. */
+[data-docket-reskin] .docket-banner-relocated {
+  display: none !important;
+}
+
+/**
  * Floating menu chrome — the top bar's own dropdown panels, confirmed live on the Combined
  * Schedule page:
  *

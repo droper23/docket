@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pathMatchScore } from "../src/adapters/shell.js";
+import { pathMatchScore, computeInitials } from "../src/adapters/shell.js";
 
 // Regression coverage for the Sep 2026 fix: the active-nav-item highlight used to be a
 // one-directional `location.pathname.startsWith(href)` check, which missed the common case
@@ -42,4 +42,24 @@ test("pathMatchScore: picks the single most specific match among several candida
   const best = scored.reduce((a, b) => (b.score > a.score ? b : a));
   assert.equal(best.label, "Home", "the exact match must win over the longer descendant match");
   assert.equal(scored.find((c) => c.label === "Unrelated")!.score, -1);
+});
+
+// computeInitials() drives the masthead's user-dropdown avatar chip (shell.ts's
+// restyleMasthead()) — derived from the trigger's own real rendered name text, never fabricated.
+
+test("computeInitials: two-word name uses first letter of first and last word", () => {
+  assert.equal(computeInitials("Derek Roper"), "DR");
+});
+
+test("computeInitials: a single-word name falls back to just its first letter", () => {
+  assert.equal(computeInitials("Cher"), "C");
+});
+
+test("computeInitials: a middle name is ignored — only the first and last words count", () => {
+  assert.equal(computeInitials("Mary Jane Watson"), "MW");
+});
+
+test("computeInitials: empty/whitespace-only input falls back to an empty string, not a crash", () => {
+  assert.equal(computeInitials(""), "");
+  assert.equal(computeInitials("   "), "");
 });

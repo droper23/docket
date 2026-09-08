@@ -76,6 +76,74 @@ test("assignmentCard only renders the completion checkbox when the source data h
   assert.equal(notDone.querySelector(".docket-checkbox")?.getAttribute("aria-label"), "Not yet completed");
 });
 
+// Regression coverage for the Sep 2026 fix: checking an item off used to have no independent
+// path at all — the whole card's onActivate (toggle.reveal() + a real click) was the only way
+// to reach the native checkbox, so "checking something off" always kicked the page back to raw
+// native LearningSuite. onToggleComplete is the card's own, separate, native-checkbox-driving path.
+
+test("assignmentCard: an interactive checkbox click toggles its own visual state and calls onToggleComplete, without firing the row's onActivate", () => {
+  setupDom("<div></div>");
+  let toggled = 0;
+  let activated = 0;
+  const card = assignmentCard(
+    { title: "Textbook 7.1", completed: false, onToggleComplete: () => toggled++ },
+    () => activated++,
+  );
+  const checkbox = card.querySelector(".docket-checkbox") as HTMLElement;
+  assert.equal(checkbox.getAttribute("role"), "checkbox", "an interactive checkbox must not stay role=img");
+  assert.equal(checkbox.getAttribute("aria-checked"), "false");
+
+  checkbox.click();
+  assert.equal(toggled, 1);
+  assert.equal(activated, 0, "clicking the checkbox must never also trigger the row's own onActivate");
+  assert.ok(checkbox.classList.contains("docket-checkbox-done"), "the visual state must flip instantly, not wait on a re-render");
+  assert.equal(checkbox.getAttribute("aria-checked"), "true");
+});
+
+test("assignmentCard: Space toggles a keyboard-focused interactive checkbox the same way a click does", () => {
+  setupDom("<div></div>");
+  let toggled = 0;
+  const card = assignmentCard({ title: "Textbook 7.1", completed: false, onToggleComplete: () => toggled++ });
+  const checkbox = card.querySelector(".docket-checkbox") as HTMLElement;
+  assert.equal(checkbox.getAttribute("tabindex"), "0");
+  const event = new (globalThis as any).window.KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true });
+  checkbox.dispatchEvent(event);
+  assert.equal(toggled, 1);
+  assert.ok(checkbox.classList.contains("docket-checkbox-done"));
+});
+
+test("assignmentCard: without onToggleComplete the checkbox stays exactly the old decorative role=img mark", () => {
+  setupDom("<div></div>");
+  const card = assignmentCard({ title: "Assignment", completed: true }); // assignmentsAdapter.ts's current usage
+  const checkbox = card.querySelector(".docket-checkbox") as HTMLElement;
+  assert.equal(checkbox.getAttribute("role"), "img");
+  assert.equal(checkbox.getAttribute("aria-checked"), null);
+  assert.equal(checkbox.getAttribute("tabindex"), null);
+});
+
+// Regression coverage for the Sep 2026 fix: a plain topic/lesson line or university calendar
+// entry (Combined Schedule's "kind") isn't actually due on the date it's grouped under, but
+// used to still get a full urgency badge (e.g. a scary "Overdue by N days") since dueBadge()
+// only ever looked at daysUntilDue/completed, never at whether the line was really a deadline.
+
+test("assignmentCard: an 'info' or 'calendar' kind item never shows a due-urgency badge, even with a real daysUntilDue", () => {
+  setupDom("<div></div>");
+  const info = assignmentCard({ title: "Appendix D: Trigonometry", daysUntilDue: -2, kind: "info" });
+  assert.equal(info.querySelector(".docket-badge"), null);
+  const calendar = assignmentCard({ title: "Labor Day", daysUntilDue: 1, kind: "calendar" });
+  assert.equal(calendar.querySelector(".docket-badge"), null);
+  const due = assignmentCard({ title: "Recitation Quiz 9/8", daysUntilDue: 1, kind: "due" });
+  assert.ok(due.querySelector(".docket-badge"), "a real due item must keep its badge");
+});
+
+test("assignmentCard: an 'info'/'calendar' kind item is visually muted via docket-row-info", () => {
+  setupDom("<div></div>");
+  const info = assignmentCard({ title: "Chapter 2.1", kind: "info" });
+  assert.ok(info.classList.contains("docket-row-info"));
+  const due = assignmentCard({ title: "WebAssign 7.1", kind: "due" });
+  assert.equal(due.classList.contains("docket-row-info"), false);
+});
+
 test("assignCourseColors assigns distinct colors up to the palette size, deterministically regardless of input order", () => {
   const codes = Array.from({ length: 12 }, (_, i) => `COURSE ${i}`);
   const colors = assignCourseColors(codes);

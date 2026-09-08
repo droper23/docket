@@ -23,6 +23,29 @@ interface ScheduleItem {
    * "Overdue by N days" in the most alarming color in the badge system. Stripped from the
    * display title; carried forward so the card can show a neutral "Opens ..." badge instead. */
   opens: boolean;
+  /** Confirmed live (Sep 2026): the native row's own title anchor carries a real, structural
+   * signal for what kind of line this is — a small gold `i.fa-circle` icon (LearningSuite's own
+   * "text-star" color token) precedes a genuine due/gradable item's title; a `img.academic-y-logo`
+   * (the BYU "Y" mark) precedes a university calendar entry (holiday, devotional); neither is
+   * present for a plain topic/lesson/file-note line. Never derived from wording — real markup
+   * only, same discipline as `opens` above. Drives dueBadge suppression and muted styling for
+   * non-due lines in assignmentCard.ts (spec: neither a "Recitation Quiz 5.3/5.5" topic header
+   * nor a "Labor Day" calendar entry is actually due on the date it's grouped under, so both
+   * previously could render an alarming "Overdue"/"Due in N days" badge they had no business
+   * showing). */
+  kind: "due" | "calendar" | "info";
+  /** The real native `<input type="checkbox">` LearningSuite renders for this row — confirmed
+   * live to exist on EVERY row (due, calendar, or plain info alike), as a SIBLING of the title
+   * cell, not nested inside it (`titleCell.parentElement`'s own child, found via a scoped
+   * query — never a hardcoded child index, since the row's own column count isn't guaranteed
+   * stable). Confirmed live: clicking it toggles completion via an in-place Vue re-render, no
+   * navigation and no page reload — and still works correctly even while an ancestor has
+   * `.hidden` set on it (exactly `overlayContent()`'s own hiding mechanism), so the card's own
+   * checkbox can drive this directly without ever revealing the native page first. */
+  checkboxEl?: HTMLInputElement;
+  /** Resynced every mount() pass from `checkboxEl.checked` (see mount()'s resync pass below) —
+   * never frozen at first-seen value, since extractItems() itself only reads each anchor once. */
+  completed?: boolean;
 }
 
 // Same window src/connectors/bookmarklet.ts's scheduleExtractorSource() uses, for the same
@@ -79,6 +102,15 @@ function extractItems(main: Element): ScheduleItem[] {
     const opensMatch = firstLine.match(/^(.*?)\s+Opens$/i);
     const title = opensMatch ? opensMatch[1]! : firstLine;
     const meta = rawSegments.slice(1).join(" · ") || undefined;
+    const kind: ScheduleItem["kind"] = a.querySelector("i.fa-circle")
+      ? "due"
+      : a.querySelector("img.academic-y-logo")
+        ? "calendar"
+        : "info";
+    // Scoped to this row only, never a hardcoded child index — see ScheduleItem.checkboxEl's
+    // own doc comment for why (the row's column count isn't a stable contract).
+    const rowEl = titleCell.parentElement;
+    const checkboxEl = (rowEl?.querySelector('input[type="checkbox"]') as HTMLInputElement | null) ?? undefined;
     results.push({
       title,
       meta,
@@ -86,6 +118,9 @@ function extractItems(main: Element): ScheduleItem[] {
       dateIso: formatIsoDate(date),
       anchor: a as HTMLElement,
       opens: !!opensMatch,
+      kind,
+      checkboxEl,
+      completed: checkboxEl?.checked,
     });
   }
   results.sort((x, y) => x.dateIso.localeCompare(y.dateIso));
@@ -144,6 +179,23 @@ export const homeAdapter: Adapter = {
     }
     processedAnchors.push(...items.map((i) => i.anchor));
 
+    // Resync + prune pass: extractItems() only ever reads a given anchor once (guarded by
+    // isProcessed), so a later toggle of the real native checkbox — by this card's own
+    // onToggleComplete below, or by the student themselves after revealing the native view —
+    // would otherwise freeze `completed` at whatever it was the first time the row was seen.
+    // Also closes a real staleness gap: LearningSuite removes a row from its own DOM once
+    // checked complete (its "Completed items" sidebar filter is off by default), which would
+    // otherwise leave a permanently-stale entry in `accumulated` that native itself no longer
+    // shows.
+    for (const [anchor, item] of accumulated) {
+      if (!item.checkboxEl) continue;
+      if (!anchor.isConnected) {
+        accumulated.delete(anchor);
+        continue;
+      }
+      item.completed = item.checkboxEl.checked;
+    }
+
     // Always re-render from the FULL accumulated set (see accumulated's doc).
     const groupedData = groupByDate(mergedItemsSorted());
     const groups = groupedData.map((g) =>
@@ -164,6 +216,14 @@ export const homeAdapter: Adapter = {
                   category: item.courseCode,
                   daysUntilDue: daysUntilInSchoolTimeZone(item.dateIso),
                   opensText: item.opens ? dueDateLabel(item.dateIso) : undefined,
+                  completed: item.completed,
+                  kind: item.kind,
+                  onToggleComplete: item.checkboxEl
+                    ? () => {
+                        item.completed = !item.completed;
+                        item.checkboxEl!.click();
+                      }
+                    : undefined,
                 },
                 () => {
                   toggle?.reveal();

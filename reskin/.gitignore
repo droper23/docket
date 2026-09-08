@@ -5,3 +5,8 @@ tools/.chrome-audit-profile/
 # referenced by ROADMAP.md as local artifacts, never committed (public repo).
 tools/shots/
 .DS_Store
+
+# Scratch page for the no-CDP live-injection method (see ROADMAP.md's thirteenth pass): a
+# hand-written dist/ page that stashes the built script in window.name and navigates to
+# learningsuite.byu.edu, where it's eval'd in page context. Not a build output — never commit.
+dist/inject.html

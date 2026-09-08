@@ -192,6 +192,66 @@ Zoom Recording&nbsp;(05/01/26)</a></div>
   }
 });
 
+test("homeAdapter wires the card's checkbox to the real native checkbox found on the same row (Sep 2026 'checking something off reverts to native' bug)", () => {
+  const tomorrow = new Date(Date.now() + 86_400_000);
+  const md = `${tomorrow.getMonth() + 1}/${tomorrow.getDate()}`;
+  // Confirmed live: LearningSuite's own real checkbox is a SIBLING of the title cell within
+  // the row, not nested inside it.
+  const html = `<main>
+    <div class="listViewDay">
+      <div>${md} - Some Day</div>
+      <div class="flex-4"><a class="cursor-pointer block truncate"><i class="fa-circle"></i><span class="truncate">Recitation Quiz 9/8</span></a></div>
+      <div>MATH 113</div>
+      <input type="checkbox">
+    </div>
+  </main>`;
+  setupDom(html, "https://learningsuite.byu.edu/.sess1/student/top/schedule");
+  try {
+    homeAdapter.mount(false);
+    const checkbox = document.querySelector(".docket-checkbox") as HTMLElement;
+    assert.equal(checkbox.getAttribute("role"), "checkbox", "a real native checkbox was found on the row, so the card's own checkbox must be interactive");
+    const nativeCheckbox = document.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    assert.equal(nativeCheckbox.checked, false);
+    checkbox.click();
+    assert.equal(nativeCheckbox.checked, true, "clicking the card's checkbox must toggle the real native checkbox in place, never reveal/navigate");
+  } finally {
+    homeAdapter.unmount();
+  }
+});
+
+test("homeAdapter classifies items from their native icon markup: a dot means due, a BYU Y-logo means calendar, neither means plain info", () => {
+  const tomorrow = new Date(Date.now() + 86_400_000);
+  const md = `${tomorrow.getMonth() + 1}/${tomorrow.getDate()}`;
+  const html = `<main>
+    <div class="listViewDay">
+      <div>${md} - Some Day</div>
+      <div class="flex-4"><a class="cursor-pointer block truncate"><i class="fa-circle"></i><span class="truncate">Recitation Quiz 9/8</span></a></div>
+      <div>MATH 113</div>
+    </div>
+    <div class="listViewDay">
+      <div>${md} - Some Day</div>
+      <div class="flex-4"><a class="cursor-pointer block truncate"><img class="academic-y-logo"><span class="truncate">Labor Day</span></a></div>
+      <div>MATH 113</div>
+    </div>
+    <div class="listViewDay">
+      <div>${md} - Some Day</div>
+      <div class="flex-4"><a class="cursor-pointer block truncate"><span class="truncate">Appendix D: Trigonometry</span></a></div>
+      <div>MATH 113</div>
+    </div>
+  </main>`;
+  setupDom(html, "https://learningsuite.byu.edu/.sess1/student/top/schedule");
+  try {
+    homeAdapter.mount(false);
+    const rows = Array.from(document.querySelectorAll(".docket-row"));
+    const byTitle = (t: string) => rows.find((r) => r.querySelector(".docket-row-title")?.textContent === t)!;
+    assert.equal(byTitle("Recitation Quiz 9/8").classList.contains("docket-row-info"), false, "a real due item (dot) must not be muted");
+    assert.ok(byTitle("Labor Day").classList.contains("docket-row-info"), "a university calendar entry (Y-logo) must be muted, not treated as due");
+    assert.ok(byTitle("Appendix D: Trigonometry").classList.contains("docket-row-info"), "a plain topic line (no dot, no Y-logo) must be muted, not treated as due");
+  } finally {
+    homeAdapter.unmount();
+  }
+});
+
 test("assignmentsAdapter formats an 'Opens' date with the same shared wording Combined Schedule uses, not the raw scraped text (Sep 2026 cross-page inconsistency bug)", () => {
   // Confirmed live: the identical real assignment (MATH 113's Video Quiz 7.2) read "Opens
   // Wednesday" on Combined Schedule (homeAdapter.ts, via dueDateLabel()) and "Opens Sep 9" here

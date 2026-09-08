@@ -284,14 +284,15 @@ html[data-docket-reskin],
 
 /* Native instructor-view banner (confirmed live: `section.bg-attention`, a solid saturated
    yellow rgb(255,243,130) sitting directly under the header on every page for an account
-   with instructor access) — the highest-visibility untouched native color found in the
-   Sep 2026 pass. A prior version of this rule used a bespoke translucent yellow tint
-   (`--docket-yellow-banner-bg`) over the page's own dark canvas — confirmed live (Sep 2026)
-   that this reads as a muddy, low-contrast olive-brown in dark mode, not a legible warning.
-   This is exactly the "attention" semantic the status-badge system's `soon` container/
-   on-container pair already exists for (see tokens.css) — reusing it here means the banner
-   gets the same contrast-checked, opaque, theme-correct treatment every due-soon badge does,
-   instead of a one-off color computed for this element alone. */
+   with instructor access). A later pass (shell.ts's mountStudentViewBadge()) relocates this
+   banner's one real action — the "back to instructor view" link — to a small icon on the
+   settings fabBar and hides the banner itself via navigation.css's `.docket-banner-relocated`
+   rule, since a rarely-used action doesn't need to permanently occupy a full-width strip of
+   chrome. This rule now only matters as the FALLBACK: if that relocation ever fails to find
+   the banner or its real link (fails soft, by design), the banner stays visible and still
+   needs to be legible rather than left in native's harsh yellow — reusing the status-badge
+   system's `soon` container/on-container pair (see tokens.css) for the same contrast-checked,
+   opaque, theme-correct treatment every due-soon badge gets, instead of a one-off color. */
 [data-docket-reskin] .bg-attention {
   background-color: var(--docket-status-soon-bg) !important;
   color: var(--docket-status-soon-fg) !important;

@@ -73,16 +73,39 @@ function ensureStylesLast(): void {
  * getSetting/setSetting (src/lib/storage.ts) and reused instead, so a stray error page
  * inherits whatever the user was just actually looking at.
  */
+// Set once an explicit Appearance override ever writes to LearningSuite's own native `dark`
+// class this page load (see applyTheme() below) — after that, the class no longer reflects
+// LearningSuite's real state, so the "system" branch must stop trusting a live read of it.
+let nativeThemeClassOverridden = false;
+
 function applyTheme(appearance: Appearance): void {
   let dark: boolean;
   if (appearance === "dark" || appearance === "light") {
     dark = appearance === "dark";
-  } else if (document.documentElement.classList.contains("h-full")) {
+    nativeThemeClassOverridden = true;
+  } else if (!nativeThemeClassOverridden && document.documentElement.classList.contains("h-full")) {
+    // Safe to trust a live read only as long as nothing above has ever touched the class this
+    // page load — otherwise this would just be reading our own prior override back, live-
+    // confirmed to flip "system" mode permanently to whatever the last explicit override was
+    // (a real regression the override fix above would otherwise introduce: switching Light →
+    // System never returned to the account's actual Dark preference).
     dark = document.documentElement.classList.contains("dark");
     setSetting("lastKnownDark", dark);
   } else {
     dark = getSetting("lastKnownDark", true);
   }
+  // LearningSuite's own native `.dark`-gated tokens (e.g. `--ba`, which bare `.bg-base` reads —
+  // global.css's own documented, deliberate native-passthrough for menus/dropdowns) are a real,
+  // live surface this reskin doesn't fully paint over. Live-confirmed: Appearance forced to
+  // Light with the account's LearningSuite-side preference left on Dark left every `.bg-base`
+  // surface (the narrow-viewport nav backdrop and every native dropdown/menu) rendering
+  // native's dark gray on an otherwise light page. Keeping the class unconditionally in sync
+  // with whatever `dark` this function just resolved — not only in the explicit-override
+  // branch — also restores it correctly when the user switches back to "system" after an
+  // override (the branch above deliberately ignores the now-untrustworthy live class then, but
+  // the class itself still needs to end up matching the real resolved theme, not be left as
+  // whatever the last override set it to).
+  document.documentElement.classList.toggle("dark", dark);
   document.documentElement.setAttribute("data-docket-theme", dark ? "dark" : "light");
 }
 

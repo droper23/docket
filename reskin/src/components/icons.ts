@@ -38,6 +38,7 @@ export const icons = {
   document: () => svgIcon("M6 3h9l5 5v13H6zM14 3v5h5"),
   examDoc: () => svgIcon("M6 3h9l5 5v13H6zM14 3v5h5M9 14l2 2 4-4"),
   clipboard: () => svgIcon("M9 4h6a1 1 0 011 1v1H8V5a1 1 0 011-1zM6 6h12v15H6zM9 11h6M9 15h6"),
+  eye: () => svgIcon("M2 12c2-4 6-6.5 10-6.5s8 2.5 10 6.5c-2 4-6 6.5-10 6.5s-8-2.5-10-6.5z M12 9.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z"),
 };
 
 /**
