@@ -249,6 +249,17 @@
   position: relative;
   z-index: 0;
 }
+/* Live-measured (Sep 2026): `.header-userdropdown-trigger`'s own native padding is
+   `6.4px 0 0` — top-only, no bottom (`.header-coursedropdown-trigger`'s is a plain `0`, unaffected
+   — confirmed live, this asymmetry is unique to the user-dropdown button, likely a leftover
+   sizing hack from LearningSuite's own original small icon-only avatar). The pill `::before`
+   below is built from this button's own box via a symmetric `-4px`/`-12px` inset, so it centers
+   correctly on the box — but the avatar/name/chevron content inside was pushed 6.4px toward the
+   bottom by that lopsided padding, reading as "the pill and its content don't line up" even
+   though the pill itself was never off-center. */
+[data-docket-reskin] .header-userdropdown-trigger {
+  padding: 0 !important;
+}
 [data-docket-reskin] .header-coursedropdown-trigger::before,
 [data-docket-reskin] .header-userdropdown-trigger::before {
   content: "";
