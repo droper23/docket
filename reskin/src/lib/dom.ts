@@ -131,6 +131,11 @@ export interface OverlayToggle {
   /** Reveals the native content (e.g. before re-firing a row's own click, so its real detail
    * panel is visible) and updates the button's own label to match — see `reveal`'s callers. */
   reveal(): void;
+  /** Returns to the redesigned view — the inverse of `reveal()`. Used to auto-return once a
+   * native detail dialog opened via `reveal()` is closed again (see homeAdapter.ts's
+   * `openNativeDetail`), rather than leaving the student stuck on the native page until they
+   * find and press the toggle button themselves. */
+  conceal(): void;
 }
 
 /**
@@ -154,5 +159,5 @@ export function createOverlayToggle(
     btn.textContent = next ? hideLabel : revealLabel;
   };
   btn.addEventListener("click", () => setRevealed(!revealed));
-  return { button: btn, reveal: () => setRevealed(true) };
+  return { button: btn, reveal: () => setRevealed(true), conceal: () => setRevealed(false) };
 }

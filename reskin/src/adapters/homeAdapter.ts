@@ -155,6 +155,51 @@ function groupByDate(items: ScheduleItem[]): { dateIso: string; items: ScheduleI
   return groups;
 }
 
+/**
+ * LearningSuite reuses one detail dialog across every click, closable via a button whose own
+ * text is literally "Close" — same shape src/connectors/bookmarklet.ts's findOpenDialog() relies
+ * on live. Used here only to detect open/close, never to read the dialog's content.
+ */
+function findDialogCloseButton(): HTMLElement | null {
+  const buttons = Array.from(document.querySelectorAll("button"));
+  return (buttons.find((b) => b.textContent?.trim() === "Close") as HTMLElement | undefined) ?? null;
+}
+
+const DIALOG_POLL_MS = 150;
+// A dialog can legitimately never open at all (e.g. an exam-start flow the student backs out
+// of before it renders) — bail out rather than leave a poll loop running forever.
+const DIALOG_POLL_TIMEOUT_MS = 15000;
+
+/**
+ * Reveals native content and re-fires the row's own click — same as every other adapter's
+ * `toggle.reveal()` — but Combined Schedule's click opens an in-place detail DIALOG rather than
+ * navigating to a new page, so nothing ever reverses the reveal on its own. Previously left the
+ * page stuck showing native LearningSuite after the student closed the dialog (reported bug,
+ * Sep 2026: closing an assignment's popup "goes back to the original learningsuite look"). Polls
+ * for that same dialog's own "Close" button appearing then disappearing and calls
+ * `toggle.conceal()` the moment it's gone, returning to the redesigned view automatically.
+ */
+function openNativeDetail(item: ScheduleItem): void {
+  toggle?.reveal();
+  item.anchor.click();
+  item.anchor.scrollIntoView({ block: "center", behavior: "smooth" });
+
+  let sawDialog = false;
+  let elapsed = 0;
+  const poll = () => {
+    const open = !!findDialogCloseButton();
+    if (open) sawDialog = true;
+    else if (sawDialog) {
+      toggle?.conceal();
+      return;
+    }
+    elapsed += DIALOG_POLL_MS;
+    if (elapsed >= DIALOG_POLL_TIMEOUT_MS) return;
+    setTimeout(poll, DIALOG_POLL_MS);
+  };
+  setTimeout(poll, DIALOG_POLL_MS);
+}
+
 let overlay: Overlay | null = null;
 let dayList: HTMLElement | null = null;
 let processedAnchors: HTMLElement[] = [];
@@ -235,11 +280,7 @@ export const homeAdapter: Adapter = {
                       }
                     : undefined,
                 },
-                () => {
-                  toggle?.reveal();
-                  item.anchor.click();
-                  item.anchor.scrollIntoView({ block: "center", behavior: "smooth" });
-                },
+                () => openNativeDetail(item),
               ),
             ),
           ),
