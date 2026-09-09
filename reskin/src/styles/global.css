@@ -82,6 +82,16 @@ html[data-docket-reskin],
   background-color: transparent !important;
 }
 
+/* The top-level section wrapper carries Tailwind's literal responsive class
+   `lg:bg-left-nav`, which is distinct from `.bg-left-nav` and otherwise keeps
+   the whole sidebar list inside one gray panel. */
+[data-docket-reskin] nav.docket-nav-enhanced > .bg-base.lg\:bg-left-nav,
+[data-docket-reskin] nav.docket-nav-enhanced .navItem,
+[data-docket-reskin] nav.docket-nav-enhanced .sideNavList {
+  background-color: transparent !important;
+  border-color: transparent !important;
+}
+
 /* Typography: LearningSuite's own headings carry no color utility class (its base
    stylesheet sets a default) — reset to the Apple type scale/color directly. Explicit
    sizes/tracking added on top of font-family/weight (Sep 2026 pass): native heading sizes
