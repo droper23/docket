@@ -119,21 +119,21 @@ html[data-docket-reskin],
  * font-nunito"`. Scoped to the confirmed compound class, not a bare `.font-nunito`, since
  * only that combination was ever actually observed.
  *
- * Rendered as an inset light "paper" card rather than a themed surface (Sep 2026 fix) —
- * confirmed live that instructor WYSIWYG content carries arbitrary inline color styles
- * (e.g. `style="color:#000000"`, authored assuming a light page), which the original
- * font-only rule left to survive verbatim onto the near-black dark canvas: unreadable body
- * copy, not a cosmetic miss. Matches how Apple Mail/Notes handle pasted rich content — keep
- * it on the light background it was actually authored for, in both app themes, rather than
- * chasing every possible inline color an instructor might have set.
+ * Instructor WYSIWYG content frequently carries inline black text intended for LearningSuite's
+ * light native canvas. Override that text on the reskin canvas, including descendant inline
+ * styles, without giving every note an opaque white box.
  */
 [data-docket-reskin] .instructorText.font-nunito {
   font-family: var(--docket-font) !important;
-  background-color: #fff !important;
-  color: #1d1d1f !important;
-  border: 1px solid var(--docket-separator);
-  border-radius: var(--docket-radius-md);
-  padding: 16px;
+  background-color: transparent !important;
+  color: var(--docket-label) !important;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+
+[data-docket-reskin] .instructorText.font-nunito :is(p, span, div, li, td, th) {
+  color: var(--docket-label) !important;
 }
 
 /**
@@ -141,28 +141,13 @@ html[data-docket-reskin],
  * a course Dashboard's per-day schedule cells — an instructor's own lesson-topic bullets for
  * that day, wrapped in `p.text-sm` (confirmed: `p.mb-2.text-sm.break-words > .instructorText
  * .font-nunito`; the whole-page version above is never nested in `.text-sm`). The full inset
- * "paper card" above (16px padding, radius-md, drop shadow) was sized for a whole Content/
- * Syllabus page, not a two-line entry inside an otherwise-compact dark list row — live it
- * rendered as a jarring oversized white slab breaking the row rhythm. Same light-paper
- * background (still needed: instructor content still carries inline `color:#000000`), but
- * sized down to read as an inline note instead of a standalone page.
+ * A compact native-flow note keeps dashboard rows readable without a separate card treatment.
  */
 /**
- * Confirmed live (course Dashboard, Sep 2026 real-usage pass): `display: inline-block` alone
- * does NOT keep this chip actually chip-sized — an inline-block box's shrink-to-fit width
- * still grows to fit as much of a long lesson-topic sentence as fits on one line before
- * wrapping, so anything longer than a couple words rendered as a wide white slab nearly the
- * width of its column — precisely the "random big white box" complaint, just on a rule that
- * already thought it had fixed this. A `max-width` forces real multi-line wrapping instead
- * of one long line, so this reads as a compact inline note regardless of the instructor's
- * actual sentence length.
+ * Keep the note in normal flow so long text wraps naturally with its schedule entry.
  */
 [data-docket-reskin] .text-sm .instructorText.font-nunito {
-  border-radius: var(--docket-radius-sm);
-  padding: 8px 10px;
-  box-shadow: none;
-  display: inline-block;
-  max-width: 260px;
+  display: block;
 }
 
 /**
