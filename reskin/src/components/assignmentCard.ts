@@ -15,6 +15,8 @@ export interface AssignmentCardData {
   courseAccent?: string; // CSS color for the leading dot
   /** Availability date ("Opens Sep 9") — see dueBadge.ts; never treated as a deadline. */
   opensText?: string;
+  /** Deadline date expressed separately when the row is primarily showing availability. */
+  dueDaysUntil?: number;
   /** Secondary real content the source anchor carried alongside its title (e.g. a file name,
    * "Download," an "(Updated on …)" stamp, a Zoom-recording label) — LearningSuite's own native
    * row keeps this on the same line and lets its own `truncate` CSS clip it; folding it into
@@ -60,6 +62,11 @@ export function assignmentCard(data: AssignmentCardData, onActivate?: () => void
   // AND a red "Overdue" badge on the same row, contradicting itself (confirmed live, Sep 2026:
   // MATH 113's "Syllabus Video Quiz," due Sep 2, Completed, still due-badged "Overdue by 4 days").
   const badge = data.completed || infoLike ? null : dueBadge(data.daysUntilDue, data.opensText, data.dueAt);
+  // Availability and deadline answer different questions. A row that says when it opens must
+  // still show the actual deadline as a chip, rather than burying it in the subtitle.
+  const dueDateBadge = !data.completed && !infoLike && data.opensText && data.dueLabel
+    ? dueBadge(data.dueDaysUntil, undefined, data.dueAt, `Due ${data.dueLabel}`)
+    : null;
   // With a precise deadline the badge already says "Due in …"; keeping a second "Due today"
   // subtitle beside it is noisy, so retain only the clock as supporting detail.
   const dueText = data.dueAt && data.dueTime
@@ -141,6 +148,7 @@ export function assignmentCard(data: AssignmentCardData, onActivate?: () => void
       h("div", { class: "docket-row-trailing" }, [
         scoreText ? h("span", { class: "docket-score" }, [scoreText]) : undefined,
         badge ?? undefined,
+        dueDateBadge ?? undefined,
         openControl,
       ]),
     ],

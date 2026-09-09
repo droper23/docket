@@ -319,6 +319,7 @@ test("assignmentsAdapter formats an 'Opens' date with the same shared wording Co
     assignmentsAdapter.mount(false);
     const badge = document.querySelector(".docket-badge")!;
     assert.equal(badge.textContent, `Opens ${expectedLabel}`, "must use the same shared dueDateLabel() wording homeAdapter.ts uses, not the raw scraped date text");
+    assert.equal(document.querySelectorAll(".docket-badge")[1]?.textContent, `Due ${dueDateLabel("2026-09-16")}`);
   } finally {
     assignmentsAdapter.unmount();
   }

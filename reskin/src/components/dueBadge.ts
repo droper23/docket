@@ -32,13 +32,13 @@ import { dueCountdown } from "../../../src/core/agendaFormatting.js";
  * way to becoming available rather than needing attention yet; already open in the past (or no
  * date at all) stays neutral gray, same as before.
  */
-export function dueBadge(daysUntilDue: number | undefined, opensText?: string, dueAt?: Date): HTMLElement | null {
+export function dueBadge(daysUntilDue: number | undefined, opensText?: string, dueAt?: Date, label?: string): HTMLElement | null {
   if (opensText) {
     const role = daysUntilDue !== undefined && daysUntilDue >= 0 ? "done" : "neutral";
     return h("span", { class: `docket-badge docket-badge-${role}` }, [`Opens ${opensText}`]);
   }
-  const label = dueCountdown(daysUntilDue, dueAt);
-  if (!label) return null;
+  const countdown = label ?? dueCountdown(daysUntilDue, dueAt);
+  if (!countdown) return null;
   let role = "neutral";
   if (daysUntilDue !== undefined) {
     if (dueAt && dueAt <= new Date()) role = "overdue";
@@ -47,5 +47,5 @@ export function dueBadge(daysUntilDue: number | undefined, opensText?: string, d
     else if (daysUntilDue === 1) role = "tomorrow";
     else if (daysUntilDue <= 7) role = "week";
   }
-  return h("span", { class: `docket-badge docket-badge-${role}` }, [label]);
+  return h("span", { class: `docket-badge docket-badge-${role}` }, [countdown]);
 }

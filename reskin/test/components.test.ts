@@ -72,6 +72,21 @@ test("assignmentCard suppresses the urgency badge for a completed item, however 
   assert.equal(card.querySelector(".docket-checkbox-done") !== null, true);
 });
 
+test("assignmentCard shows an opening date and its separate deadline as chips", () => {
+  setupDom("<div></div>");
+  const card = assignmentCard({
+    title: "Video Quiz 7.2",
+    opensText: "today",
+    daysUntilDue: 0,
+    dueLabel: "Friday",
+    dueDaysUntil: 2,
+  });
+  assert.deepEqual(
+    Array.from(card.querySelectorAll(".docket-badge"), (badge) => badge.textContent),
+    ["Opens today", "Due Friday"],
+  );
+});
+
 test("assignmentCard only renders the completion checkbox when the source data has a real completion concept", () => {
   setupDom("<div></div>");
   const noConcept = assignmentCard({ title: "Labor Day" }); // e.g. a dashboard holiday marker

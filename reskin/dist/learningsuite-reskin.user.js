@@ -922,13 +922,13 @@ html[data-docket-page="announcements"] main > div {
   }
 
   // src/components/dueBadge.ts
-  function dueBadge(daysUntilDue, opensText, dueAt) {
+  function dueBadge(daysUntilDue, opensText, dueAt, label) {
     if (opensText) {
       const role2 = daysUntilDue !== void 0 && daysUntilDue >= 0 ? "done" : "neutral";
       return h("span", { class: `docket-badge docket-badge-${role2}` }, [`Opens ${opensText}`]);
     }
-    const label = dueCountdown(daysUntilDue, dueAt);
-    if (!label) return null;
+    const countdown = label ?? dueCountdown(daysUntilDue, dueAt);
+    if (!countdown) return null;
     let role = "neutral";
     if (daysUntilDue !== void 0) {
       if (dueAt && dueAt <= /* @__PURE__ */ new Date()) role = "overdue";
@@ -937,13 +937,14 @@ html[data-docket-page="announcements"] main > div {
       else if (daysUntilDue === 1) role = "tomorrow";
       else if (daysUntilDue <= 7) role = "week";
     }
-    return h("span", { class: `docket-badge docket-badge-${role}` }, [label]);
+    return h("span", { class: `docket-badge docket-badge-${role}` }, [countdown]);
   }
 
   // src/components/assignmentCard.ts
   function assignmentCard(data, onActivate) {
     const infoLike = data.kind === "info" || data.kind === "calendar";
     const badge = data.completed || infoLike ? null : dueBadge(data.daysUntilDue, data.opensText, data.dueAt);
+    const dueDateBadge = !data.completed && !infoLike && data.opensText && data.dueLabel ? dueBadge(data.dueDaysUntil, void 0, data.dueAt, `Due ${data.dueLabel}`) : null;
     const dueText = data.dueAt && data.dueTime ? data.dueTime : data.dueLabel ? `Due ${data.dueLabel}${data.dueTime ? " " + data.dueTime : ""}` : void 0;
     const categoryText = data.category ? data.category + (data.categoryWeight ? ` (${data.categoryWeight} of grade)` : "") : void 0;
     const metaText = data.meta || void 0;
@@ -999,6 +1000,7 @@ html[data-docket-page="announcements"] main > div {
         h("div", { class: "docket-row-trailing" }, [
           scoreText ? h("span", { class: "docket-score" }, [scoreText]) : void 0,
           badge ?? void 0,
+          dueDateBadge ?? void 0,
           openControl
         ])
       ]
@@ -1091,8 +1093,9 @@ html[data-docket-page="announcements"] main > div {
         categoryWeight: r.categoryWeight,
         dueLabel: iso ? dueDateLabel(iso) : void 0,
         dueTime: time,
-        dueAt: iso && time && !r.opensText ? schoolDateTime(iso, time) : void 0,
+        dueAt: iso && time ? schoolDateTime(iso, time) : void 0,
         daysUntilDue,
+        dueDaysUntil: iso ? daysUntilInSchoolTimeZone(iso) : void 0,
         completed: r.completed,
         opensText: opensIso ? dueDateLabel(opensIso) : r.opensText,
         scoreEarned: r.scoreEarned,
