@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         LearningSuite Reskin
 // @namespace    https://github.com/droper23/docket
-// @version      0.1.1
+// @version      0.1.2
 // @description  A visual/interaction layer over BYU LearningSuite, styled like an Apple-designed app. LearningSuite stays the real backend — nothing is replaced. See reskin/README.md.
 // @author       Docket contributors
 // @match        https://learningsuite.byu.edu/*
@@ -1998,6 +1998,15 @@
     restyleMasthead();
     mountStudentViewBadge();
   }
+  function refreshShell(settings) {
+    if (settings.useCompanionNav && (!navEl || !navEl.isConnected)) {
+      navEl = restyleNav();
+    }
+    if (settings.useCompanionNav && (!topTabsEl || !topTabsEl.isConnected)) {
+      topTabsEl = restyleTopTabs();
+    }
+    diagnostics.shellMounted = !!navEl || !!topTabsEl;
+  }
 
   // src/lib/observe.ts
   function observeMutations(target, callback, options = { childList: true, subtree: true }, debounceMs = 150) {
@@ -2122,7 +2131,11 @@
       document.documentElement.setAttribute("data-docket-reduced-motion", String(next.reducedMotion));
     });
     runAdapters(currentSettings);
-    observeMutations(document.body, () => runAdapters(loadSettings()));
+    observeMutations(document.body, () => {
+      const settings = loadSettings();
+      refreshShell(settings);
+      runAdapters(settings);
+    });
     observeMutations(document.documentElement, () => runAdapters(loadSettings()), { attributes: true, attributeFilter: ["class"] });
   }
   function earlyApplyTheme() {

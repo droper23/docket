@@ -1,6 +1,6 @@
 {
   "name": "learningsuite-reskin",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Safari userscript: an Apple-HIG-styled visual/interaction layer over BYU LearningSuite. LearningSuite stays the real backend.",
   "type": "module",

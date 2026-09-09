@@ -271,6 +271,21 @@ export function mountShell(settings: ReskinSettings, onSettingsSaved: (s: Reskin
   mountStudentViewBadge();
 }
 
+/**
+ * LearningSuite renders the sidebar asynchronously on some full page loads.
+ * Retry its in-place enhancement once that real nav has arrived without
+ * recreating the floating controls that mountShell() owns.
+ */
+export function refreshShell(settings: ReskinSettings): void {
+  if (settings.useCompanionNav && (!navEl || !navEl.isConnected)) {
+    navEl = restyleNav();
+  }
+  if (settings.useCompanionNav && (!topTabsEl || !topTabsEl.isConnected)) {
+    topTabsEl = restyleTopTabs();
+  }
+  diagnostics.shellMounted = !!navEl || !!topTabsEl;
+}
+
 export function unmountShell(): void {
   if (navEl) {
     navEl.classList.remove("docket-nav-enhanced", "docket-scope");

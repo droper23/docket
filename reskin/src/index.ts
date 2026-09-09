@@ -9,7 +9,7 @@ import responsiveCss from "./styles/responsive.css";
 import scheduleCss from "./styles/schedule.css";
 
 import { adapters } from "./adapters/registry.js";
-import { mountShell } from "./adapters/shell.js";
+import { mountShell, refreshShell } from "./adapters/shell.js";
 import { loadSettings } from "./core/settings.js";
 import type { ReskinSettings, Appearance } from "./core/settings.js";
 import { BACKGROUND_CHOICES } from "./core/settings.js";
@@ -237,7 +237,11 @@ function boot(): void {
   });
 
   runAdapters(currentSettings);
-  observeMutations(document.body, () => runAdapters(loadSettings()));
+  observeMutations(document.body, () => {
+    const settings = loadSettings();
+    refreshShell(settings);
+    runAdapters(settings);
+  });
   // The body observer above only sees childList/subtree changes — it never fires when the
   // user flips LearningSuite's own Dark Mode toggle, which only changes the `class`
   // attribute on <html>, not body content. Watch that specifically so theme changes are
