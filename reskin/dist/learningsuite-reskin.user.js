@@ -1,15 +1,15 @@
 // ==UserScript==
 // @name         LearningSuite Reskin
 // @namespace    https://github.com/droper23/docket
-// @version      0.1.7
+// @version      0.1.8
 // @description  A visual/interaction layer over BYU LearningSuite, styled like an Apple-designed app. LearningSuite stays the real backend — nothing is replaced. See reskin/README.md.
 // @author       Docket contributors
 // @match        https://learningsuite.byu.edu/*
 // @run-at       document-start
 // @grant        GM_getValue
 // @grant        GM_setValue
-// @updateURL    https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.7
-// @downloadURL  https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.7
+// @updateURL    https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.8
+// @downloadURL  https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.8
 // ==/UserScript==
 
 "use strict";
