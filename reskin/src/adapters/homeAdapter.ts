@@ -359,9 +359,13 @@ async function loadDueTimes(compatibilityMode: boolean, button: HTMLButtonElemen
     }
   } finally {
     loadingDueTimes = false;
-    homeAdapter.mount(compatibilityMode);
-    button.disabled = false;
-    button.textContent = found ? `Loaded ${found} due times` : "Due times unavailable";
+    // The overlay (and this button) may already be gone — the student navigated away, or
+    // (browser) something else unmounted — mid-fetch. Re-mounting here would wrongly resurrect it.
+    if (overlay) {
+      homeAdapter.mount(compatibilityMode);
+      button.disabled = false;
+      button.textContent = found ? `Loaded ${found} due times` : "Due times unavailable";
+    }
   }
 }
 
@@ -527,6 +531,10 @@ export const homeAdapter: Adapter = {
           (() => {
             const button = h("button", { class: "docket-load-due-times", type: "button" }, ["Load due times"]);
             button.addEventListener("click", () => void loadDueTimes(compatibilityMode, button));
+            // Auto-run once per overlay lifetime (this branch itself only executes once — see the
+            // `overlay && dayList` check above — so this fires exactly on first mount, not on every
+            // mutation-triggered re-render). The button stays for a manual retry afterward.
+            void loadDueTimes(compatibilityMode, button);
             return button;
           })(),
         ]),
@@ -554,6 +562,10 @@ export const homeAdapter: Adapter = {
     dayList = null;
     toggle = null;
     scrolledToToday = false;
+    // A due-times fetch begun on mount can still be in flight when the student navigates away
+    // (or a test tears down) before it settles — don't leave this stuck true, or a later remount
+    // (see loadDueTimes's own auto-trigger) would silently no-op forever.
+    loadingDueTimes = false;
     for (const a of processedAnchors) {
       a.removeAttribute("data-docket-scheduleitem");
       accumulated.delete(a);
