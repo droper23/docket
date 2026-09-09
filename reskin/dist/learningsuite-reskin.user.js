@@ -1277,7 +1277,7 @@ html[data-docket-page="announcements"] main > div {
       const courses = new DOMParser().parseFromString(await (await fetch(courseListUrl)).text(), "text/html");
       const needed = new Set(mergedItemsSorted().filter((i) => i.kind === "due" && !i.opens).map((i) => i.courseCode));
       const links = Array.from(courses.querySelectorAll('a[href*="/cid-"]')).map((a) => ({
-        code: (a.textContent ?? "").split(" - ")[0].trim(),
+        code: (a.textContent ?? "").split(" - ")[0].replace(/\s*\(\d+\)\s*$/, "").trim(),
         href: a.href
       })).filter((c) => needed.has(c.code));
       const normalized = (title) => title.replace(/\s+(?:closes?|opens?)$/i, "").replace(/\s+/g, " ").trim().toLowerCase();

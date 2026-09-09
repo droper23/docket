@@ -162,6 +162,45 @@ test("homeAdapter reads Combined Schedule items within the lookahead window", ()
   }
 });
 
+test("homeAdapter loads a course section's exact deadline onto today's Combined Schedule card", async () => {
+  const today = new Date();
+  const md = `${today.getMonth() + 1}/${today.getDate()}`;
+  const month = today.toLocaleString("en-US", { month: "short" });
+  const html = `<main>
+    <div class="listViewDay">
+      <div>${md} - Today</div>
+      <div class="flex-4"><a class="cursor-pointer block truncate"><i class="fa-circle"></i>Problem Set 1</a></div>
+      <div>MATH 313</div>
+    </div>
+  </main>`;
+  setupDom(html, "https://learningsuite.byu.edu/.sess1/student/top/schedule");
+  const originalFetch = globalThis.fetch;
+  const originalDomParser = globalThis.DOMParser;
+  globalThis.DOMParser = window.DOMParser;
+  globalThis.fetch = (async (input: URL | RequestInfo) => {
+    const url = String(input);
+    const text = url.includes("/courses")
+      // LearningSuite includes the section in Course List, but Combined Schedule only shows
+      // the catalog code. This must still select the course's Assignments page.
+      ? '<main><a href="https://learningsuite.byu.edu/cid-math313/student/home">MATH 313 (02) - Linear Algebra</a></main>'
+      : `<main><div class="bg-base text-highlight"><div></div><div>Problem Set 1</div><div>${month} ${today.getDate()} 11:59 pm MDT</div><div>Submit</div><div>/10</div></div></main>`;
+    return { text: async () => text } as Response;
+  }) as typeof fetch;
+  try {
+    homeAdapter.mount(false);
+    const button = document.querySelector(".docket-load-due-times") as HTMLButtonElement;
+    button.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.match(document.querySelector(".docket-badge")?.textContent ?? "", /^(Due in|Overdue by) /);
+    assert.match(document.querySelector(".docket-row-subtitle")?.textContent ?? "", /11:59 pm MDT/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    globalThis.DOMParser = originalDomParser;
+    homeAdapter.unmount();
+  }
+});
+
 test("homeAdapter splits a single anchor's blank-line-separated real content into a title and a meta line (Sep 2026 concatenated-title bug)", () => {
   const tomorrow = new Date(Date.now() + 86_400_000);
   const md = `${tomorrow.getMonth() + 1}/${tomorrow.getDate()}`;
