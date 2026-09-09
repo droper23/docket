@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         LearningSuite Reskin
 // @namespace    https://github.com/droper23/docket
-// @version      0.1.3
+// @version      0.1.4
 // @description  A visual/interaction layer over BYU LearningSuite, styled like an Apple-designed app. LearningSuite stays the real backend — nothing is replaced. See reskin/README.md.
 // @author       Docket contributors
 // @match        https://learningsuite.byu.edu/*
@@ -337,7 +337,7 @@ html[data-docket-page="announcements"] main > div {
    from the same tokens a due row uses (never a new color) so it reads as non-actionable
    context at a glance, the same distinction Combined Schedule's own native page draws with a
    gold dot vs. no dot at all. */
-.docket-row-info .docket-row-title { font-weight: 500; color: var(--docket-label-secondary); }
+.docket-row-info .docket-row-title { font-weight: 500; font-style: italic; color: var(--docket-label-secondary); }
 .docket-row-info .docket-row-subtitle { color: var(--docket-label-tertiary); }
 .docket-checkbox-done { border-color: var(--docket-green); background: var(--docket-green); }
 .docket-checkbox-done::after {
@@ -832,10 +832,44 @@ html[data-docket-page="announcements"] main > div {
   function daysUntilInSchoolTimeZone(dateStr) {
     return daysBetween(todayInSchoolTimeZone(), dateStr);
   }
+  function schoolDateTime(dateStr, time) {
+    const date = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const clock = time.match(/^(\d{1,2}):(\d{2})\s*([ap]m)\b/i);
+    if (!date || !clock) return void 0;
+    const year = Number(date[1]);
+    const month = Number(date[2]);
+    const day = Number(date[3]);
+    let hour = Number(clock[1]);
+    const minute = Number(clock[2]);
+    if (month < 1 || month > 12 || day < 1 || day > 31 || hour < 1 || hour > 12 || minute > 59) return void 0;
+    hour = hour % 12 + (clock[3].toLowerCase() === "pm" ? 12 : 0);
+    const wallClockUtc = Date.UTC(year, month - 1, day, hour, minute);
+    const offsetAt = (instant2) => {
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: SCHOOL_TIME_ZONE,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23"
+      }).formatToParts(new Date(instant2));
+      const part = (type) => Number(parts.find((p) => p.type === type)?.value);
+      return Date.UTC(part("year"), part("month") - 1, part("day"), part("hour"), part("minute")) - instant2;
+    };
+    let instant = wallClockUtc - offsetAt(wallClockUtc);
+    instant = wallClockUtc - offsetAt(instant);
+    return new Date(instant);
+  }
 
   // ../src/core/agendaFormatting.ts
-  function dueCountdown(daysUntilDue) {
+  function dueCountdown(daysUntilDue, dueAt, now = /* @__PURE__ */ new Date()) {
     if (daysUntilDue === void 0) return void 0;
+    if (dueAt) {
+      const minutes = Math.max(1, Math.ceil(Math.abs(dueAt.getTime() - now.getTime()) / 6e4));
+      const duration = minutes < 60 ? `${minutes} minute${minutes === 1 ? "" : "s"}` : minutes < 24 * 60 ? `${Math.ceil(minutes / 60)} hour${Math.ceil(minutes / 60) === 1 ? "" : "s"}` : `${Math.floor(minutes / (24 * 60))} day${Math.floor(minutes / (24 * 60)) === 1 ? "" : "s"}${minutes % (24 * 60) >= 60 ? ` ${Math.ceil(minutes % (24 * 60) / 60)} hour${Math.ceil(minutes % (24 * 60) / 60) === 1 ? "" : "s"}` : ""}`;
+      return dueAt > now ? `Due in ${duration}` : `Overdue by ${duration}`;
+    }
     if (daysUntilDue < 0) {
       const n = Math.abs(daysUntilDue);
       return `Overdue by ${n} day${n === 1 ? "" : "s"}`;
@@ -867,16 +901,17 @@ html[data-docket-page="announcements"] main > div {
   }
 
   // src/components/dueBadge.ts
-  function dueBadge(daysUntilDue, opensText) {
+  function dueBadge(daysUntilDue, opensText, dueAt) {
     if (opensText) {
       const role2 = daysUntilDue !== void 0 && daysUntilDue >= 0 ? "done" : "neutral";
       return h("span", { class: `docket-badge docket-badge-${role2}` }, [`Opens ${opensText}`]);
     }
-    const label = dueCountdown(daysUntilDue);
+    const label = dueCountdown(daysUntilDue, dueAt);
     if (!label) return null;
     let role = "neutral";
     if (daysUntilDue !== void 0) {
-      if (daysUntilDue < 0) role = "overdue";
+      if (dueAt && dueAt <= /* @__PURE__ */ new Date()) role = "overdue";
+      else if (daysUntilDue < 0) role = "overdue";
       else if (daysUntilDue === 0) role = "soon";
       else if (daysUntilDue === 1) role = "tomorrow";
       else if (daysUntilDue <= 7) role = "week";
@@ -887,8 +922,8 @@ html[data-docket-page="announcements"] main > div {
   // src/components/assignmentCard.ts
   function assignmentCard(data, onActivate) {
     const infoLike = data.kind === "info" || data.kind === "calendar";
-    const badge = data.completed || infoLike ? null : dueBadge(data.daysUntilDue, data.opensText);
-    const dueText = data.dueLabel ? `Due ${data.dueLabel}${data.dueTime ? " " + data.dueTime : ""}` : void 0;
+    const badge = data.completed || infoLike ? null : dueBadge(data.daysUntilDue, data.opensText, data.dueAt);
+    const dueText = data.dueAt && data.dueTime ? data.dueTime : data.dueLabel ? `Due ${data.dueLabel}${data.dueTime ? " " + data.dueTime : ""}` : void 0;
     const categoryText = data.category ? data.category + (data.categoryWeight ? ` (${data.categoryWeight} of grade)` : "") : void 0;
     const metaText = data.meta || void 0;
     const scoreText = data.scorePossible ? `${data.scoreEarned ?? "\u2014"}/${data.scorePossible}` : void 0;
@@ -1035,6 +1070,7 @@ html[data-docket-page="announcements"] main > div {
         categoryWeight: r.categoryWeight,
         dueLabel: iso ? dueDateLabel(iso) : void 0,
         dueTime: time,
+        dueAt: iso && time && !r.opensText ? schoolDateTime(iso, time) : void 0,
         daysUntilDue,
         completed: r.completed,
         opensText: opensIso ? dueDateLabel(opensIso) : r.opensText,
