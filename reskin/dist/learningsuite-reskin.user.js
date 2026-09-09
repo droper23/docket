@@ -1,15 +1,15 @@
 // ==UserScript==
 // @name         LearningSuite Reskin
 // @namespace    https://github.com/droper23/docket
-// @version      0.1.11
+// @version      0.1.12
 // @description  A visual/interaction layer over BYU LearningSuite, styled like an Apple-designed app. LearningSuite stays the real backend — nothing is replaced. See reskin/README.md.
 // @author       Docket contributors
 // @match        https://learningsuite.byu.edu/*
 // @run-at       document-start
 // @grant        GM_getValue
 // @grant        GM_setValue
-// @updateURL    https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.11
-// @downloadURL  https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.11
+// @updateURL    https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.12
+// @downloadURL  https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.12
 // ==/UserScript==
 
 "use strict";
@@ -1266,6 +1266,25 @@ html[data-docket-page="announcements"] main > div {
   var DIALOG_POLL_MS = 150;
   var DIALOG_POLL_TIMEOUT_MS = 15e3;
   var loadingDueTimes = false;
+  function extractBalancedJson(text, start) {
+    const open = text[start];
+    if (open !== "{" && open !== "[") return null;
+    let depth = 0;
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i];
+      if (ch === "{" || ch === "[") depth++;
+      else if (ch === "}" || ch === "]") {
+        depth--;
+        if (depth === 0) return text.slice(start, i + 1);
+      }
+    }
+    return null;
+  }
+  function extractJsonAfter(text, marker) {
+    const m = text.match(marker);
+    if (!m || m.index === void 0) return null;
+    return extractBalancedJson(text, m.index + m[0].length);
+  }
   async function loadDueTimes(compatibilityMode, button) {
     if (loadingDueTimes) return;
     loadingDueTimes = true;
@@ -1274,25 +1293,37 @@ html[data-docket-page="announcements"] main > div {
     try {
       const courseListUrl = new URL(location.href);
       courseListUrl.pathname = courseListUrl.pathname.replace(/\/schedule$/, "/courses");
-      const courses = new DOMParser().parseFromString(await (await fetch(courseListUrl)).text(), "text/html");
-      const links = Array.from(courses.querySelectorAll('a[href*="/cid-"]')).map((a) => ({ href: a.href }));
+      const courseListHtml = await (await fetch(courseListUrl)).text();
+      const groupsJson = extractJsonAfter(courseListHtml, /"courseGroups"\s*:\s*/);
+      const groups = groupsJson ? JSON.parse(groupsJson) : [];
+      const hrefs = groups.flatMap((g) => g.courseList ?? []).map((c) => c.studentViewHref ?? c.href).filter((href) => !!href);
       const normalized = (title) => title.replace(/\s+(?:closes?|opens?)$/i, "").replace(/[^\w]+/g, " ").trim().toLowerCase();
-      for (let index = 0; index < links.length; index++) {
-        button.textContent = `Loading due times ${index + 1}/${links.length}`;
-        const course = links[index];
-        const url = new URL(course.href, location.origin);
-        url.pathname = url.pathname.replace(/\/student\/home\/?$/, "/student/home/assignments");
-        const assignmentPage = new DOMParser().parseFromString(await (await fetch(url)).text(), "text/html");
-        for (const row2 of extractRows(assignmentPage.querySelector("main") ?? assignmentPage.body)) {
-          const { iso, time } = parseAssignmentDueText(row2.dueText);
-          if (!iso || !time) continue;
-          const item = mergedItemsSorted().find((i) => i.dateIso === iso && normalized(i.title) === normalized(row2.title));
-          const dueAt = item && schoolDateTime(iso, time);
-          if (item && dueAt) {
-            item.dueTime = time;
-            item.dueAt = dueAt;
-            found++;
+      for (let index = 0; index < hrefs.length; index++) {
+        button.textContent = `Loading due times ${index + 1}/${hrefs.length}`;
+        try {
+          const url = new URL(hrefs[index], location.origin);
+          url.pathname = url.pathname.replace(/\/student\/home\/?$/, "/student/home/assignments");
+          const assignmentsHtml = await (await fetch(url)).text();
+          const assignmentsJson = extractJsonAfter(assignmentsHtml, /\bvar\s+assignments\s*=\s*/);
+          if (!assignmentsJson) continue;
+          const assignments = JSON.parse(assignmentsJson);
+          for (const assignment of assignments) {
+            const due = assignment.dueDate?.match(/^(\d{4}-\d{2}-\d{2}) (\d{1,2}):(\d{2})/);
+            if (!assignment.name || !due) continue;
+            const iso = due[1];
+            const hour24 = Number(due[2]);
+            const hour12 = hour24 % 12 || 12;
+            const time = `${hour12}:${due[3]} ${hour24 >= 12 ? "pm" : "am"}`;
+            const item = mergedItemsSorted().find((i) => i.dateIso === iso && normalized(i.title) === normalized(assignment.name));
+            const dueAt = item && schoolDateTime(iso, time);
+            if (item && dueAt) {
+              item.dueTime = time;
+              item.dueAt = dueAt;
+              found++;
+            }
           }
+        } catch (error) {
+          console.warn("[LearningSuite Reskin] loadDueTimes: skipping a course", error);
         }
       }
     } finally {

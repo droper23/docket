@@ -3,9 +3,8 @@ import { looksLikeScheduleListView } from "../core/pageDetector.js";
 import { overlayContent, markProcessed, isProcessed, h, listItem, createOverlayToggle, findScrollParent } from "../lib/dom.js";
 import type { Overlay, OverlayToggle } from "../lib/dom.js";
 import { assignmentCard } from "../components/assignmentCard.js";
-import { extractRows } from "./assignmentsAdapter.js";
 import { icons } from "../components/icons.js";
-import { parseSlashDate, formatIsoDate, parseAssignmentDueText } from "../lib/parseDueText.js";
+import { parseSlashDate, formatIsoDate } from "../lib/parseDueText.js";
 import { dayLabel, dueDateLabel } from "../../../src/core/agendaFormatting.js";
 import { daysUntilInSchoolTimeZone, schoolDateTime } from "../../../src/core/schoolTime.js";
 import { diagnostics } from "../core/diagnostics.js";
@@ -181,6 +180,49 @@ const DIALOG_POLL_TIMEOUT_MS = 15000;
 
 let loadingDueTimes = false;
 
+/**
+ * Course List and Assignments are both client-rendered (Vue): confirmed live (Sep 2026) that a
+ * same-origin `fetch()` of either page's raw HTML gets only the pre-mount shell — `<main>` has
+ * no rows, no `<a href="/cid-...">` links, nothing DOMParser can find, because that content only
+ * exists after the page's own JS runs. No amount of DOM-scraping fixes that. Both pages *do* ship
+ * their real data server-side, though: as a plain JSON literal inside one of the page's own
+ * inline `<script>` tags (how Vue hydrates without a second round trip) — Course List embeds a
+ * `"courseGroups": [...]` value, an Assignments page a top-level `var assignments = [...]`.
+ * Extracting that literal directly is what actually works cross-page.
+ */
+function extractBalancedJson(text: string, start: number): string | null {
+  const open = text[start];
+  if (open !== "{" && open !== "[") return null;
+  let depth = 0;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === "{" || ch === "[") depth++;
+    else if (ch === "}" || ch === "]") {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+function extractJsonAfter(text: string, marker: RegExp): string | null {
+  const m = text.match(marker);
+  if (!m || m.index === undefined) return null;
+  return extractBalancedJson(text, m.index + m[0].length);
+}
+
+interface ApiCourse {
+  href?: string;
+  studentViewHref?: string;
+}
+
+interface ApiAssignment {
+  name?: string;
+  /** School-local "YYYY-MM-DD HH:mm:ss" (24h), e.g. "2026-12-10 23:59:00" — already BYU time, no
+   * timezone abbreviation to parse, unlike an Assignments-page row's rendered due text. */
+  dueDate?: string | null;
+}
+
 async function loadDueTimes(compatibilityMode: boolean, button: HTMLButtonElement): Promise<void> {
   if (loadingDueTimes) return;
   loadingDueTimes = true;
@@ -189,30 +231,48 @@ async function loadDueTimes(compatibilityMode: boolean, button: HTMLButtonElemen
   try {
     const courseListUrl = new URL(location.href);
     courseListUrl.pathname = courseListUrl.pathname.replace(/\/schedule$/, "/courses");
-    const courses = new DOMParser().parseFromString(await (await fetch(courseListUrl)).text(), "text/html");
+    const courseListHtml = await (await fetch(courseListUrl)).text();
+    const groupsJson = extractJsonAfter(courseListHtml, /"courseGroups"\s*:\s*/);
+    const groups: { courseList?: ApiCourse[] }[] = groupsJson ? JSON.parse(groupsJson) : [];
     // Course List's label format varies (e.g. "MATH 113 (016) Calculus 2" vs. the
     // schedule's "MATH 113"), so scan each connected course rather than making that
     // presentation-only label a prerequisite for loading a real deadline.
-    const links = Array.from(courses.querySelectorAll('a[href*="/cid-"]')).map((a) => ({ href: (a as HTMLAnchorElement).href }));
+    const hrefs = groups
+      .flatMap((g) => g.courseList ?? [])
+      .map((c) => c.studentViewHref ?? c.href)
+      .filter((href): href is string => !!href);
     const normalized = (title: string) => title
       .replace(/\s+(?:closes?|opens?)$/i, "")
       .replace(/[^\w]+/g, " ")
       .trim()
       .toLowerCase();
-    for (let index = 0; index < links.length; index++) {
-      button.textContent = `Loading due times ${index + 1}/${links.length}`;
-      const course = links[index]!;
-      // DOMParser documents have an opaque base URL, so Course List's real relative hrefs
-      // need the live page's origin before they can be requested.
-      const url = new URL(course.href, location.origin);
-      url.pathname = url.pathname.replace(/\/student\/home\/?$/, "/student/home/assignments");
-      const assignmentPage = new DOMParser().parseFromString(await (await fetch(url)).text(), "text/html");
-      for (const row of extractRows(assignmentPage.querySelector("main") ?? assignmentPage.body)) {
-        const { iso, time } = parseAssignmentDueText(row.dueText);
-        if (!iso || !time) continue;
-        const item = mergedItemsSorted().find((i) => i.dateIso === iso && normalized(i.title) === normalized(row.title));
-        const dueAt = item && schoolDateTime(iso, time);
-        if (item && dueAt) { item.dueTime = time; item.dueAt = dueAt; found++; }
+    for (let index = 0; index < hrefs.length; index++) {
+      button.textContent = `Loading due times ${index + 1}/${hrefs.length}`;
+      try {
+        // These hrefs (e.g. ".aD2E/cid-.../student/home") come back without a leading slash, so
+        // they need the live page's origin as base before they can be requested. A course can
+        // also be externally hosted (confirmed live, Sep 2026: a MAX-taught section's href
+        // points off-origin) — that fetch() rejects outright, and must not abort every other
+        // course still left in this loop.
+        const url = new URL(hrefs[index]!, location.origin);
+        url.pathname = url.pathname.replace(/\/student\/home\/?$/, "/student/home/assignments");
+        const assignmentsHtml = await (await fetch(url)).text();
+        const assignmentsJson = extractJsonAfter(assignmentsHtml, /\bvar\s+assignments\s*=\s*/);
+        if (!assignmentsJson) continue;
+        const assignments: ApiAssignment[] = JSON.parse(assignmentsJson);
+        for (const assignment of assignments) {
+          const due = assignment.dueDate?.match(/^(\d{4}-\d{2}-\d{2}) (\d{1,2}):(\d{2})/);
+          if (!assignment.name || !due) continue;
+          const iso = due[1]!;
+          const hour24 = Number(due[2]);
+          const hour12 = hour24 % 12 || 12;
+          const time = `${hour12}:${due[3]} ${hour24 >= 12 ? "pm" : "am"}`;
+          const item = mergedItemsSorted().find((i) => i.dateIso === iso && normalized(i.title) === normalized(assignment.name!));
+          const dueAt = item && schoolDateTime(iso, time);
+          if (item && dueAt) { item.dueTime = time; item.dueAt = dueAt; found++; }
+        }
+      } catch (error) {
+        console.warn("[LearningSuite Reskin] loadDueTimes: skipping a course", error);
       }
     }
   } finally {

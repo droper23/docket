@@ -165,7 +165,7 @@ test("homeAdapter reads Combined Schedule items within the lookahead window", ()
 test("homeAdapter loads a course section's exact deadline onto today's Combined Schedule card", async () => {
   const today = new Date();
   const md = `${today.getMonth() + 1}/${today.getDate()}`;
-  const month = today.toLocaleString("en-US", { month: "short" });
+  const todayIso = formatIsoDate(today);
   const html = `<main>
     <div class="listViewDay">
       <div>${md} - Today</div>
@@ -175,15 +175,18 @@ test("homeAdapter loads a course section's exact deadline onto today's Combined 
   </main>`;
   setupDom(html, "https://learningsuite.byu.edu/.sess1/student/top/schedule");
   const originalFetch = globalThis.fetch;
-  const originalDomParser = globalThis.DOMParser;
-  globalThis.DOMParser = window.DOMParser;
+  // Course List and Assignments are both client-rendered: their raw HTML has no rendered rows
+  // or real <a href> links at all (confirmed live, Sep 2026) — real data only ever shows up as a
+  // JSON literal inside one of the page's own inline <script> tags (Course List's
+  // "courseGroups", an Assignments page's own `var assignments = [...]`), so that's what the
+  // mocks below reproduce instead of pre-rendered markup.
   globalThis.fetch = (async (input: URL | RequestInfo) => {
     const url = String(input);
     const text = url.includes("/courses")
       // LearningSuite includes the section in Course List, but Combined Schedule only shows
       // the catalog code. This must still select the course's Assignments page.
-      ? '<main><a href="/cid-math313/student/home">MATH 313 (02) Linear Algebra</a></main>'
-      : `<main><div class="bg-base text-highlight"><div></div><div>Problem Set 1</div><div>${month} ${today.getDate()} 11:59 pm MDT</div><div>Submit</div><div>/10</div></div></main>`;
+      ? `<script>var data = {"courseGroups":[{"courseList":[{"studentViewHref":"cid-math313/student/home"}]}]};</script>`
+      : `<script>var assignments = [{"name":"Problem Set 1","dueDate":"${todayIso} 23:59:00"}];</script>`;
     return { text: async () => text } as Response;
   }) as typeof fetch;
   try {
@@ -193,10 +196,9 @@ test("homeAdapter loads a course section's exact deadline onto today's Combined 
     await new Promise((resolve) => setTimeout(resolve, 0));
     await new Promise((resolve) => setTimeout(resolve, 0));
     assert.match(document.querySelector(".docket-badge")?.textContent ?? "", /^(Due in|Overdue by) /);
-    assert.match(document.querySelector(".docket-row-subtitle")?.textContent ?? "", /11:59 pm MDT/);
+    assert.match(document.querySelector(".docket-row-subtitle")?.textContent ?? "", /11:59 pm/);
   } finally {
     globalThis.fetch = originalFetch;
-    globalThis.DOMParser = originalDomParser;
     homeAdapter.unmount();
   }
 });
