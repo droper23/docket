@@ -385,7 +385,7 @@ test("dashboardAdapter renders the per-day schedule as grouped cards without hid
     originalLink.addEventListener("click", () => {
       originalClicked = true;
     });
-    (Array.from(document.querySelectorAll(".docket-row-title")).find((el) => el.textContent === "Recitation Quiz 9/8")!.closest(".docket-row-tappable") as HTMLElement).click();
+    (Array.from(document.querySelectorAll(".docket-row-title")).find((el) => el.textContent === "Recitation Quiz 9/8")!.closest(".docket-row")!.querySelector(".docket-row-open") as HTMLElement).click();
     assert.equal(originalClicked, true, "clicking a real assignment row must re-fire the original element's own click handler");
   } finally {
     dashboardAdapter.unmount();
@@ -423,7 +423,7 @@ test("dashboardAdapter preserves every real anchor in a paragraph, not just the 
     const [recordingLink, slidesLink] = Array.from(document.querySelectorAll("a.cursor-pointer")) as HTMLElement[];
     recordingLink!.addEventListener("click", () => (recordingClicked = true));
     slidesLink!.addEventListener("click", () => (slidesClicked = true));
-    (Array.from(document.querySelectorAll(".docket-row-title")).find((el) => el.textContent === "Slides PDF")!.closest(".docket-row-tappable") as HTMLElement).click();
+    (Array.from(document.querySelectorAll(".docket-row-title")).find((el) => el.textContent === "Slides PDF")!.closest(".docket-row")!.querySelector(".docket-row-open") as HTMLElement).click();
     assert.equal(slidesClicked, true, "the second anchor's own click handler must be reachable, not just the first");
     assert.equal(recordingClicked, false);
   } finally {

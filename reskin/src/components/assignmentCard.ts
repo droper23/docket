@@ -71,7 +71,7 @@ export function assignmentCard(data: AssignmentCardData, onActivate?: () => void
   // Only rendered when the source data has a real completion concept (assignment rows) —
   // `undefined` here means "not a task" (a dashboard holiday/lesson-note), not "not done".
   let checkbox: HTMLElement | undefined;
-  if (data.completed !== undefined) {
+  if (data.completed !== undefined && !infoLike) {
     const interactive = !!data.onToggleComplete;
     checkbox = h("div", {
       class: `docket-checkbox${data.completed ? " docket-checkbox-done" : ""}`,
@@ -105,10 +105,19 @@ export function assignmentCard(data: AssignmentCardData, onActivate?: () => void
     }
   }
 
+  // Keep task completion and opening the native detail view as sibling controls. A previous
+  // implementation made the entire row a role=link, which nested an interactive checkbox
+  // inside another interactive target on Combined Schedule. That is both invalid semantics
+  // and confusing in keyboard/screen-reader traversal.
+  const openControl = onActivate
+    ? h("button", { class: "docket-row-open", type: "button", "aria-label": `Open ${data.title}` }, ["Open"])
+    : undefined;
+  if (openControl) openControl.addEventListener("click", onActivate!);
+
   const row = h(
     "div",
     {
-      class: "docket-row" + (onActivate ? " docket-row-tappable" : "") + (infoLike ? " docket-row-info" : ""),
+      class: "docket-row" + (infoLike ? " docket-row-info" : ""),
       // A left-edge accent stripe, same color/assignment as the course's own card elsewhere
       // (courseListAdapter.ts/gradeSummaryAdapter.ts's assignCourseColors()) — lets a multi-course
       // agenda (Combined Schedule) be scanned by color the same way the Course List/Grade Summary
@@ -126,22 +135,9 @@ export function assignmentCard(data: AssignmentCardData, onActivate?: () => void
       h("div", { class: "docket-row-trailing" }, [
         scoreText ? h("span", { class: "docket-score" }, [scoreText]) : undefined,
         badge ?? undefined,
-        onActivate ? h("span", { class: "docket-chevron" }) : undefined,
+        openControl,
       ]),
     ],
   );
-  if (onActivate) {
-    row.addEventListener("click", onActivate);
-    row.tabIndex = 0;
-    // A link (activates and navigates), not a button — Enter only, no Space (platform link
-    // convention; Space is reserved for scrolling the page, same as any other real link).
-    row.setAttribute("role", "link");
-    row.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        onActivate();
-      }
-    });
-  }
   return row;
 }
