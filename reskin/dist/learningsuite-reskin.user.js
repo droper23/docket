@@ -1,15 +1,15 @@
 // ==UserScript==
 // @name         LearningSuite Reskin
 // @namespace    https://github.com/droper23/docket
-// @version      0.1.5
+// @version      0.1.6
 // @description  A visual/interaction layer over BYU LearningSuite, styled like an Apple-designed app. LearningSuite stays the real backend — nothing is replaced. See reskin/README.md.
 // @author       Docket contributors
 // @match        https://learningsuite.byu.edu/*
 // @run-at       document-start
 // @grant        GM_getValue
 // @grant        GM_setValue
-// @updateURL    https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.5
-// @downloadURL  https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.5
+// @updateURL    https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.6
+// @downloadURL  https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.6
 // ==/UserScript==
 
 "use strict";
@@ -70,7 +70,26 @@
 }
 .docket-header {
   margin-bottom: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
+.docket-header .docket-display { margin: 0; }
+.docket-load-due-times {
+  border: 1px solid var(--docket-separator);
+  border-radius: 999px;
+  background: var(--docket-fill-secondary);
+  color: var(--docket-label);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.docket-load-due-times:hover { background: var(--docket-fill-tertiary); }
+.docket-load-due-times:disabled { cursor: progress; opacity: .65; }
 
 /* Course Announcements stays native by design: its instructor-authored content can include
    arbitrary rich text and links. Live audit (Sep 2026) confirmed the page's one real wrapper
@@ -1244,9 +1263,78 @@ html[data-docket-page="announcements"] main > div {
     const buttons = Array.from(document.querySelectorAll("button"));
     return buttons.find((b) => b.textContent?.trim() === "Close") ?? null;
   }
+  function dueTimeFromDialog() {
+    const close = findDialogCloseButton();
+    const dialog = close?.closest('[role="dialog"]') ?? close?.parentElement ?? document.body;
+    const text = dialog.textContent ?? "";
+    const match = text.match(/(?:due|closes?)\s*:\s*[\s\S]{0,100}?(\d{1,2}:\d{2}\s*(?:a\.?m\.?|p\.?m\.?)(?:\s*M[SD]T)?)/i);
+    if (!match) return void 0;
+    return match[1].replace(/\./g, "").replace(/\s+/g, " ").trim();
+  }
+  function captureDueTime(item) {
+    const dueTime = dueTimeFromDialog();
+    if (!dueTime) return false;
+    const dueAt = schoolDateTime(item.dateIso, dueTime);
+    if (!dueAt) return false;
+    item.dueTime = dueTime;
+    item.dueAt = dueAt;
+    return true;
+  }
   var DIALOG_POLL_MS = 150;
   var DIALOG_POLL_TIMEOUT_MS = 15e3;
-  function openNativeDetail(item) {
+  var loadingDueTimes = false;
+  function waitForDialog(open, timeout = 2500) {
+    return new Promise((resolve) => {
+      let elapsed = 0;
+      const poll = () => {
+        const close = findDialogCloseButton();
+        if (open && close || !open && !close) {
+          resolve(close);
+          return;
+        }
+        elapsed += DIALOG_POLL_MS;
+        if (elapsed >= timeout) {
+          resolve(null);
+          return;
+        }
+        setTimeout(poll, DIALOG_POLL_MS);
+      };
+      poll();
+    });
+  }
+  async function loadDueTimes(compatibilityMode, button) {
+    if (loadingDueTimes) return;
+    const tasks = mergedItemsSorted().filter(
+      (item) => item.kind === "due" && !item.opens && !item.dueAt && daysUntilInSchoolTimeZone(item.dateIso) >= 0
+    );
+    if (!tasks.length) return;
+    loadingDueTimes = true;
+    button.disabled = true;
+    let found = 0;
+    const scrollParent = findScrollParent(tasks[0].anchor);
+    const scrollTop = scrollParent.scrollTop;
+    toggle2?.reveal();
+    try {
+      for (let index = 0; index < tasks.length; index++) {
+        button.textContent = `Loading due times ${index + 1}/${tasks.length}`;
+        const item = tasks[index];
+        item.anchor.click();
+        const close = await waitForDialog(true);
+        if (!close) continue;
+        if (captureDueTime(item)) found++;
+        close.click();
+        await waitForDialog(false, 1200);
+      }
+    } finally {
+      toggle2?.conceal();
+      scrollParent.scrollTop = scrollTop;
+      loadingDueTimes = false;
+      homeAdapter.mount(compatibilityMode);
+      button.disabled = false;
+      button.textContent = found ? `Loaded ${found} due times` : "Due times unavailable";
+    }
+  }
+  function openNativeDetail(item, onCaptured) {
     const scrollParent = findScrollParent(item.anchor);
     const scrollPos = scrollParent.scrollTop;
     toggle2?.reveal();
@@ -1256,8 +1344,10 @@ html[data-docket-page="announcements"] main > div {
     let elapsed = 0;
     const poll = () => {
       const open = !!findDialogCloseButton();
-      if (open) sawDialog = true;
-      else if (sawDialog) {
+      if (open) {
+        sawDialog = true;
+        if (!item.dueAt && captureDueTime(item)) onCaptured?.();
+      } else if (sawDialog) {
         toggle2?.conceal();
         scrollParent.scrollTop = scrollPos;
         return;
@@ -1317,6 +1407,8 @@ html[data-docket-page="announcements"] main > div {
                     meta: item.meta,
                     category: item.courseCode,
                     daysUntilDue: daysUntilInSchoolTimeZone(item.dateIso),
+                    dueTime: item.dueTime,
+                    dueAt: item.dueAt,
                     opensText: item.opens ? dueDateLabel(item.dateIso) : void 0,
                     completed: item.completed,
                     kind: item.kind,
@@ -1326,7 +1418,7 @@ html[data-docket-page="announcements"] main > div {
                       item.checkboxEl.click();
                     } : void 0
                   },
-                  () => openNativeDetail(item)
+                  () => openNativeDetail(item, () => homeAdapter.mount(compatibilityMode))
                 )
               )
             )
@@ -1343,7 +1435,14 @@ html[data-docket-page="announcements"] main > div {
         );
         toggle2 = createOverlayToggle(() => overlay3);
         const view = h("div", { class: "docket-scope docket-page" }, [
-          h("div", { class: "docket-header" }, [h("h1", { class: "docket-display" }, ["Today & Upcoming"])]),
+          h("div", { class: "docket-header" }, [
+            h("h1", { class: "docket-display" }, ["Today & Upcoming"]),
+            (() => {
+              const button = h("button", { class: "docket-load-due-times", type: "button" }, ["Load due times"]);
+              button.addEventListener("click", () => void loadDueTimes(compatibilityMode, button));
+              return button;
+            })()
+          ]),
           dayList,
           toggle2.button
         ]);

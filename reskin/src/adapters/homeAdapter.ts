@@ -6,7 +6,7 @@ import { assignmentCard } from "../components/assignmentCard.js";
 import { icons } from "../components/icons.js";
 import { parseSlashDate, formatIsoDate } from "../lib/parseDueText.js";
 import { dayLabel, dueDateLabel } from "../../../src/core/agendaFormatting.js";
-import { daysUntilInSchoolTimeZone } from "../../../src/core/schoolTime.js";
+import { daysUntilInSchoolTimeZone, schoolDateTime } from "../../../src/core/schoolTime.js";
 import { diagnostics } from "../core/diagnostics.js";
 import { assignCourseColors } from "../lib/courseColor.js";
 import { loadSettings } from "../core/settings.js";
@@ -48,6 +48,11 @@ interface ScheduleItem {
   /** Resynced every mount() pass from `checkboxEl.checked` (see mount()'s resync pass below) —
    * never frozen at first-seen value, since extractItems() itself only reads each anchor once. */
   completed?: boolean;
+  /** Exact clock time read from LearningSuite's own item-detail dialog. The Combined Schedule
+   * table itself only exposes the calendar date, so this is deliberately populated from the
+   * authenticated detail UI rather than guessed. */
+  dueTime?: string;
+  dueAt?: Date;
 }
 
 // Same window src/connectors/bookmarklet.ts's scheduleExtractorSource() uses, for the same
@@ -166,10 +171,91 @@ function findDialogCloseButton(): HTMLElement | null {
   return (buttons.find((b) => b.textContent?.trim() === "Close") as HTMLElement | undefined) ?? null;
 }
 
+/** LearningSuite's detail dialog is the only Combined Schedule surface that carries the
+ * deadline clock. Normalize its real label so `schoolDateTime()` can safely interpret it. */
+function dueTimeFromDialog(): string | undefined {
+  const close = findDialogCloseButton();
+  const dialog = close?.closest('[role="dialog"]') ?? close?.parentElement ?? document.body;
+  const text = dialog.textContent ?? "";
+  const match = text.match(/(?:due|closes?)\s*:\s*[\s\S]{0,100}?(\d{1,2}:\d{2}\s*(?:a\.?m\.?|p\.?m\.?)(?:\s*M[SD]T)?)/i);
+  if (!match) return undefined;
+  return match[1]!.replace(/\./g, "").replace(/\s+/g, " ").trim();
+}
+
+function captureDueTime(item: ScheduleItem): boolean {
+  const dueTime = dueTimeFromDialog();
+  if (!dueTime) return false;
+  const dueAt = schoolDateTime(item.dateIso, dueTime);
+  if (!dueAt) return false;
+  item.dueTime = dueTime;
+  item.dueAt = dueAt;
+  return true;
+}
+
 const DIALOG_POLL_MS = 150;
 // A dialog can legitimately never open at all (e.g. an exam-start flow the student backs out
 // of before it renders) — bail out rather than leave a poll loop running forever.
 const DIALOG_POLL_TIMEOUT_MS = 15000;
+
+let loadingDueTimes = false;
+
+function waitForDialog(open: boolean, timeout = 2500): Promise<HTMLElement | null> {
+  return new Promise((resolve) => {
+    let elapsed = 0;
+    const poll = () => {
+      const close = findDialogCloseButton();
+      if ((open && close) || (!open && !close)) {
+        resolve(close);
+        return;
+      }
+      elapsed += DIALOG_POLL_MS;
+      if (elapsed >= timeout) {
+        resolve(null);
+        return;
+      }
+      setTimeout(poll, DIALOG_POLL_MS);
+    };
+    poll();
+  });
+}
+
+/**
+ * The calendar list omits its deadline clock, but its existing detail dialog exposes it.
+ * This opt-in pass opens only real upcoming tasks, reads that existing text, and immediately
+ * closes each dialog. It never guesses a default deadline or makes an external request.
+ */
+async function loadDueTimes(compatibilityMode: boolean, button: HTMLButtonElement): Promise<void> {
+  if (loadingDueTimes) return;
+  const tasks = mergedItemsSorted().filter((item) =>
+    item.kind === "due" && !item.opens && !item.dueAt && daysUntilInSchoolTimeZone(item.dateIso) >= 0,
+  );
+  if (!tasks.length) return;
+  loadingDueTimes = true;
+  button.disabled = true;
+  let found = 0;
+  const scrollParent = findScrollParent(tasks[0]!.anchor);
+  const scrollTop = scrollParent.scrollTop;
+  toggle?.reveal();
+  try {
+    for (let index = 0; index < tasks.length; index++) {
+      button.textContent = `Loading due times ${index + 1}/${tasks.length}`;
+      const item = tasks[index]!;
+      item.anchor.click();
+      const close = await waitForDialog(true);
+      if (!close) continue;
+      if (captureDueTime(item)) found++;
+      close.click();
+      await waitForDialog(false, 1200);
+    }
+  } finally {
+    toggle?.conceal();
+    scrollParent.scrollTop = scrollTop;
+    loadingDueTimes = false;
+    homeAdapter.mount(compatibilityMode);
+    button.disabled = false;
+    button.textContent = found ? `Loaded ${found} due times` : "Due times unavailable";
+  }
+}
 
 /**
  * Reveals native content and re-fires the row's own click — same as every other adapter's
@@ -187,7 +273,7 @@ const DIALOG_POLL_TIMEOUT_MS = 15000;
  * either, so closing the dialog previously left the student dropped at that unrelated position
  * instead of back where they were reading (reported bug, Sep 2026: "it jumps to the bottom").
  */
-function openNativeDetail(item: ScheduleItem): void {
+function openNativeDetail(item: ScheduleItem, onCaptured?: () => void): void {
   const scrollParent = findScrollParent(item.anchor);
   const scrollPos = scrollParent.scrollTop;
 
@@ -199,7 +285,10 @@ function openNativeDetail(item: ScheduleItem): void {
   let elapsed = 0;
   const poll = () => {
     const open = !!findDialogCloseButton();
-    if (open) sawDialog = true;
+    if (open) {
+      sawDialog = true;
+      if (!item.dueAt && captureDueTime(item)) onCaptured?.();
+    }
     else if (sawDialog) {
       toggle?.conceal();
       scrollParent.scrollTop = scrollPos;
@@ -282,6 +371,8 @@ export const homeAdapter: Adapter = {
                   meta: item.meta,
                   category: item.courseCode,
                   daysUntilDue: daysUntilInSchoolTimeZone(item.dateIso),
+                  dueTime: item.dueTime,
+                  dueAt: item.dueAt,
                   opensText: item.opens ? dueDateLabel(item.dateIso) : undefined,
                   completed: item.completed,
                   kind: item.kind,
@@ -293,7 +384,7 @@ export const homeAdapter: Adapter = {
                       }
                     : undefined,
                 },
-                () => openNativeDetail(item),
+                () => openNativeDetail(item, () => homeAdapter.mount(compatibilityMode)),
               ),
             ),
           ),
@@ -313,7 +404,14 @@ export const homeAdapter: Adapter = {
       );
       toggle = createOverlayToggle(() => overlay);
       const view = h("div", { class: "docket-scope docket-page" }, [
-        h("div", { class: "docket-header" }, [h("h1", { class: "docket-display" }, ["Today & Upcoming"])]),
+        h("div", { class: "docket-header" }, [
+          h("h1", { class: "docket-display" }, ["Today & Upcoming"]),
+          (() => {
+            const button = h("button", { class: "docket-load-due-times", type: "button" }, ["Load due times"]);
+            button.addEventListener("click", () => void loadDueTimes(compatibilityMode, button));
+            return button;
+          })(),
+        ]),
         dayList,
         toggle.button,
       ]);

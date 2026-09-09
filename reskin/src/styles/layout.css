@@ -13,7 +13,26 @@
 }
 .docket-header {
   margin-bottom: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
+.docket-header .docket-display { margin: 0; }
+.docket-load-due-times {
+  border: 1px solid var(--docket-separator);
+  border-radius: 999px;
+  background: var(--docket-fill-secondary);
+  color: var(--docket-label);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.docket-load-due-times:hover { background: var(--docket-fill-tertiary); }
+.docket-load-due-times:disabled { cursor: progress; opacity: .65; }
 
 /* Course Announcements stays native by design: its instructor-authored content can include
    arbitrary rich text and links. Live audit (Sep 2026) confirmed the page's one real wrapper
