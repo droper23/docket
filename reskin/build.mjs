@@ -12,7 +12,7 @@
  * student explicitly typed in; nothing is sent, only read. See reskin/PRIVACY.md.
  */
 import { build } from "esbuild";
-import { readFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -44,13 +44,22 @@ const metadata = `// ==UserScript==
 
 mkdirSync(join(__dirname, "dist"), { recursive: true });
 
+const outfile = join(__dirname, "dist/learningsuite-reskin.user.js");
+
 await build({
   entryPoints: [join(__dirname, "src/index.ts")],
   bundle: true,
   format: "iife",
   target: "safari14",
-  outfile: join(__dirname, "dist/learningsuite-reskin.user.js"),
+  outfile,
   loader: { ".css": "text" },
   banner: { js: metadata },
   logLevel: "info",
 });
+
+// Userscripts evaluates content-mode scripts inside a function that has a
+// non-simple parameter list. A "use strict" directive is a syntax error in
+// that context; esbuild adds one to IIFE output by default. The bundle does
+// not require strict mode, so remove only that generated directive.
+const output = readFileSync(outfile, "utf8");
+writeFileSync(outfile, output.replace(/\n"use strict";\n/, "\n"));

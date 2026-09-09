@@ -14,7 +14,6 @@
 // @downloadURL  https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.15
 // ==/UserScript==
 
-"use strict";
 (() => {
   // src/styles/font-inter.css
   var font_inter_default = `/**
