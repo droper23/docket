@@ -202,7 +202,9 @@ async function loadDueTimes(compatibilityMode: boolean, button: HTMLButtonElemen
     for (let index = 0; index < links.length; index++) {
       button.textContent = `Loading due times ${index + 1}/${links.length}`;
       const course = links[index]!;
-      const url = new URL(course.href);
+      // DOMParser documents have an opaque base URL, so Course List's real relative hrefs
+      // need the live page's origin before they can be requested.
+      const url = new URL(course.href, location.origin);
       url.pathname = url.pathname.replace(/\/student\/home\/?$/, "/student/home/assignments");
       const assignmentPage = new DOMParser().parseFromString(await (await fetch(url)).text(), "text/html");
       for (const row of extractRows(assignmentPage.querySelector("main") ?? assignmentPage.body)) {

@@ -1,15 +1,15 @@
 // ==UserScript==
 // @name         LearningSuite Reskin
 // @namespace    https://github.com/droper23/docket
-// @version      0.1.10
+// @version      0.1.11
 // @description  A visual/interaction layer over BYU LearningSuite, styled like an Apple-designed app. LearningSuite stays the real backend — nothing is replaced. See reskin/README.md.
 // @author       Docket contributors
 // @match        https://learningsuite.byu.edu/*
 // @run-at       document-start
 // @grant        GM_getValue
 // @grant        GM_setValue
-// @updateURL    https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.10
-// @downloadURL  https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.10
+// @updateURL    https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.11
+// @downloadURL  https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.11
 // ==/UserScript==
 
 "use strict";
@@ -1280,7 +1280,7 @@ html[data-docket-page="announcements"] main > div {
       for (let index = 0; index < links.length; index++) {
         button.textContent = `Loading due times ${index + 1}/${links.length}`;
         const course = links[index];
-        const url = new URL(course.href);
+        const url = new URL(course.href, location.origin);
         url.pathname = url.pathname.replace(/\/student\/home\/?$/, "/student/home/assignments");
         const assignmentPage = new DOMParser().parseFromString(await (await fetch(url)).text(), "text/html");
         for (const row2 of extractRows(assignmentPage.querySelector("main") ?? assignmentPage.body)) {

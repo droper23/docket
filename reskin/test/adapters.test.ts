@@ -182,7 +182,7 @@ test("homeAdapter loads a course section's exact deadline onto today's Combined 
     const text = url.includes("/courses")
       // LearningSuite includes the section in Course List, but Combined Schedule only shows
       // the catalog code. This must still select the course's Assignments page.
-      ? '<main><a href="https://learningsuite.byu.edu/cid-math313/student/home">MATH 313 (02) Linear Algebra</a></main>'
+      ? '<main><a href="/cid-math313/student/home">MATH 313 (02) Linear Algebra</a></main>'
       : `<main><div class="bg-base text-highlight"><div></div><div>Problem Set 1</div><div>${month} ${today.getDate()} 11:59 pm MDT</div><div>Submit</div><div>/10</div></div></main>`;
     return { text: async () => text } as Response;
   }) as typeof fetch;
