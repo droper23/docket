@@ -181,13 +181,6 @@ const DIALOG_POLL_TIMEOUT_MS = 15000;
 
 let loadingDueTimes = false;
 
-/** Course List labels are e.g. "MATH 113 (016) Calculus 2", while Combined Schedule
- * shows only "MATH 113". Extract that shared catalog code without relying on a separator
- * that LearningSuite does not consistently render. */
-function courseCodeFromLabel(text: string): string {
-  return text.match(/^[A-Z]+(?:\s+[A-Z]+)*\s+\d{3,4}/)?.[0] ?? text.trim();
-}
-
 async function loadDueTimes(compatibilityMode: boolean, button: HTMLButtonElement): Promise<void> {
   if (loadingDueTimes) return;
   loadingDueTimes = true;
@@ -197,11 +190,15 @@ async function loadDueTimes(compatibilityMode: boolean, button: HTMLButtonElemen
     const courseListUrl = new URL(location.href);
     courseListUrl.pathname = courseListUrl.pathname.replace(/\/schedule$/, "/courses");
     const courses = new DOMParser().parseFromString(await (await fetch(courseListUrl)).text(), "text/html");
-    const needed = new Set(mergedItemsSorted().filter((i) => i.kind === "due" && !i.opens).map((i) => i.courseCode));
-    const links = Array.from(courses.querySelectorAll('a[href*="/cid-"]')).map((a) => ({
-      code: courseCodeFromLabel(a.textContent ?? ""), href: (a as HTMLAnchorElement).href,
-    })).filter((c) => needed.has(c.code));
-    const normalized = (title: string) => title.replace(/\s+(?:closes?|opens?)$/i, "").replace(/\s+/g, " ").trim().toLowerCase();
+    // Course List's label format varies (e.g. "MATH 113 (016) Calculus 2" vs. the
+    // schedule's "MATH 113"), so scan each connected course rather than making that
+    // presentation-only label a prerequisite for loading a real deadline.
+    const links = Array.from(courses.querySelectorAll('a[href*="/cid-"]')).map((a) => ({ href: (a as HTMLAnchorElement).href }));
+    const normalized = (title: string) => title
+      .replace(/\s+(?:closes?|opens?)$/i, "")
+      .replace(/[^\w]+/g, " ")
+      .trim()
+      .toLowerCase();
     for (let index = 0; index < links.length; index++) {
       button.textContent = `Loading due times ${index + 1}/${links.length}`;
       const course = links[index]!;
@@ -211,7 +208,7 @@ async function loadDueTimes(compatibilityMode: boolean, button: HTMLButtonElemen
       for (const row of extractRows(assignmentPage.querySelector("main") ?? assignmentPage.body)) {
         const { iso, time } = parseAssignmentDueText(row.dueText);
         if (!iso || !time) continue;
-        const item = mergedItemsSorted().find((i) => i.courseCode === course.code && i.dateIso === iso && normalized(i.title) === normalized(row.title));
+        const item = mergedItemsSorted().find((i) => i.dateIso === iso && normalized(i.title) === normalized(row.title));
         const dueAt = item && schoolDateTime(iso, time);
         if (item && dueAt) { item.dueTime = time; item.dueAt = dueAt; found++; }
       }

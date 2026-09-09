@@ -1,15 +1,15 @@
 // ==UserScript==
 // @name         LearningSuite Reskin
 // @namespace    https://github.com/droper23/docket
-// @version      0.1.9
+// @version      0.1.10
 // @description  A visual/interaction layer over BYU LearningSuite, styled like an Apple-designed app. LearningSuite stays the real backend — nothing is replaced. See reskin/README.md.
 // @author       Docket contributors
 // @match        https://learningsuite.byu.edu/*
 // @run-at       document-start
 // @grant        GM_getValue
 // @grant        GM_setValue
-// @updateURL    https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.9
-// @downloadURL  https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.9
+// @updateURL    https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.10
+// @downloadURL  https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.10
 // ==/UserScript==
 
 "use strict";
@@ -1266,9 +1266,6 @@ html[data-docket-page="announcements"] main > div {
   var DIALOG_POLL_MS = 150;
   var DIALOG_POLL_TIMEOUT_MS = 15e3;
   var loadingDueTimes = false;
-  function courseCodeFromLabel(text) {
-    return text.match(/^[A-Z]+(?:\s+[A-Z]+)*\s+\d{3,4}/)?.[0] ?? text.trim();
-  }
   async function loadDueTimes(compatibilityMode, button) {
     if (loadingDueTimes) return;
     loadingDueTimes = true;
@@ -1278,12 +1275,8 @@ html[data-docket-page="announcements"] main > div {
       const courseListUrl = new URL(location.href);
       courseListUrl.pathname = courseListUrl.pathname.replace(/\/schedule$/, "/courses");
       const courses = new DOMParser().parseFromString(await (await fetch(courseListUrl)).text(), "text/html");
-      const needed = new Set(mergedItemsSorted().filter((i) => i.kind === "due" && !i.opens).map((i) => i.courseCode));
-      const links = Array.from(courses.querySelectorAll('a[href*="/cid-"]')).map((a) => ({
-        code: courseCodeFromLabel(a.textContent ?? ""),
-        href: a.href
-      })).filter((c) => needed.has(c.code));
-      const normalized = (title) => title.replace(/\s+(?:closes?|opens?)$/i, "").replace(/\s+/g, " ").trim().toLowerCase();
+      const links = Array.from(courses.querySelectorAll('a[href*="/cid-"]')).map((a) => ({ href: a.href }));
+      const normalized = (title) => title.replace(/\s+(?:closes?|opens?)$/i, "").replace(/[^\w]+/g, " ").trim().toLowerCase();
       for (let index = 0; index < links.length; index++) {
         button.textContent = `Loading due times ${index + 1}/${links.length}`;
         const course = links[index];
@@ -1293,7 +1286,7 @@ html[data-docket-page="announcements"] main > div {
         for (const row2 of extractRows(assignmentPage.querySelector("main") ?? assignmentPage.body)) {
           const { iso, time } = parseAssignmentDueText(row2.dueText);
           if (!iso || !time) continue;
-          const item = mergedItemsSorted().find((i) => i.courseCode === course.code && i.dateIso === iso && normalized(i.title) === normalized(row2.title));
+          const item = mergedItemsSorted().find((i) => i.dateIso === iso && normalized(i.title) === normalized(row2.title));
           const dueAt = item && schoolDateTime(iso, time);
           if (item && dueAt) {
             item.dueTime = time;
