@@ -1,15 +1,15 @@
 // ==UserScript==
 // @name         LearningSuite Reskin
 // @namespace    https://github.com/droper23/docket
-// @version      0.1.6
+// @version      0.1.7
 // @description  A visual/interaction layer over BYU LearningSuite, styled like an Apple-designed app. LearningSuite stays the real backend — nothing is replaced. See reskin/README.md.
 // @author       Docket contributors
 // @match        https://learningsuite.byu.edu/*
 // @run-at       document-start
 // @grant        GM_getValue
 // @grant        GM_setValue
-// @updateURL    https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.6
-// @downloadURL  https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.6
+// @updateURL    https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.7
+// @downloadURL  https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.7
 // ==/UserScript==
 
 "use strict";
@@ -1263,71 +1263,43 @@ html[data-docket-page="announcements"] main > div {
     const buttons = Array.from(document.querySelectorAll("button"));
     return buttons.find((b) => b.textContent?.trim() === "Close") ?? null;
   }
-  function dueTimeFromDialog() {
-    const close = findDialogCloseButton();
-    const dialog = close?.closest('[role="dialog"]') ?? close?.parentElement ?? document.body;
-    const text = dialog.textContent ?? "";
-    const match = text.match(/(?:due|closes?)\s*:\s*[\s\S]{0,100}?(\d{1,2}:\d{2}\s*(?:a\.?m\.?|p\.?m\.?)(?:\s*M[SD]T)?)/i);
-    if (!match) return void 0;
-    return match[1].replace(/\./g, "").replace(/\s+/g, " ").trim();
-  }
-  function captureDueTime(item) {
-    const dueTime = dueTimeFromDialog();
-    if (!dueTime) return false;
-    const dueAt = schoolDateTime(item.dateIso, dueTime);
-    if (!dueAt) return false;
-    item.dueTime = dueTime;
-    item.dueAt = dueAt;
-    return true;
-  }
   var DIALOG_POLL_MS = 150;
   var DIALOG_POLL_TIMEOUT_MS = 15e3;
   var loadingDueTimes = false;
-  function waitForDialog(open, timeout = 2500) {
-    return new Promise((resolve) => {
-      let elapsed = 0;
-      const poll = () => {
-        const close = findDialogCloseButton();
-        if (open && close || !open && !close) {
-          resolve(close);
-          return;
-        }
-        elapsed += DIALOG_POLL_MS;
-        if (elapsed >= timeout) {
-          resolve(null);
-          return;
-        }
-        setTimeout(poll, DIALOG_POLL_MS);
-      };
-      poll();
-    });
-  }
   async function loadDueTimes(compatibilityMode, button) {
     if (loadingDueTimes) return;
-    const tasks = mergedItemsSorted().filter(
-      (item) => item.kind === "due" && !item.opens && !item.dueAt && daysUntilInSchoolTimeZone(item.dateIso) >= 0
-    );
-    if (!tasks.length) return;
     loadingDueTimes = true;
     button.disabled = true;
     let found = 0;
-    const scrollParent = findScrollParent(tasks[0].anchor);
-    const scrollTop = scrollParent.scrollTop;
-    toggle2?.reveal();
     try {
-      for (let index = 0; index < tasks.length; index++) {
-        button.textContent = `Loading due times ${index + 1}/${tasks.length}`;
-        const item = tasks[index];
-        item.anchor.click();
-        const close = await waitForDialog(true);
-        if (!close) continue;
-        if (captureDueTime(item)) found++;
-        close.click();
-        await waitForDialog(false, 1200);
+      const courseListUrl = new URL(location.href);
+      courseListUrl.pathname = courseListUrl.pathname.replace(/\/schedule$/, "/courses");
+      const courses = new DOMParser().parseFromString(await (await fetch(courseListUrl)).text(), "text/html");
+      const needed = new Set(mergedItemsSorted().filter((i) => i.kind === "due" && !i.opens).map((i) => i.courseCode));
+      const links = Array.from(courses.querySelectorAll('a[href*="/cid-"]')).map((a) => ({
+        code: (a.textContent ?? "").split(" - ")[0].trim(),
+        href: a.href
+      })).filter((c) => needed.has(c.code));
+      const normalized = (title) => title.replace(/\s+(?:closes?|opens?)$/i, "").replace(/\s+/g, " ").trim().toLowerCase();
+      for (let index = 0; index < links.length; index++) {
+        button.textContent = `Loading due times ${index + 1}/${links.length}`;
+        const course = links[index];
+        const url = new URL(course.href);
+        url.pathname = url.pathname.replace(/\/student\/home\/?$/, "/student/home/assignments");
+        const assignmentPage = new DOMParser().parseFromString(await (await fetch(url)).text(), "text/html");
+        for (const row2 of extractRows(assignmentPage.querySelector("main") ?? assignmentPage.body)) {
+          const { iso, time } = parseAssignmentDueText(row2.dueText);
+          if (!iso || !time) continue;
+          const item = mergedItemsSorted().find((i) => i.courseCode === course.code && i.dateIso === iso && normalized(i.title) === normalized(row2.title));
+          const dueAt = item && schoolDateTime(iso, time);
+          if (item && dueAt) {
+            item.dueTime = time;
+            item.dueAt = dueAt;
+            found++;
+          }
+        }
       }
     } finally {
-      toggle2?.conceal();
-      scrollParent.scrollTop = scrollTop;
       loadingDueTimes = false;
       homeAdapter.mount(compatibilityMode);
       button.disabled = false;
@@ -1346,7 +1318,7 @@ html[data-docket-page="announcements"] main > div {
       const open = !!findDialogCloseButton();
       if (open) {
         sawDialog = true;
-        if (!item.dueAt && captureDueTime(item)) onCaptured?.();
+        if (!item.dueAt) onCaptured?.();
       } else if (sawDialog) {
         toggle2?.conceal();
         scrollParent.scrollTop = scrollPos;

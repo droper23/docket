@@ -3,8 +3,9 @@ import { looksLikeScheduleListView } from "../core/pageDetector.js";
 import { overlayContent, markProcessed, isProcessed, h, listItem, createOverlayToggle, findScrollParent } from "../lib/dom.js";
 import type { Overlay, OverlayToggle } from "../lib/dom.js";
 import { assignmentCard } from "../components/assignmentCard.js";
+import { extractRows } from "./assignmentsAdapter.js";
 import { icons } from "../components/icons.js";
-import { parseSlashDate, formatIsoDate } from "../lib/parseDueText.js";
+import { parseSlashDate, formatIsoDate, parseAssignmentDueText } from "../lib/parseDueText.js";
 import { dayLabel, dueDateLabel } from "../../../src/core/agendaFormatting.js";
 import { daysUntilInSchoolTimeZone, schoolDateTime } from "../../../src/core/schoolTime.js";
 import { diagnostics } from "../core/diagnostics.js";
@@ -173,25 +174,6 @@ function findDialogCloseButton(): HTMLElement | null {
 
 /** LearningSuite's detail dialog is the only Combined Schedule surface that carries the
  * deadline clock. Normalize its real label so `schoolDateTime()` can safely interpret it. */
-function dueTimeFromDialog(): string | undefined {
-  const close = findDialogCloseButton();
-  const dialog = close?.closest('[role="dialog"]') ?? close?.parentElement ?? document.body;
-  const text = dialog.textContent ?? "";
-  const match = text.match(/(?:due|closes?)\s*:\s*[\s\S]{0,100}?(\d{1,2}:\d{2}\s*(?:a\.?m\.?|p\.?m\.?)(?:\s*M[SD]T)?)/i);
-  if (!match) return undefined;
-  return match[1]!.replace(/\./g, "").replace(/\s+/g, " ").trim();
-}
-
-function captureDueTime(item: ScheduleItem): boolean {
-  const dueTime = dueTimeFromDialog();
-  if (!dueTime) return false;
-  const dueAt = schoolDateTime(item.dateIso, dueTime);
-  if (!dueAt) return false;
-  item.dueTime = dueTime;
-  item.dueAt = dueAt;
-  return true;
-}
-
 const DIALOG_POLL_MS = 150;
 // A dialog can legitimately never open at all (e.g. an exam-start flow the student backs out
 // of before it renders) — bail out rather than leave a poll loop running forever.
@@ -199,57 +181,35 @@ const DIALOG_POLL_TIMEOUT_MS = 15000;
 
 let loadingDueTimes = false;
 
-function waitForDialog(open: boolean, timeout = 2500): Promise<HTMLElement | null> {
-  return new Promise((resolve) => {
-    let elapsed = 0;
-    const poll = () => {
-      const close = findDialogCloseButton();
-      if ((open && close) || (!open && !close)) {
-        resolve(close);
-        return;
-      }
-      elapsed += DIALOG_POLL_MS;
-      if (elapsed >= timeout) {
-        resolve(null);
-        return;
-      }
-      setTimeout(poll, DIALOG_POLL_MS);
-    };
-    poll();
-  });
-}
-
-/**
- * The calendar list omits its deadline clock, but its existing detail dialog exposes it.
- * This opt-in pass opens only real upcoming tasks, reads that existing text, and immediately
- * closes each dialog. It never guesses a default deadline or makes an external request.
- */
 async function loadDueTimes(compatibilityMode: boolean, button: HTMLButtonElement): Promise<void> {
   if (loadingDueTimes) return;
-  const tasks = mergedItemsSorted().filter((item) =>
-    item.kind === "due" && !item.opens && !item.dueAt && daysUntilInSchoolTimeZone(item.dateIso) >= 0,
-  );
-  if (!tasks.length) return;
   loadingDueTimes = true;
   button.disabled = true;
   let found = 0;
-  const scrollParent = findScrollParent(tasks[0]!.anchor);
-  const scrollTop = scrollParent.scrollTop;
-  toggle?.reveal();
   try {
-    for (let index = 0; index < tasks.length; index++) {
-      button.textContent = `Loading due times ${index + 1}/${tasks.length}`;
-      const item = tasks[index]!;
-      item.anchor.click();
-      const close = await waitForDialog(true);
-      if (!close) continue;
-      if (captureDueTime(item)) found++;
-      close.click();
-      await waitForDialog(false, 1200);
+    const courseListUrl = new URL(location.href);
+    courseListUrl.pathname = courseListUrl.pathname.replace(/\/schedule$/, "/courses");
+    const courses = new DOMParser().parseFromString(await (await fetch(courseListUrl)).text(), "text/html");
+    const needed = new Set(mergedItemsSorted().filter((i) => i.kind === "due" && !i.opens).map((i) => i.courseCode));
+    const links = Array.from(courses.querySelectorAll('a[href*="/cid-"]')).map((a) => ({
+      code: (a.textContent ?? "").split(" - ")[0]!.trim(), href: (a as HTMLAnchorElement).href,
+    })).filter((c) => needed.has(c.code));
+    const normalized = (title: string) => title.replace(/\s+(?:closes?|opens?)$/i, "").replace(/\s+/g, " ").trim().toLowerCase();
+    for (let index = 0; index < links.length; index++) {
+      button.textContent = `Loading due times ${index + 1}/${links.length}`;
+      const course = links[index]!;
+      const url = new URL(course.href);
+      url.pathname = url.pathname.replace(/\/student\/home\/?$/, "/student/home/assignments");
+      const assignmentPage = new DOMParser().parseFromString(await (await fetch(url)).text(), "text/html");
+      for (const row of extractRows(assignmentPage.querySelector("main") ?? assignmentPage.body)) {
+        const { iso, time } = parseAssignmentDueText(row.dueText);
+        if (!iso || !time) continue;
+        const item = mergedItemsSorted().find((i) => i.courseCode === course.code && i.dateIso === iso && normalized(i.title) === normalized(row.title));
+        const dueAt = item && schoolDateTime(iso, time);
+        if (item && dueAt) { item.dueTime = time; item.dueAt = dueAt; found++; }
+      }
     }
   } finally {
-    toggle?.conceal();
-    scrollParent.scrollTop = scrollTop;
     loadingDueTimes = false;
     homeAdapter.mount(compatibilityMode);
     button.disabled = false;
@@ -287,7 +247,7 @@ function openNativeDetail(item: ScheduleItem, onCaptured?: () => void): void {
     const open = !!findDialogCloseButton();
     if (open) {
       sawDialog = true;
-      if (!item.dueAt && captureDueTime(item)) onCaptured?.();
+      if (!item.dueAt) onCaptured?.();
     }
     else if (sawDialog) {
       toggle?.conceal();
