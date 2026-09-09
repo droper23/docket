@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         LearningSuite Reskin
 // @namespace    https://github.com/droper23/docket
-// @version      0.1.13
+// @version      0.1.15
 // @description  A visual/interaction layer over BYU LearningSuite, styled like an Apple-designed app. LearningSuite stays the real backend — nothing is replaced. See reskin/README.md.
 // @author       Docket contributors
 // @match        https://learningsuite.byu.edu/*
@@ -10,8 +10,8 @@
 // @grant        GM_setValue
 // @grant        GM_xmlhttpRequest
 // @connect      max.byu.edu
-// @updateURL    https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.13
-// @downloadURL  https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.13
+// @updateURL    https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.15
+// @downloadURL  https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.15
 // ==/UserScript==
 
 "use strict";
@@ -1537,9 +1537,11 @@ html[data-docket-page="announcements"] main > div {
       }
     } finally {
       loadingDueTimes = false;
-      homeAdapter.mount(compatibilityMode);
-      button.disabled = false;
-      button.textContent = found ? `Loaded ${found} due times` : "Due times unavailable";
+      if (overlay3) {
+        homeAdapter.mount(compatibilityMode);
+        button.disabled = false;
+        button.textContent = found ? `Loaded ${found} due times` : "Due times unavailable";
+      }
     }
   }
   function openNativeDetail(item, onCaptured) {
@@ -1674,6 +1676,7 @@ html[data-docket-page="announcements"] main > div {
       dayList = null;
       toggle2 = null;
       scrolledToToday = false;
+      loadingDueTimes = false;
       for (const a of processedAnchors) {
         a.removeAttribute("data-docket-scheduleitem");
         accumulated.delete(a);
