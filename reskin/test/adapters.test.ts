@@ -12,6 +12,7 @@ import { gradeSummaryAdapter } from "../src/adapters/gradeSummaryAdapter.js";
 import { dashboardAdapter } from "../src/adapters/dashboardAdapter.js";
 import { formatIsoDate } from "../src/lib/parseDueText.js";
 import { dueDateLabel } from "../../src/core/agendaFormatting.js";
+import { DEFAULT_SETTINGS, saveSettings } from "../src/core/settings.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const courseListHtml = readFileSync(join(__dirname, "fixtures/course-list.html"), "utf8");
@@ -469,5 +470,76 @@ test("dashboardAdapter preserves every real anchor in a paragraph, not just the 
     assert.equal(recordingClicked, false);
   } finally {
     dashboardAdapter.unmount();
+  }
+});
+
+test("homeAdapter merges an 'External Calendars' iCalendar feed into the Combined Schedule agenda", async () => {
+  // Appended last in this file, and never resets homeAdapter's own module-level
+  // externalItems/externalFeedsLoadedForKey cache (see homeAdapter.ts's doc comment on why
+  // that's safe in production — Settings changes always force a full page reload) — so this
+  // must stay the final test to touch homeAdapter, or a later test would inherit this feed.
+  const todayIso = formatIsoDate(new Date());
+  const todayCompact = todayIso.replace(/-/g, "");
+  // Real shape confirmed live against a BYU MAX (max.byu.edu) Physics 121 feed, Sep 2026:
+  // DESCRIPTION reads "<title> is due at H:MM, <url>" and RFC 5545 line-folds past 75 octets
+  // (a continuation line starting with a single space) — both reproduced here, not simplified
+  // away, since parseIcs()'s unfold() is exactly what has to handle this correctly.
+  const ics = [
+    "BEGIN:VCALENDAR",
+    "BEGIN:VEVENT",
+    "UID:max-hw2@max.byu.edu",
+    "SUMMARY:Homework 2",
+    `DTSTART;VALUE=DATE:${todayCompact}`,
+    "DESCRIPTION:Homework 2 is due at 23:59\\, https://max.byu.edu/20265-phscs",
+    " 121/content/homework/2",
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n");
+
+  setupDom("<main></main>", "https://learningsuite.byu.edu/.sess1/student/top/schedule");
+  const g = globalThis as unknown as Record<string, unknown>;
+  // storage.ts prefers GM_getValue/GM_setValue over localStorage — mocked directly so this
+  // test doesn't depend on whether Node's test environment has a working localStorage.
+  const gmStore: Record<string, unknown> = {};
+  g["GM_getValue"] = (key: string, def: unknown) => (key in gmStore ? gmStore[key] : def);
+  g["GM_setValue"] = (key: string, value: unknown) => {
+    gmStore[key] = value;
+  };
+  saveSettings({ ...DEFAULT_SETTINGS, externalFeeds: [{ label: "PHSCS 121", url: "https://max.byu.edu/calendar/ical/20265-phscs121/3" }] });
+  const requestedUrls: string[] = [];
+  g["GM_xmlhttpRequest"] = (details: { url: string; onload: (r: { status: number; responseText: string }) => void }) => {
+    requestedUrls.push(details.url);
+    details.onload({ status: 200, responseText: ics });
+  };
+  const originalOpen = window.open;
+  const openedUrls: string[] = [];
+  window.open = ((url?: string | URL) => {
+    openedUrls.push(String(url));
+    return null;
+  }) as typeof window.open;
+
+  try {
+    homeAdapter.mount(false);
+    // loadExternalFeeds() fetches and re-mounts from its own `finally` block — both async hops
+    // (the GM_xmlhttpRequest call above resolves synchronously, but the surrounding Promise
+    // chain in gmFetchText/loadExternalFeeds still needs a couple of microtask turns).
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.deepEqual(requestedUrls, ["https://max.byu.edu/calendar/ical/20265-phscs121/3"]);
+    const titles = Array.from(document.querySelectorAll(".docket-row-title")).map((el) => el.textContent);
+    assert.ok(titles.includes("Homework 2"), "the external feed's item must appear in the merged agenda");
+    const subtitle = Array.from(document.querySelectorAll(".docket-row-subtitle")).find((el) => el.textContent?.includes("PHSCS 121"))!.textContent;
+    assert.match(subtitle!, /11:59 pm/, "MAX's own due-time convention (\"is due at HH:MM\") must be parsed, not just the bare date");
+
+    const openBtn = Array.from(document.querySelectorAll(".docket-row")).find((row) => row.querySelector(".docket-row-title")?.textContent === "Homework 2")!.querySelector(".docket-row-open") as HTMLElement;
+    openBtn.click();
+    assert.deepEqual(openedUrls, ["https://max.byu.edu/20265-phscs121/content/homework/2"], "opening an external item must go to its real MAX URL in a new tab, never LearningSuite's own (nonexistent) detail dialog");
+  } finally {
+    window.open = originalOpen;
+    delete g["GM_xmlhttpRequest"];
+    delete g["GM_getValue"];
+    delete g["GM_setValue"];
+    homeAdapter.unmount();
   }
 });

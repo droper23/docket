@@ -1,15 +1,17 @@
 // ==UserScript==
 // @name         LearningSuite Reskin
 // @namespace    https://github.com/droper23/docket
-// @version      0.1.12
+// @version      0.1.13
 // @description  A visual/interaction layer over BYU LearningSuite, styled like an Apple-designed app. LearningSuite stays the real backend — nothing is replaced. See reskin/README.md.
 // @author       Docket contributors
 // @match        https://learningsuite.byu.edu/*
 // @run-at       document-start
 // @grant        GM_getValue
 // @grant        GM_setValue
-// @updateURL    https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.12
-// @downloadURL  https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.12
+// @grant        GM_xmlhttpRequest
+// @connect      max.byu.edu
+// @updateURL    https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.13
+// @downloadURL  https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.13
 // ==/UserScript==
 
 "use strict";
@@ -717,7 +719,8 @@ html[data-docket-page="announcements"] main > div {
     compatibilityMode: false,
     reducedMotion: false,
     background: "default",
-    courseColors: {}
+    courseColors: {},
+    externalFeeds: []
   };
   var KEY = "settings";
   function loadSettings() {
@@ -1202,6 +1205,159 @@ html[data-docket-page="announcements"] main > div {
     Syllabus: "clipboard"
   };
 
+  // ../src/connectors/icsParser.ts
+  function unfold(raw) {
+    const rawLines = raw.split(/\r\n|\n|\r/);
+    const lines = [];
+    for (const line of rawLines) {
+      if ((line.startsWith(" ") || line.startsWith("	")) && lines.length > 0) {
+        lines[lines.length - 1] += line.slice(1);
+      } else {
+        lines.push(line);
+      }
+    }
+    return lines;
+  }
+  var HTML_ENTITIES = {
+    "&amp;": "&",
+    "&lt;": "<",
+    "&gt;": ">",
+    "&quot;": '"',
+    "&#39;": "'",
+    "&apos;": "'",
+    "&nbsp;": " ",
+    "&ldquo;": "\u201C",
+    "&rdquo;": "\u201D",
+    "&lsquo;": "\u2018",
+    "&rsquo;": "\u2019",
+    "&ndash;": "\u2013",
+    "&mdash;": "\u2014",
+    "&hellip;": "\u2026"
+  };
+  function decodeHtmlEntities(value) {
+    let out = value;
+    for (let i = 0; i < 3; i++) {
+      const next = out.replace(/&(amp|lt|gt|quot|#39|apos|nbsp|ldquo|rdquo|lsquo|rsquo|ndash|mdash|hellip);/g, (m) => HTML_ENTITIES[m] ?? m).replace(/&#(\d+);/g, (_m, code) => String.fromCharCode(Number(code)));
+      if (next === out) break;
+      out = next;
+    }
+    return out;
+  }
+  function unescapeText(value) {
+    const icsUnescaped = value.replace(/\\n/gi, "\n").replace(/\\,/g, ",").replace(/\\;/g, ";").replace(/\\\\/g, "\\");
+    return decodeHtmlEntities(icsUnescaped);
+  }
+  function parseLine(line) {
+    const colonIndex = line.indexOf(":");
+    if (colonIndex === -1) return null;
+    const head = line.slice(0, colonIndex);
+    const value = line.slice(colonIndex + 1);
+    const [name, ...paramParts] = head.split(";");
+    if (!name) return null;
+    const params = {};
+    for (const part of paramParts) {
+      const eq = part.indexOf("=");
+      if (eq === -1) continue;
+      params[part.slice(0, eq).toUpperCase()] = part.slice(eq + 1);
+    }
+    return { name: name.toUpperCase(), params, value };
+  }
+  function parseDateValue(value) {
+    const dateOnly = /^(\d{4})(\d{2})(\d{2})$/;
+    const dateTime = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z?$/;
+    let m = value.match(dateTime);
+    if (m) {
+      const [, y, mo, d, h2, mi, s] = m;
+      return { dateTime: `${y}-${mo}-${d}T${h2}:${mi}:${s}` };
+    }
+    m = value.match(dateOnly);
+    if (m) {
+      const [, y, mo, d] = m;
+      return { date: `${y}-${mo}-${d}` };
+    }
+    return {};
+  }
+  function parseIcs(raw) {
+    const lines = unfold(raw);
+    const events = [];
+    let current = null;
+    for (const line of lines) {
+      if (line === "BEGIN:VEVENT") {
+        current = { allDay: false };
+        continue;
+      }
+      if (line === "END:VEVENT") {
+        if (current && current.uid && current.summary) {
+          events.push(current);
+        }
+        current = null;
+        continue;
+      }
+      if (!current) continue;
+      const parsed = parseLine(line);
+      if (!parsed) continue;
+      const { name, params, value } = parsed;
+      switch (name) {
+        case "UID":
+          current.uid = value.trim();
+          break;
+        case "SUMMARY":
+          current.summary = unescapeText(value.trim());
+          break;
+        case "DESCRIPTION":
+          current.description = unescapeText(value.trim());
+          break;
+        case "DTSTART": {
+          const { date, dateTime } = parseDateValue(value.trim());
+          if (date) {
+            current.startDate = date;
+            current.allDay = params.VALUE === "DATE" || true;
+          }
+          if (dateTime) {
+            current.startDateTime = dateTime;
+            current.allDay = false;
+          }
+          break;
+        }
+        case "DTEND": {
+          const { date, dateTime } = parseDateValue(value.trim());
+          if (date) current.endDate = date;
+          if (dateTime) current.endDateTime = dateTime;
+          break;
+        }
+        default:
+          break;
+      }
+    }
+    return events;
+  }
+
+  // src/lib/gmRequest.ts
+  function gmFetchText(url) {
+    return new Promise((resolve, reject) => {
+      if (typeof GM_xmlhttpRequest !== "function") {
+        reject(new Error("GM_xmlhttpRequest not granted by this userscript manager"));
+        return;
+      }
+      try {
+        GM_xmlhttpRequest({
+          method: "GET",
+          url,
+          headers: { Accept: "text/calendar" },
+          timeout: 15e3,
+          onload: (response) => {
+            if (response.status >= 200 && response.status < 300) resolve(response.responseText);
+            else reject(new Error(`HTTP ${response.status}`));
+          },
+          onerror: () => reject(new Error("network error")),
+          ontimeout: () => reject(new Error("timed out"))
+        });
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
+    });
+  }
+
   // src/adapters/homeAdapter.ts
   var WINDOW_DAYS_PAST = 120;
   var WINDOW_DAYS_FUTURE = 14;
@@ -1245,8 +1401,61 @@ html[data-docket-page="announcements"] main > div {
     return results;
   }
   var accumulated = /* @__PURE__ */ new Map();
+  var externalItems = [];
+  var externalFeedsLoadedForKey = "";
+  var loadingExternalFeeds = false;
+  function parseMaxDescription(description) {
+    if (!description) return {};
+    const timeMatch = description.match(/is due at (\d{1,2}):(\d{2})/i);
+    const urlMatch = description.match(/https?:\/\/\S+/);
+    if (!timeMatch) return { url: urlMatch?.[0] };
+    const hour24 = Number(timeMatch[1]);
+    const hour12 = hour24 % 12 || 12;
+    return { time: `${hour12}:${timeMatch[2]} ${hour24 >= 12 ? "pm" : "am"}`, url: urlMatch?.[0] };
+  }
+  async function loadExternalFeeds(compatibilityMode) {
+    const feeds = loadSettings().externalFeeds;
+    const key = JSON.stringify(feeds);
+    if (!feeds.length || key === externalFeedsLoadedForKey || loadingExternalFeeds) return;
+    loadingExternalFeeds = true;
+    try {
+      const now = /* @__PURE__ */ new Date();
+      const minDate = new Date(now.getTime() - WINDOW_DAYS_PAST * 864e5);
+      const maxDate = new Date(now.getTime() + WINDOW_DAYS_FUTURE * 864e5);
+      const results = [];
+      for (const feed of feeds) {
+        try {
+          const raw = await gmFetchText(feed.url);
+          for (const ev of parseIcs(raw)) {
+            const dateIso = ev.endDate ?? ev.startDate ?? ev.endDateTime?.slice(0, 10) ?? ev.startDateTime?.slice(0, 10);
+            if (!dateIso) continue;
+            const date = /* @__PURE__ */ new Date(`${dateIso}T00:00:00`);
+            if (date < minDate || date > maxDate) continue;
+            const { time, url } = parseMaxDescription(ev.description);
+            results.push({
+              title: ev.summary,
+              courseCode: feed.label,
+              dateIso,
+              opens: false,
+              kind: "due",
+              dueTime: time,
+              dueAt: time ? schoolDateTime(dateIso, time) : void 0,
+              href: url
+            });
+          }
+        } catch (error) {
+          console.warn("[LearningSuite Reskin] loadExternalFeeds: skipping a feed", feed.label, error);
+        }
+      }
+      externalItems = results;
+      externalFeedsLoadedForKey = key;
+    } finally {
+      loadingExternalFeeds = false;
+      homeAdapter.mount(compatibilityMode);
+    }
+  }
   function mergedItemsSorted() {
-    const items = [...accumulated.values()];
+    const items = [...accumulated.values(), ...externalItems];
     items.sort((x, y) => x.dateIso.localeCompare(y.dateIso));
     return items;
   }
@@ -1368,8 +1577,9 @@ html[data-docket-page="announcements"] main > div {
     mount(compatibilityMode) {
       const main = document.querySelector("main");
       if (!main) return;
+      void loadExternalFeeds(compatibilityMode);
       const items = extractItems(main);
-      if (!items.length && !overlay3) return;
+      if (!items.length && !overlay3 && !externalItems.length) return;
       for (const i of items) {
         markProcessed(i.anchor, "scheduleitem");
         accumulated.set(i.anchor, i);
@@ -1417,7 +1627,7 @@ html[data-docket-page="announcements"] main > div {
                       item.checkboxEl.click();
                     } : void 0
                   },
-                  () => openNativeDetail(item, () => homeAdapter.mount(compatibilityMode))
+                  item.anchor ? () => openNativeDetail(item, () => homeAdapter.mount(compatibilityMode)) : item.href ? () => window.open(item.href, "_blank", "noopener") : void 0
                 )
               )
             )
@@ -1745,7 +1955,7 @@ html[data-docket-page="announcements"] main > div {
   ];
 
   // src/styles/panel.css
-  var panel_default = '/**\n * Embedded directly into each panel\'s own Shadow DOM (see components/settingsPanel.ts\n * and diagnosticsPanel.ts).\n *\n * Consumes the real page\'s own design tokens via `var(--docket-token, fallback)` rather than\n * hardcoding a separate palette \u2014 confirmed live (Sep 2026) that CSS custom properties are\n * excluded from what `:host { all: initial; }` resets below, and DO inherit into a shadow\n * tree from the shadow host\'s own inherited value: `getComputedStyle()` on an element inside\n * this very shadow root already resolves `--docket-accent`/`--docket-surface-2`/etc. to the\n * exact values `document.documentElement` carries, with no manual JS threading required. Each\n * `var()` below still keeps a literal fallback (this file\'s own previous hardcoded value, where\n * reasonable) for the narrow case where the reskin\'s own stylesheet somehow isn\'t in scope yet.\n * A prior version of this file used a bespoke iOS-era palette instead (`rgba(242,242,247,0.82)`\n * translucent glass, `#007aff` system blue, `#34c759` system green) \u2014 confirmed live that this\n * was the one screenshot in a full-page audit that still read as a visibly older-generation\n * product than the opaque, flat-accent pages around it.\n *\n * Dark/light is resolved from BOTH the inherited tokens above (which already flip per-theme at\n * `document.documentElement`) AND the `data-docket-theme` attribute the host element carries\n * (set explicitly at mount time in settingsPanel.ts/diagnosticsPanel.ts from the exact same\n * value src/index.ts\'s applyTheme() just computed) \u2014 the attribute still matters for the one\n * thing that ISN\'T a custom property, `prefers-color-scheme`-independent behavior is otherwise\n * automatic once the real tokens are in scope. Same pattern for `data-docket-reduced-motion`.\n */\n:host { all: initial; }\n* { box-sizing: border-box; }\n.backdrop {\n  position: fixed; inset: 0;\n  background: rgba(0, 0, 0, 0.32);\n  display: flex; align-items: center; justify-content: center;\n  z-index: 2147483000;\n  font-family: var(--docket-font, "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif);\n}\n.sheet {\n  width: min(420px, 92vw);\n  max-height: 86vh;\n  overflow-y: auto;\n  /* Opaque, not translucent glass \u2014 matches every other surface in the app (see tokens.css\'s\n     own comment: the one surviving shadow token is explicitly reserved for genuinely floating\n     chrome INCLUDING this sheet, but that\'s a shadow, not a blur-backed material). */\n  background: var(--docket-surface-2, #f1f3f4);\n  color: var(--docket-label, #1f1f1f);\n  border: 1px solid var(--docket-separator, #dadce0);\n  border-radius: var(--docket-radius-lg, 20px);\n  box-shadow: var(--docket-shadow-float, 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 8px rgba(0, 0, 0, 0.15));\n}\n.sheet-header {\n  display: flex; align-items: center; justify-content: space-between;\n  padding: 16px 18px 10px; font-size: 17px; font-weight: 700;\n}\n.sheet-close {\n  border: none; background: var(--docket-fill, #eceef0); color: inherit;\n  width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 15px;\n}\n/* A Shadow DOM root inherits none of the page\'s own focus styling (or global.css\'s own\n   :focus-visible rules \u2014 those can\'t cross the boundary either), so every real button/select\n   in this panel needs its own ring defined right here, matching the same recipe used\n   everywhere else in the reskin. */\n.sheet-close:focus-visible,\n.swatch:focus-visible,\n.switch:focus-visible,\nselect:focus-visible,\nbutton.seg:focus-visible {\n  outline: 2px solid var(--docket-accent, #0b57d0);\n  outline-offset: 2px;\n}\n/* Same grouped-list idiom as the page\'s own `.docket-group` (cards.css) \u2014 a bordered,\n   rounded, hairline-divided card, not a translucent chrome-gray fill. */\n.group {\n  margin: 10px 14px 16px;\n  background: var(--docket-surface-1, #f8f9fa);\n  border: 1px solid var(--docket-separator, #dadce0);\n  border-radius: var(--docket-radius-md, 14px);\n  overflow: hidden;\n}\n.row {\n  display: flex; align-items: center; justify-content: space-between;\n  padding: 11px 14px; font-size: 14px; border-bottom: 1px solid var(--docket-separator, #dadce0);\n  min-height: 44px;\n}\n.row:last-child { border-bottom: none; }\n.row-col { flex-direction: column; align-items: stretch; gap: 10px; }\n.row-label { font-weight: 500; }\n/* Settings > Background: macOS-System-Settings-style swatch strip (see\n   settingsPanel.ts backgroundRow()). Selection ring uses the app\'s own real accent, not a\n   separate iOS system blue \u2014 the same affordance the Appearance pane\'s highlight-color row\n   uses elsewhere in the app. */\n.swatch-row { display: flex; gap: 8px; }\n.swatch {\n  width: 34px; height: 34px; border-radius: 50%; border: none; cursor: pointer;\n  background: var(--swatch, #f2f2f7);\n  box-shadow: inset 0 0 0 1px var(--docket-separator, rgba(0, 0, 0, 0.08));\n  transition: transform var(--docket-dur-fast, 120ms) ease, box-shadow var(--docket-dur-fast, 120ms) ease;\n}\n.swatch:hover { transform: scale(1.06); }\n.swatch:active { transform: scale(0.96); }\n.swatch[data-selected="true"] {\n  box-shadow:\n    inset 0 0 0 1px var(--docket-separator, rgba(0, 0, 0, 0.08)),\n    0 0 0 2.5px var(--docket-surface-2, #f1f3f4),\n    0 0 0 4.5px var(--docket-accent, #0b57d0);\n}\n:host([data-docket-reduced-motion="true"]) .swatch { transition-duration: 0.001ms; }\n.row-detail { font-size: 12px; opacity: 0.7; margin-top: 2px; }\n/* Settings > Course Colors: same iOS-Settings-style section label as the grouped rows below\n   it, since a list of per-course rows (unlike every other group here) needs its own heading to\n   read as one topic rather than a continuation of Background. */\n.group-title {\n  margin: 14px 14px 6px; padding: 0 4px;\n  font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em;\n  color: var(--docket-label-secondary, #444746);\n}\n/* A smaller swatch than Background\'s own \u2014 a course row packs the full 12-color palette plus\n   an "Auto" reset pill into one row width, so wrapping is expected on a narrow sheet. */\n.swatch-row-wrap { flex-wrap: wrap; }\n.swatch-sm { width: 24px; height: 24px; }\n.swatch-row-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }\nselect, button.seg {\n  font: inherit; border-radius: var(--docket-radius-sm, 8px); border: none;\n  background: var(--docket-fill, #eceef0);\n  color: inherit; padding: 5px 9px; cursor: pointer;\n}\n.switch {\n  width: 42px; height: 26px; border-radius: 999px; border: none; cursor: pointer;\n  background: var(--docket-fill, rgba(120, 120, 128, 0.32)); position: relative; flex-shrink: 0;\n  transition: background-color var(--docket-dur-fast, 120ms) ease;\n}\n.switch::after {\n  content: ""; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px;\n  border-radius: 50%; background: var(--docket-on-accent, #fff); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);\n  transition: transform var(--docket-dur-fast, 120ms) ease;\n}\n/* Same accent used for a checked radio/checkbox elsewhere in the app (navigation.css) \u2014 a\n   toggle\'s "on" state is that same "selected control" language, not a separate iOS system\n   green (--docket-green is reserved specifically for a completed-assignment checkbox fill, a\n   distinct semantic \u2014 see cards.css\'s .docket-checkbox-done). */\n.switch[data-on="true"] { background: var(--docket-accent, #0b57d0); }\n.switch[data-on="true"]::after { transform: translateX(16px); }\n:host([data-docket-reduced-motion="true"]) .switch,\n:host([data-docket-reduced-motion="true"]) .switch::after {\n  transition-duration: 0.001ms;\n}\n.diag-ok { color: var(--docket-green, #146c2e); }\n.diag-warn { color: var(--docket-status-soon-fg, #9c5500); }\n.footer-note { padding: 4px 18px 16px; font-size: 11px; color: var(--docket-label-secondary, #444746); }\n';
+  var panel_default = '/**\n * Embedded directly into each panel\'s own Shadow DOM (see components/settingsPanel.ts\n * and diagnosticsPanel.ts).\n *\n * Consumes the real page\'s own design tokens via `var(--docket-token, fallback)` rather than\n * hardcoding a separate palette \u2014 confirmed live (Sep 2026) that CSS custom properties are\n * excluded from what `:host { all: initial; }` resets below, and DO inherit into a shadow\n * tree from the shadow host\'s own inherited value: `getComputedStyle()` on an element inside\n * this very shadow root already resolves `--docket-accent`/`--docket-surface-2`/etc. to the\n * exact values `document.documentElement` carries, with no manual JS threading required. Each\n * `var()` below still keeps a literal fallback (this file\'s own previous hardcoded value, where\n * reasonable) for the narrow case where the reskin\'s own stylesheet somehow isn\'t in scope yet.\n * A prior version of this file used a bespoke iOS-era palette instead (`rgba(242,242,247,0.82)`\n * translucent glass, `#007aff` system blue, `#34c759` system green) \u2014 confirmed live that this\n * was the one screenshot in a full-page audit that still read as a visibly older-generation\n * product than the opaque, flat-accent pages around it.\n *\n * Dark/light is resolved from BOTH the inherited tokens above (which already flip per-theme at\n * `document.documentElement`) AND the `data-docket-theme` attribute the host element carries\n * (set explicitly at mount time in settingsPanel.ts/diagnosticsPanel.ts from the exact same\n * value src/index.ts\'s applyTheme() just computed) \u2014 the attribute still matters for the one\n * thing that ISN\'T a custom property, `prefers-color-scheme`-independent behavior is otherwise\n * automatic once the real tokens are in scope. Same pattern for `data-docket-reduced-motion`.\n */\n:host { all: initial; }\n* { box-sizing: border-box; }\n.backdrop {\n  position: fixed; inset: 0;\n  background: rgba(0, 0, 0, 0.32);\n  display: flex; align-items: center; justify-content: center;\n  z-index: 2147483000;\n  font-family: var(--docket-font, "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif);\n}\n.sheet {\n  width: min(420px, 92vw);\n  max-height: 86vh;\n  overflow-y: auto;\n  /* Opaque, not translucent glass \u2014 matches every other surface in the app (see tokens.css\'s\n     own comment: the one surviving shadow token is explicitly reserved for genuinely floating\n     chrome INCLUDING this sheet, but that\'s a shadow, not a blur-backed material). */\n  background: var(--docket-surface-2, #f1f3f4);\n  color: var(--docket-label, #1f1f1f);\n  border: 1px solid var(--docket-separator, #dadce0);\n  border-radius: var(--docket-radius-lg, 20px);\n  box-shadow: var(--docket-shadow-float, 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 8px rgba(0, 0, 0, 0.15));\n}\n.sheet-header {\n  display: flex; align-items: center; justify-content: space-between;\n  padding: 16px 18px 10px; font-size: 17px; font-weight: 700;\n}\n.sheet-close {\n  border: none; background: var(--docket-fill, #eceef0); color: inherit;\n  width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 15px;\n}\n/* A Shadow DOM root inherits none of the page\'s own focus styling (or global.css\'s own\n   :focus-visible rules \u2014 those can\'t cross the boundary either), so every real button/select\n   in this panel needs its own ring defined right here, matching the same recipe used\n   everywhere else in the reskin. */\n.sheet-close:focus-visible,\n.swatch:focus-visible,\n.switch:focus-visible,\nselect:focus-visible,\nbutton.seg:focus-visible {\n  outline: 2px solid var(--docket-accent, #0b57d0);\n  outline-offset: 2px;\n}\n/* Same grouped-list idiom as the page\'s own `.docket-group` (cards.css) \u2014 a bordered,\n   rounded, hairline-divided card, not a translucent chrome-gray fill. */\n.group {\n  margin: 10px 14px 16px;\n  background: var(--docket-surface-1, #f8f9fa);\n  border: 1px solid var(--docket-separator, #dadce0);\n  border-radius: var(--docket-radius-md, 14px);\n  overflow: hidden;\n}\n.row {\n  display: flex; align-items: center; justify-content: space-between;\n  padding: 11px 14px; font-size: 14px; border-bottom: 1px solid var(--docket-separator, #dadce0);\n  min-height: 44px;\n}\n.row:last-child { border-bottom: none; }\n.row-col { flex-direction: column; align-items: stretch; gap: 10px; }\n.row-label { font-weight: 500; }\n/* Settings > Background: macOS-System-Settings-style swatch strip (see\n   settingsPanel.ts backgroundRow()). Selection ring uses the app\'s own real accent, not a\n   separate iOS system blue \u2014 the same affordance the Appearance pane\'s highlight-color row\n   uses elsewhere in the app. */\n.swatch-row { display: flex; gap: 8px; }\n.swatch {\n  width: 34px; height: 34px; border-radius: 50%; border: none; cursor: pointer;\n  background: var(--swatch, #f2f2f7);\n  box-shadow: inset 0 0 0 1px var(--docket-separator, rgba(0, 0, 0, 0.08));\n  transition: transform var(--docket-dur-fast, 120ms) ease, box-shadow var(--docket-dur-fast, 120ms) ease;\n}\n.swatch:hover { transform: scale(1.06); }\n.swatch:active { transform: scale(0.96); }\n.swatch[data-selected="true"] {\n  box-shadow:\n    inset 0 0 0 1px var(--docket-separator, rgba(0, 0, 0, 0.08)),\n    0 0 0 2.5px var(--docket-surface-2, #f1f3f4),\n    0 0 0 4.5px var(--docket-accent, #0b57d0);\n}\n:host([data-docket-reduced-motion="true"]) .swatch { transition-duration: 0.001ms; }\n.row-detail { font-size: 12px; opacity: 0.7; margin-top: 2px; }\n/* Settings > Course Colors: same iOS-Settings-style section label as the grouped rows below\n   it, since a list of per-course rows (unlike every other group here) needs its own heading to\n   read as one topic rather than a continuation of Background. */\n.group-title {\n  margin: 14px 14px 6px; padding: 0 4px;\n  font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em;\n  color: var(--docket-label-secondary, #444746);\n}\n/* A smaller swatch than Background\'s own \u2014 a course row packs the full 12-color palette plus\n   an "Auto" reset pill into one row width, so wrapping is expected on a narrow sheet. */\n.swatch-row-wrap { flex-wrap: wrap; }\n.swatch-sm { width: 24px; height: 24px; }\n.swatch-row-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }\nselect, button.seg {\n  font: inherit; border-radius: var(--docket-radius-sm, 8px); border: none;\n  background: var(--docket-fill, #eceef0);\n  color: inherit; padding: 5px 9px; cursor: pointer;\n}\n/* Settings > External Calendars\' add-feed row \u2014 the only free-text entry in this panel. */\n.text-input {\n  font: inherit; border-radius: var(--docket-radius-sm, 8px);\n  border: 1px solid var(--docket-separator, #dadce0);\n  background: var(--docket-surface-2, #f1f3f4); color: inherit; padding: 7px 9px;\n}\n.text-input:focus-visible {\n  outline: 2px solid var(--docket-accent, #0b57d0); outline-offset: 1px;\n}\n.switch {\n  width: 42px; height: 26px; border-radius: 999px; border: none; cursor: pointer;\n  background: var(--docket-fill, rgba(120, 120, 128, 0.32)); position: relative; flex-shrink: 0;\n  transition: background-color var(--docket-dur-fast, 120ms) ease;\n}\n.switch::after {\n  content: ""; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px;\n  border-radius: 50%; background: var(--docket-on-accent, #fff); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);\n  transition: transform var(--docket-dur-fast, 120ms) ease;\n}\n/* Same accent used for a checked radio/checkbox elsewhere in the app (navigation.css) \u2014 a\n   toggle\'s "on" state is that same "selected control" language, not a separate iOS system\n   green (--docket-green is reserved specifically for a completed-assignment checkbox fill, a\n   distinct semantic \u2014 see cards.css\'s .docket-checkbox-done). */\n.switch[data-on="true"] { background: var(--docket-accent, #0b57d0); }\n.switch[data-on="true"]::after { transform: translateX(16px); }\n:host([data-docket-reduced-motion="true"]) .switch,\n:host([data-docket-reduced-motion="true"]) .switch::after {\n  transition-duration: 0.001ms;\n}\n.diag-ok { color: var(--docket-green, #146c2e); }\n.diag-warn { color: var(--docket-status-soon-fg, #9c5500); }\n.footer-note { padding: 4px 18px 16px; font-size: 11px; color: var(--docket-label-secondary, #444746); }\n';
 
   // src/components/diagnosticsPanel.ts
   var host = null;
@@ -1945,6 +2155,49 @@ html[data-docket-page="announcements"] main > div {
     row2.appendChild(controls);
     return row2;
   }
+  function externalFeedsSection(feeds, onChange) {
+    const title = document.createElement("div");
+    title.className = "group-title";
+    title.textContent = "External Calendars";
+    const rows = feeds.map((feed, index) => {
+      const row2 = document.createElement("div");
+      row2.className = "row";
+      const label = document.createElement("span");
+      label.className = "row-label";
+      label.textContent = feed.label;
+      const removeBtn = document.createElement("button");
+      removeBtn.className = "seg";
+      removeBtn.textContent = "Remove";
+      removeBtn.setAttribute("aria-label", `Remove ${feed.label}`);
+      removeBtn.addEventListener("click", () => onChange(feeds.filter((_, i) => i !== index)));
+      row2.append(label, removeBtn);
+      return row2;
+    });
+    const addRow = document.createElement("div");
+    addRow.className = "row row-col";
+    const labelInput = document.createElement("input");
+    labelInput.className = "text-input";
+    labelInput.type = "text";
+    labelInput.placeholder = "Course label (e.g. PHSCS 121)";
+    const urlInput = document.createElement("input");
+    urlInput.className = "text-input";
+    urlInput.type = "url";
+    urlInput.placeholder = "iCalendar (.ics) feed URL";
+    const addBtn = document.createElement("button");
+    addBtn.className = "seg";
+    addBtn.textContent = "Add";
+    addBtn.addEventListener("click", () => {
+      const label = labelInput.value.trim();
+      const url = urlInput.value.trim();
+      if (!label || !url) return;
+      onChange([...feeds, { label, url }]);
+    });
+    addRow.append(labelInput, urlInput, addBtn);
+    const note = document.createElement("div");
+    note.className = "footer-note";
+    note.textContent = "Only used to fetch the exact URL you enter here \u2014 nothing else is sent. See PRIVACY.md.";
+    return [title, group([...rows, addRow]), note];
+  }
   function diagnosticsRow() {
     const row2 = document.createElement("div");
     row2.className = "row";
@@ -2033,6 +2286,7 @@ html[data-docket-page="announcements"] main > div {
       header,
       group([appearanceRow(settings.appearance, (v) => persist({ appearance: v })), backgroundRow(settings.background, (v) => persist({ background: v }))]),
       ...courseColorSection,
+      ...externalFeedsSection(settings.externalFeeds, (next) => persist({ externalFeeds: next })),
       group([
         switchRow(shadow, "Use Companion navigation", settings.useCompanionNav, (v) => persist({ useCompanionNav: v })),
         switchRow(shadow, "Reduce Motion", settings.reducedMotion, (v) => persist({ reducedMotion: v }))
@@ -2048,7 +2302,7 @@ html[data-docket-page="announcements"] main > div {
     sheet.appendChild(compatNote);
     const footer = document.createElement("div");
     footer.className = "footer-note";
-    footer.textContent = "Nothing here is sent anywhere \u2014 settings are stored only on this device, and this reskin talks to no server but learningsuite.byu.edu itself.";
+    footer.textContent = "Nothing here is sent anywhere \u2014 settings are stored only on this device. This reskin talks to no server but learningsuite.byu.edu itself, except any URL you explicitly add under External Calendars above.";
     sheet.appendChild(footer);
     backdrop.appendChild(sheet);
     shadow.appendChild(backdrop);

@@ -120,6 +120,15 @@ select, button.seg {
   background: var(--docket-fill, #eceef0);
   color: inherit; padding: 5px 9px; cursor: pointer;
 }
+/* Settings > External Calendars' add-feed row — the only free-text entry in this panel. */
+.text-input {
+  font: inherit; border-radius: var(--docket-radius-sm, 8px);
+  border: 1px solid var(--docket-separator, #dadce0);
+  background: var(--docket-surface-2, #f1f3f4); color: inherit; padding: 7px 9px;
+}
+.text-input:focus-visible {
+  outline: 2px solid var(--docket-accent, #0b57d0); outline-offset: 1px;
+}
 .switch {
   width: 42px; height: 26px; border-radius: 999px; border: none; cursor: pointer;
   background: var(--docket-fill, rgba(120, 120, 128, 0.32)); position: relative; flex-shrink: 0;

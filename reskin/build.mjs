@@ -4,6 +4,12 @@
  * metadata block — no signing, no Xcode, no code-signing pipeline at all
  * (that's the whole point: see reskin/README.md). `@match` is scoped to
  * LearningSuite's own origin only (spec §23 — narrowest possible permission).
+ *
+ * `@connect max.byu.edu` + `GM_xmlhttpRequest` are the one deliberate exception: opt-in
+ * "External Calendars" (Settings) lets a student merge a course's iCalendar feed hosted
+ * elsewhere (e.g. BYU MAX, `max.byu.edu`) into the Combined Schedule agenda — see
+ * homeAdapter.ts's loadExternalFeeds(). Off by default, and only ever fetches a URL the
+ * student explicitly typed in; nothing is sent, only read. See reskin/PRIVACY.md.
  */
 import { build } from "esbuild";
 import { readFileSync, mkdirSync } from "node:fs";
@@ -29,6 +35,8 @@ const metadata = `// ==UserScript==
 // @run-at       document-start
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @grant        GM_xmlhttpRequest
+// @connect      max.byu.edu
 // @updateURL    https://raw.githubusercontent.com/${REPO}/main/${SCRIPT_PATH}?v=${pkg.version}
 // @downloadURL  https://raw.githubusercontent.com/${REPO}/main/${SCRIPT_PATH}?v=${pkg.version}
 // ==/UserScript==

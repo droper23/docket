@@ -167,6 +167,60 @@ function courseColorRow(label: string, current: string, isOverridden: boolean, o
   return row;
 }
 
+/**
+ * Settings > External Calendars: opt-in feeds (e.g. a BYU MAX course) merged into the
+ * Combined Schedule agenda — see homeAdapter.ts's loadExternalFeeds(). List of existing feeds
+ * (remove-only; edit by removing and re-adding) plus a two-field add row, same plain
+ * `<input>`/button idiom as the rest of this panel (no new interaction pattern introduced).
+ */
+function externalFeedsSection(feeds: { label: string; url: string }[], onChange: (next: { label: string; url: string }[]) => void): HTMLElement[] {
+  const title = document.createElement("div");
+  title.className = "group-title";
+  title.textContent = "External Calendars";
+
+  const rows = feeds.map((feed, index) => {
+    const row = document.createElement("div");
+    row.className = "row";
+    const label = document.createElement("span");
+    label.className = "row-label";
+    label.textContent = feed.label;
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "seg";
+    removeBtn.textContent = "Remove";
+    removeBtn.setAttribute("aria-label", `Remove ${feed.label}`);
+    removeBtn.addEventListener("click", () => onChange(feeds.filter((_, i) => i !== index)));
+    row.append(label, removeBtn);
+    return row;
+  });
+
+  const addRow = document.createElement("div");
+  addRow.className = "row row-col";
+  const labelInput = document.createElement("input");
+  labelInput.className = "text-input";
+  labelInput.type = "text";
+  labelInput.placeholder = "Course label (e.g. PHSCS 121)";
+  const urlInput = document.createElement("input");
+  urlInput.className = "text-input";
+  urlInput.type = "url";
+  urlInput.placeholder = "iCalendar (.ics) feed URL";
+  const addBtn = document.createElement("button");
+  addBtn.className = "seg";
+  addBtn.textContent = "Add";
+  addBtn.addEventListener("click", () => {
+    const label = labelInput.value.trim();
+    const url = urlInput.value.trim();
+    if (!label || !url) return;
+    onChange([...feeds, { label, url }]);
+  });
+  addRow.append(labelInput, urlInput, addBtn);
+
+  const note = document.createElement("div");
+  note.className = "footer-note";
+  note.textContent = "Only used to fetch the exact URL you enter here — nothing else is sent. See PRIVACY.md.";
+
+  return [title, group([...rows, addRow]), note];
+}
+
 function diagnosticsRow(): HTMLElement {
   const row = document.createElement("div");
   row.className = "row";
@@ -277,6 +331,7 @@ export function openSettingsPanel(onSave: (settings: ReskinSettings) => void): v
     header,
     group([appearanceRow(settings.appearance, (v) => persist({ appearance: v })), backgroundRow(settings.background, (v) => persist({ background: v }))]),
     ...courseColorSection,
+    ...externalFeedsSection(settings.externalFeeds, (next) => persist({ externalFeeds: next })),
     group([
       switchRow(shadow, "Use Companion navigation", settings.useCompanionNav, (v) => persist({ useCompanionNav: v })),
       switchRow(shadow, "Reduce Motion", settings.reducedMotion, (v) => persist({ reducedMotion: v })),
@@ -294,7 +349,7 @@ export function openSettingsPanel(onSave: (settings: ReskinSettings) => void): v
 
   const footer = document.createElement("div");
   footer.className = "footer-note";
-  footer.textContent = "Nothing here is sent anywhere — settings are stored only on this device, and this reskin talks to no server but learningsuite.byu.edu itself.";
+  footer.textContent = "Nothing here is sent anywhere — settings are stored only on this device. This reskin talks to no server but learningsuite.byu.edu itself, except any URL you explicitly add under External Calendars above.";
   sheet.appendChild(footer);
 
   backdrop.appendChild(sheet);

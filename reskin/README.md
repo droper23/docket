@@ -170,6 +170,10 @@ is the sturdier Android recommendation.
   submit/feedback flow is LearningSuite's, never reimplemented here.
 - **Today & Upcoming** — Combined Schedule (List view) becomes a day-grouped agenda for the
   next two weeks.
+- **External Calendars** (Settings, opt-in, off by default) — merges a course tracked
+  outside LearningSuite entirely (e.g. a BYU MAX-taught course) into the same Today &
+  Upcoming agenda, by fetching an iCalendar (`.ics`) feed URL you add yourself. See
+  `PRIVACY.md`.
 - Grades, Announcements, and a real calendar view aren't built yet — LearningSuite's
   original pages are simply left untouched there. See `ROADMAP.md`.
 
@@ -177,7 +181,8 @@ is the sturdier Android recommendation.
 
 - Never asks for or sees a BYU password, Duo code, or session ID.
 - Never contacts any server but `learningsuite.byu.edu` itself — no backend, no analytics,
-  no third party. See `PRIVACY.md`.
+  no third party — **except** a URL you explicitly add under Settings > External Calendars,
+  which is fetched read-only and never sent anywhere else. See `PRIVACY.md`.
 - Never deletes or rewrites LearningSuite's own DOM — it hides the original view (`hidden`,
   reversible any time) behind the redesigned one and inserts new elements alongside it.
 

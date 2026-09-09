@@ -11,9 +11,20 @@ and date. Never a password, a Duo code, a session cookie, or a `subsessionID`.
 
 ## What this sends, and to whom
 
-Nothing, to anyone. This reskin makes no network requests of its own at all — it only reads
-and restyles the DOM of a page your own browser already loaded from
-`learningsuite.byu.edu`. No backend, no analytics, no third-party service, no external AI.
+Nothing, to anyone, by default. This reskin's core behavior makes no network requests of
+its own at all — it only reads and restyles the DOM of a page your own browser already
+loaded from `learningsuite.byu.edu`. No backend, no analytics, no third-party service, no
+external AI.
+
+**The one opt-in exception: External Calendars (Settings).** If you add a course's
+iCalendar feed URL there (e.g. a BYU MAX course, which has no LearningSuite page to read at
+all), this reskin fetches that exact URL on your behalf — a plain, read-only GET, using the
+userscript manager's own cross-origin grant (`GM_xmlhttpRequest`, declared in the script's
+metadata alongside `@connect max.byu.edu`) rather than the page's own `fetch()`, since the
+target site doesn't grant browser-JS cross-origin access. Nothing about you or your
+LearningSuite data is sent in that request — no cookie, no identifier, just a GET to the URL
+you typed in. Off by default; only ever talks to a URL you explicitly added, never one
+discovered or guessed.
 
 ## Where settings live
 

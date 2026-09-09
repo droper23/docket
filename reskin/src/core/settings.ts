@@ -35,6 +35,14 @@ export interface ReskinSettings {
    * this same map so an override applies everywhere that course's accent shows up.
    */
   courseColors: Record<string, string>;
+  /**
+   * Opt-in, off by default: courses tracked outside LearningSuite whose own iCalendar feed
+   * should be merged into the Combined Schedule agenda (see homeAdapter.ts's
+   * loadExternalFeeds()) — e.g. a BYU MAX-taught course, which LearningSuite's own Combined
+   * Schedule never lists at all. `label` becomes that item's course-code badge in the agenda,
+   * same as a real LearningSuite course code.
+   */
+  externalFeeds: { label: string; url: string }[];
 }
 
 export const DEFAULT_SETTINGS: ReskinSettings = {
@@ -44,6 +52,7 @@ export const DEFAULT_SETTINGS: ReskinSettings = {
   reducedMotion: false,
   background: "default",
   courseColors: {},
+  externalFeeds: [],
 };
 
 const KEY = "settings";

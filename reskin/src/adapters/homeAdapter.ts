@@ -7,9 +7,11 @@ import { icons } from "../components/icons.js";
 import { parseSlashDate, formatIsoDate } from "../lib/parseDueText.js";
 import { dayLabel, dueDateLabel } from "../../../src/core/agendaFormatting.js";
 import { daysUntilInSchoolTimeZone, schoolDateTime } from "../../../src/core/schoolTime.js";
+import { parseIcs } from "../../../src/connectors/icsParser.js";
 import { diagnostics } from "../core/diagnostics.js";
 import { assignCourseColors } from "../lib/courseColor.js";
 import { loadSettings } from "../core/settings.js";
+import { gmFetchText } from "../lib/gmRequest.js";
 
 interface ScheduleItem {
   title: string;
@@ -18,7 +20,12 @@ interface ScheduleItem {
   meta?: string;
   courseCode?: string;
   dateIso: string;
-  anchor: HTMLElement;
+  /** Absent for an "External Calendars" item (see loadExternalFeeds() below) — there's no
+   * LearningSuite row to reveal, so mount()'s render picks `href` instead when this is unset. */
+  anchor?: HTMLElement;
+  /** External-feed items only: opens in a new tab instead of LearningSuite's own detail
+   * dialog, since that item lives on a different site entirely. */
+  href?: string;
   /** Confirmed live (Sep 2026): a not-yet-due item's own real anchor text ends in the literal
    * word "Opens" (e.g. "HW 1 - Information Storage Opens") when listed under its availability
    * date rather than its due date — that day can be well in the past, which previously read as
@@ -145,8 +152,83 @@ function extractItems(main: Element): ScheduleItem[] {
  */
 const accumulated = new Map<HTMLElement, ScheduleItem>();
 
+/**
+ * "External Calendars" (Settings): courses tracked outside LearningSuite entirely — a real
+ * one, BYU MAX (`max.byu.edu`), has no LearningSuite presence to scrape at all, so this is a
+ * separate, un-anchored source merged in only at render time (see mergedItemsSorted()), never
+ * mixed into `accumulated`'s anchor-keyed map above.
+ */
+let externalItems: ScheduleItem[] = [];
+let externalFeedsLoadedForKey = "";
+let loadingExternalFeeds = false;
+
+/** MAX's own iCalendar DESCRIPTION reads like "Homework 2 is due at 23:59, https://max.byu.edu/…"
+ * — confirmed live against a real Fall 2026 Physics 121 feed. Neither field is a standard ICS
+ * property; both are this one MAX-specific convention, so a feed without this description shape
+ * (a different course, a different platform) simply renders with no due time and no link, same
+ * as a plain all-day LearningSuite item — never a hard failure. */
+function parseMaxDescription(description: string | undefined): { time?: string; url?: string } {
+  if (!description) return {};
+  const timeMatch = description.match(/is due at (\d{1,2}):(\d{2})/i);
+  const urlMatch = description.match(/https?:\/\/\S+/);
+  if (!timeMatch) return { url: urlMatch?.[0] };
+  const hour24 = Number(timeMatch[1]);
+  const hour12 = hour24 % 12 || 12;
+  return { time: `${hour12}:${timeMatch[2]} ${hour24 >= 12 ? "pm" : "am"}`, url: urlMatch?.[0] };
+}
+
+/**
+ * Fetches every configured external feed and replaces `externalItems` wholesale, then
+ * re-mounts so the merged agenda picks them up — same "fetch, then re-mount from the finally
+ * block" shape as loadDueTimes() above. Guarded by `externalFeedsLoadedForKey` so the
+ * mutation-observer-driven re-mounts this adapter gets on every DOM change don't re-fetch on
+ * every single one; re-runs only when the configured feeds themselves change (Settings always
+ * triggers a full page reload — see index.ts — which resets this module's state anyway).
+ */
+async function loadExternalFeeds(compatibilityMode: boolean): Promise<void> {
+  const feeds = loadSettings().externalFeeds;
+  const key = JSON.stringify(feeds);
+  if (!feeds.length || key === externalFeedsLoadedForKey || loadingExternalFeeds) return;
+  loadingExternalFeeds = true;
+  try {
+    const now = new Date();
+    const minDate = new Date(now.getTime() - WINDOW_DAYS_PAST * 86400000);
+    const maxDate = new Date(now.getTime() + WINDOW_DAYS_FUTURE * 86400000);
+    const results: ScheduleItem[] = [];
+    for (const feed of feeds) {
+      try {
+        const raw = await gmFetchText(feed.url);
+        for (const ev of parseIcs(raw)) {
+          const dateIso = ev.endDate ?? ev.startDate ?? ev.endDateTime?.slice(0, 10) ?? ev.startDateTime?.slice(0, 10);
+          if (!dateIso) continue;
+          const date = new Date(`${dateIso}T00:00:00`);
+          if (date < minDate || date > maxDate) continue;
+          const { time, url } = parseMaxDescription(ev.description);
+          results.push({
+            title: ev.summary,
+            courseCode: feed.label,
+            dateIso,
+            opens: false,
+            kind: "due",
+            dueTime: time,
+            dueAt: time ? schoolDateTime(dateIso, time) : undefined,
+            href: url,
+          });
+        }
+      } catch (error) {
+        console.warn("[LearningSuite Reskin] loadExternalFeeds: skipping a feed", feed.label, error);
+      }
+    }
+    externalItems = results;
+    externalFeedsLoadedForKey = key;
+  } finally {
+    loadingExternalFeeds = false;
+    homeAdapter.mount(compatibilityMode);
+  }
+}
+
 function mergedItemsSorted(): ScheduleItem[] {
-  const items = [...accumulated.values()];
+  const items = [...accumulated.values(), ...externalItems];
   items.sort((x, y) => x.dateIso.localeCompare(y.dateIso));
   return items;
 }
@@ -299,7 +381,9 @@ async function loadDueTimes(compatibilityMode: boolean, button: HTMLButtonElemen
  * either, so closing the dialog previously left the student dropped at that unrelated position
  * instead of back where they were reading (reported bug, Sep 2026: "it jumps to the bottom").
  */
-function openNativeDetail(item: ScheduleItem, onCaptured?: () => void): void {
+/** Only ever called with a real, scraped LearningSuite row — see mount()'s `item.anchor ? ...`
+ * branch — never an "External Calendars" item, which has no native row to reveal at all. */
+function openNativeDetail(item: ScheduleItem & { anchor: HTMLElement }, onCaptured?: () => void): void {
   const scrollParent = findScrollParent(item.anchor);
   const scrollPos = scrollParent.scrollTop;
 
@@ -343,14 +427,18 @@ export const homeAdapter: Adapter = {
   mount(compatibilityMode) {
     const main = document.querySelector("main");
     if (!main) return;
+    void loadExternalFeeds(compatibilityMode);
     const items = extractItems(main);
-    if (!items.length && !overlay) return;
+    if (!items.length && !overlay && !externalItems.length) return;
 
+    // `items` always comes from extractItems() above, which always sets a real anchor — the
+    // `!`s below are that guarantee, not an assumption; only "External Calendars" items
+    // (never part of this array — see mergedItemsSorted()) go anchor-less.
     for (const i of items) {
-      markProcessed(i.anchor, "scheduleitem");
-      accumulated.set(i.anchor, i);
+      markProcessed(i.anchor!, "scheduleitem");
+      accumulated.set(i.anchor!, i);
     }
-    processedAnchors.push(...items.map((i) => i.anchor));
+    processedAnchors.push(...items.map((i) => i.anchor!));
 
     // Resync + prune pass: extractItems() only ever reads a given anchor once (guarded by
     // isProcessed), so a later toggle of the real native checkbox — by this card's own
@@ -410,7 +498,11 @@ export const homeAdapter: Adapter = {
                       }
                     : undefined,
                 },
-                () => openNativeDetail(item, () => homeAdapter.mount(compatibilityMode)),
+                item.anchor
+                  ? () => openNativeDetail(item as ScheduleItem & { anchor: HTMLElement }, () => homeAdapter.mount(compatibilityMode))
+                  : item.href
+                    ? () => window.open(item.href, "_blank", "noopener")
+                    : undefined,
               ),
             ),
           ),
