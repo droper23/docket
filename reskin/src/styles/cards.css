@@ -18,6 +18,8 @@
   transition: background-color var(--docket-dur-fast) var(--docket-ease-standard);
 }
 .docket-group .docket-row:last-child { border-bottom: none; }
+.docket-row-tappable { cursor: pointer; }
+.docket-row-tappable:hover { background: var(--docket-fill); }
 .docket-row-main { flex: 1; min-width: 0; }
 .docket-row-title {
   font-size: 15px; font-weight: 600; color: var(--docket-label);
@@ -31,20 +33,6 @@
 }
 .docket-row-trailing { flex-shrink: 0; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--docket-label-secondary); }
 .docket-score { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--docket-label); }
-.docket-row-open {
-  appearance: none;
-  border: 0;
-  border-radius: var(--docket-radius-pill);
-  background: transparent;
-  color: var(--docket-accent);
-  cursor: pointer;
-  font: inherit;
-  font-weight: 600;
-  padding: 6px 8px;
-}
-.docket-row-open:hover { background: var(--docket-fill); }
-.docket-row-open:focus-visible { outline: 2px solid var(--docket-accent); outline-offset: 2px; }
-
 .docket-row-body { padding: 0 16px 14px 38px; font-size: 13px; color: var(--docket-label-secondary); line-height: 1.5; }
 .docket-row-body p { margin: 0 0 8px; white-space: pre-wrap; }
 

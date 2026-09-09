@@ -428,7 +428,7 @@ test("dashboardAdapter renders the per-day schedule as grouped cards without hid
     originalLink.addEventListener("click", () => {
       originalClicked = true;
     });
-    (Array.from(document.querySelectorAll(".docket-row-title")).find((el) => el.textContent === "Recitation Quiz 9/8")!.closest(".docket-row")!.querySelector(".docket-row-open") as HTMLElement).click();
+    (Array.from(document.querySelectorAll(".docket-row-title")).find((el) => el.textContent === "Recitation Quiz 9/8")!.closest(".docket-row") as HTMLElement).click();
     assert.equal(originalClicked, true, "clicking a real assignment row must re-fire the original element's own click handler");
   } finally {
     dashboardAdapter.unmount();
@@ -466,7 +466,7 @@ test("dashboardAdapter preserves every real anchor in a paragraph, not just the 
     const [recordingLink, slidesLink] = Array.from(document.querySelectorAll("a.cursor-pointer")) as HTMLElement[];
     recordingLink!.addEventListener("click", () => (recordingClicked = true));
     slidesLink!.addEventListener("click", () => (slidesClicked = true));
-    (Array.from(document.querySelectorAll(".docket-row-title")).find((el) => el.textContent === "Slides PDF")!.closest(".docket-row")!.querySelector(".docket-row-open") as HTMLElement).click();
+    (Array.from(document.querySelectorAll(".docket-row-title")).find((el) => el.textContent === "Slides PDF")!.closest(".docket-row") as HTMLElement).click();
     assert.equal(slidesClicked, true, "the second anchor's own click handler must be reachable, not just the first");
     assert.equal(recordingClicked, false);
   } finally {
@@ -533,8 +533,8 @@ test("homeAdapter merges an 'External Calendars' iCalendar feed into the Combine
     const subtitle = Array.from(document.querySelectorAll(".docket-row-subtitle")).find((el) => el.textContent?.includes("PHSCS 121"))!.textContent;
     assert.match(subtitle!, /11:59 pm/, "MAX's own due-time convention (\"is due at HH:MM\") must be parsed, not just the bare date");
 
-    const openBtn = Array.from(document.querySelectorAll(".docket-row")).find((row) => row.querySelector(".docket-row-title")?.textContent === "Homework 2")!.querySelector(".docket-row-open") as HTMLElement;
-    openBtn.click();
+    const row = Array.from(document.querySelectorAll(".docket-row")).find((row) => row.querySelector(".docket-row-title")?.textContent === "Homework 2") as HTMLElement;
+    row.click();
     assert.deepEqual(openedUrls, ["https://max.byu.edu/20265-phscs121/content/homework/2"], "opening an external item must go to its real MAX URL in a new tab, never LearningSuite's own (nonexistent) detail dialog");
   } finally {
     window.open = originalOpen;

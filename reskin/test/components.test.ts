@@ -102,7 +102,7 @@ test("assignmentCard only renders the completion checkbox when the source data h
 // to reach the native checkbox, so "checking something off" always kicked the page back to raw
 // native LearningSuite. onToggleComplete is the card's own, separate, native-checkbox-driving path.
 
-test("assignmentCard: completion and detail are separate controls", () => {
+test("assignmentCard: completion stays separate while clicking the tile opens details", () => {
   setupDom("<div></div>");
   let toggled = 0;
   let activated = 0;
@@ -120,10 +120,10 @@ test("assignmentCard: completion and detail are separate controls", () => {
   assert.ok(checkbox.classList.contains("docket-checkbox-done"), "the visual state must flip instantly, not wait on a re-render");
   assert.equal(checkbox.getAttribute("aria-checked"), "true");
 
-  const open = card.querySelector(".docket-row-open") as HTMLElement;
+  assert.ok(card.classList.contains("docket-row-tappable"));
   assert.equal(card.getAttribute("role"), null, "the row itself must not be an interactive wrapper");
-  open.click();
-  assert.equal(activated, 1, "opening details must remain available as its own control");
+  card.click();
+  assert.equal(activated, 1, "clicking anywhere else on the tile must open its details");
 });
 
 test("assignmentCard: Space toggles a keyboard-focused interactive checkbox the same way a click does", () => {
@@ -174,7 +174,7 @@ test("assignmentCard: informational items never expose a completion control", ()
   setupDom("<div></div>");
   const info = assignmentCard({ title: "Appendix D", kind: "info", completed: false, onToggleComplete: () => {} }, () => {});
   assert.equal(info.querySelector(".docket-checkbox"), null);
-  assert.ok(info.querySelector(".docket-row-open"), "resources can still be opened without looking like tasks");
+  assert.ok(info.classList.contains("docket-row-tappable"), "resources can still be opened without looking like tasks");
 });
 
 test("assignCourseColors assigns distinct colors up to the palette size, deterministically regardless of input order", () => {

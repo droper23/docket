@@ -253,6 +253,8 @@ html[data-docket-page="announcements"] main > div {
   transition: background-color var(--docket-dur-fast) var(--docket-ease-standard);
 }
 .docket-group .docket-row:last-child { border-bottom: none; }
+.docket-row-tappable { cursor: pointer; }
+.docket-row-tappable:hover { background: var(--docket-fill); }
 .docket-row-main { flex: 1; min-width: 0; }
 .docket-row-title {
   font-size: 15px; font-weight: 600; color: var(--docket-label);
@@ -266,20 +268,6 @@ html[data-docket-page="announcements"] main > div {
 }
 .docket-row-trailing { flex-shrink: 0; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--docket-label-secondary); }
 .docket-score { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--docket-label); }
-.docket-row-open {
-  appearance: none;
-  border: 0;
-  border-radius: var(--docket-radius-pill);
-  background: transparent;
-  color: var(--docket-accent);
-  cursor: pointer;
-  font: inherit;
-  font-weight: 600;
-  padding: 6px 8px;
-}
-.docket-row-open:hover { background: var(--docket-fill); }
-.docket-row-open:focus-visible { outline: 2px solid var(--docket-accent); outline-offset: 2px; }
-
 .docket-row-body { padding: 0 16px 14px 38px; font-size: 13px; color: var(--docket-label-secondary); line-height: 1.5; }
 .docket-row-body p { margin: 0 0 8px; white-space: pre-wrap; }
 
@@ -977,12 +965,10 @@ html[data-docket-page="announcements"] main > div {
         });
       }
     }
-    const openControl = onActivate ? h("button", { class: "docket-row-open", type: "button", "aria-label": `Open ${data.title}` }, ["Open"]) : void 0;
-    if (openControl) openControl.addEventListener("click", onActivate);
     const row2 = h(
       "div",
       {
-        class: "docket-row" + (infoLike ? " docket-row-info" : ""),
+        class: "docket-row" + (infoLike ? " docket-row-info" : "") + (onActivate ? " docket-row-tappable" : ""),
         // A left-edge accent stripe, same color/assignment as the course's own card elsewhere
         // (courseListAdapter.ts/gradeSummaryAdapter.ts's assignCourseColors()) — lets a multi-course
         // agenda (Combined Schedule) be scanned by color the same way the Course List/Grade Summary
@@ -1000,11 +986,11 @@ html[data-docket-page="announcements"] main > div {
         h("div", { class: "docket-row-trailing" }, [
           scoreText ? h("span", { class: "docket-score" }, [scoreText]) : void 0,
           badge ?? void 0,
-          dueDateBadge ?? void 0,
-          openControl
+          dueDateBadge ?? void 0
         ])
       ]
     );
+    if (onActivate) row2.addEventListener("click", onActivate);
     return row2;
   }
 

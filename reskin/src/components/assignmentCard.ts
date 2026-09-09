@@ -118,19 +118,10 @@ export function assignmentCard(data: AssignmentCardData, onActivate?: () => void
     }
   }
 
-  // Keep task completion and opening the native detail view as sibling controls. A previous
-  // implementation made the entire row a role=link, which nested an interactive checkbox
-  // inside another interactive target on Combined Schedule. That is both invalid semantics
-  // and confusing in keyboard/screen-reader traversal.
-  const openControl = onActivate
-    ? h("button", { class: "docket-row-open", type: "button", "aria-label": `Open ${data.title}` }, ["Open"])
-    : undefined;
-  if (openControl) openControl.addEventListener("click", onActivate!);
-
   const row = h(
     "div",
     {
-      class: "docket-row" + (infoLike ? " docket-row-info" : ""),
+      class: "docket-row" + (infoLike ? " docket-row-info" : "") + (onActivate ? " docket-row-tappable" : ""),
       // A left-edge accent stripe, same color/assignment as the course's own card elsewhere
       // (courseListAdapter.ts/gradeSummaryAdapter.ts's assignCourseColors()) — lets a multi-course
       // agenda (Combined Schedule) be scanned by color the same way the Course List/Grade Summary
@@ -149,9 +140,11 @@ export function assignmentCard(data: AssignmentCardData, onActivate?: () => void
         scoreText ? h("span", { class: "docket-score" }, [scoreText]) : undefined,
         badge ?? undefined,
         dueDateBadge ?? undefined,
-        openControl,
       ]),
     ],
   );
+  // The row is a pointer target, while the checkbox above stops propagation so toggling it
+  // never opens the native detail panel too.
+  if (onActivate) row.addEventListener("click", onActivate);
   return row;
 }
