@@ -20,6 +20,8 @@ interface ScheduleItem {
   meta?: string;
   courseCode?: string;
   dateIso: string;
+  /** Deadline day for an availability row, paired from its matching “Closes” schedule item. */
+  dueDateIso?: string;
   /** Absent for an "External Calendars" item (see loadExternalFeeds() below) — there's no
    * LearningSuite row to reveal, so mount()'s render picks `href` instead when this is unset. */
   anchor?: HTMLElement;
@@ -162,6 +164,31 @@ let externalItems: ScheduleItem[] = [];
 let externalFeedsLoadedForKey = "";
 let loadingExternalFeeds = false;
 
+function normalizedAssignmentTitle(title: string): string {
+  return title
+    .replace(/\s+(?:closes?|opens?)$/i, "")
+    .replace(/[^\w]+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+/** Combined Schedule represents availability and deadlines as separate rows ("Opens" and
+ * "Closes"). Pair them so an opening card can still tell the student when its work is due. */
+function pairOpeningDeadlines(items: ScheduleItem[]): void {
+  for (const item of items) {
+    if (!item.opens) continue;
+    const closing = items.find((candidate) =>
+      candidate.courseCode === item.courseCode
+      && /\s+closes?$/i.test(candidate.title)
+      && normalizedAssignmentTitle(candidate.title) === normalizedAssignmentTitle(item.title),
+    );
+    if (!closing) continue;
+    item.dueDateIso = closing.dateIso;
+    item.dueTime = closing.dueTime;
+    item.dueAt = closing.dueAt;
+  }
+}
+
 /** MAX's own iCalendar DESCRIPTION reads like "Homework 2 is due at 23:59, https://max.byu.edu/…"
  * — confirmed live against a real Fall 2026 Physics 121 feed. Neither field is a standard ICS
  * property; both are this one MAX-specific convention, so a feed without this description shape
@@ -230,6 +257,7 @@ async function loadExternalFeeds(compatibilityMode: boolean): Promise<void> {
 function mergedItemsSorted(): ScheduleItem[] {
   const items = [...accumulated.values(), ...externalItems];
   items.sort((x, y) => x.dateIso.localeCompare(y.dateIso));
+  pairOpeningDeadlines(items);
   return items;
 }
 
@@ -323,11 +351,6 @@ async function loadDueTimes(compatibilityMode: boolean, button: HTMLButtonElemen
       .flatMap((g) => g.courseList ?? [])
       .map((c) => c.studentViewHref ?? c.href)
       .filter((href): href is string => !!href);
-    const normalized = (title: string) => title
-      .replace(/\s+(?:closes?|opens?)$/i, "")
-      .replace(/[^\w]+/g, " ")
-      .trim()
-      .toLowerCase();
     for (let index = 0; index < hrefs.length; index++) {
       button.textContent = `Loading due times ${index + 1}/${hrefs.length}`;
       try {
@@ -349,7 +372,7 @@ async function loadDueTimes(compatibilityMode: boolean, button: HTMLButtonElemen
           const hour24 = Number(due[2]);
           const hour12 = hour24 % 12 || 12;
           const time = `${hour12}:${due[3]} ${hour24 >= 12 ? "pm" : "am"}`;
-          const item = mergedItemsSorted().find((i) => i.dateIso === iso && normalized(i.title) === normalized(assignment.name!));
+          const item = mergedItemsSorted().find((i) => i.dateIso === iso && normalizedAssignmentTitle(i.title) === normalizedAssignmentTitle(assignment.name!));
           const dueAt = item && schoolDateTime(iso, time);
           if (item && dueAt) { item.dueTime = time; item.dueAt = dueAt; found++; }
         }
@@ -489,6 +512,8 @@ export const homeAdapter: Adapter = {
                   meta: item.meta,
                   category: item.courseCode,
                   daysUntilDue: daysUntilInSchoolTimeZone(item.dateIso),
+                  dueLabel: item.opens && item.dueDateIso ? dueDateLabel(item.dueDateIso) : undefined,
+                  dueDaysUntil: item.dueDateIso ? daysUntilInSchoolTimeZone(item.dueDateIso) : undefined,
                   dueTime: item.dueTime,
                   dueAt: item.dueAt,
                   opensText: item.opens ? dueDateLabel(item.dateIso) : undefined,

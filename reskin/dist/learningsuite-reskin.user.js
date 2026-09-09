@@ -933,7 +933,7 @@ html[data-docket-page="announcements"] main > div {
     const infoLike = data.kind === "info" || data.kind === "calendar";
     const badge = data.completed || infoLike ? null : dueBadge(data.daysUntilDue, data.opensText, data.dueAt);
     const dueDateBadge = !data.completed && !infoLike && data.opensText && data.dueLabel ? dueBadge(data.dueDaysUntil, void 0, data.dueAt, `Due ${data.dueLabel}`) : null;
-    const dueText = data.dueAt && data.dueTime ? data.dueTime : data.dueLabel ? `Due ${data.dueLabel}${data.dueTime ? " " + data.dueTime : ""}` : void 0;
+    const dueText = data.opensText && data.dueLabel ? data.dueTime : data.dueAt && data.dueTime ? data.dueTime : data.dueLabel ? `Due ${data.dueLabel}${data.dueTime ? " " + data.dueTime : ""}` : void 0;
     const categoryText = data.category ? data.category + (data.categoryWeight ? ` (${data.categoryWeight} of grade)` : "") : void 0;
     const metaText = data.meta || void 0;
     const scoreText = data.scorePossible ? `${data.scoreEarned ?? "\u2014"}/${data.scorePossible}` : void 0;
@@ -1392,6 +1392,21 @@ html[data-docket-page="announcements"] main > div {
   var externalItems = [];
   var externalFeedsLoadedForKey = "";
   var loadingExternalFeeds = false;
+  function normalizedAssignmentTitle(title) {
+    return title.replace(/\s+(?:closes?|opens?)$/i, "").replace(/[^\w]+/g, " ").trim().toLowerCase();
+  }
+  function pairOpeningDeadlines(items) {
+    for (const item of items) {
+      if (!item.opens) continue;
+      const closing = items.find(
+        (candidate) => candidate.courseCode === item.courseCode && /\s+closes?$/i.test(candidate.title) && normalizedAssignmentTitle(candidate.title) === normalizedAssignmentTitle(item.title)
+      );
+      if (!closing) continue;
+      item.dueDateIso = closing.dateIso;
+      item.dueTime = closing.dueTime;
+      item.dueAt = closing.dueAt;
+    }
+  }
   function parseMaxDescription(description) {
     if (!description) return {};
     const timeMatch = description.match(/is due at (\d{1,2}):(\d{2})/i);
@@ -1445,6 +1460,7 @@ html[data-docket-page="announcements"] main > div {
   function mergedItemsSorted() {
     const items = [...accumulated.values(), ...externalItems];
     items.sort((x, y) => x.dateIso.localeCompare(y.dateIso));
+    pairOpeningDeadlines(items);
     return items;
   }
   function groupByDate(items) {
@@ -1494,7 +1510,6 @@ html[data-docket-page="announcements"] main > div {
       const groupsJson = extractJsonAfter(courseListHtml, /"courseGroups"\s*:\s*/);
       const groups = groupsJson ? JSON.parse(groupsJson) : [];
       const hrefs = groups.flatMap((g) => g.courseList ?? []).map((c) => c.studentViewHref ?? c.href).filter((href) => !!href);
-      const normalized = (title) => title.replace(/\s+(?:closes?|opens?)$/i, "").replace(/[^\w]+/g, " ").trim().toLowerCase();
       for (let index = 0; index < hrefs.length; index++) {
         button.textContent = `Loading due times ${index + 1}/${hrefs.length}`;
         try {
@@ -1511,7 +1526,7 @@ html[data-docket-page="announcements"] main > div {
             const hour24 = Number(due[2]);
             const hour12 = hour24 % 12 || 12;
             const time = `${hour12}:${due[3]} ${hour24 >= 12 ? "pm" : "am"}`;
-            const item = mergedItemsSorted().find((i) => i.dateIso === iso && normalized(i.title) === normalized(assignment.name));
+            const item = mergedItemsSorted().find((i) => i.dateIso === iso && normalizedAssignmentTitle(i.title) === normalizedAssignmentTitle(assignment.name));
             const dueAt = item && schoolDateTime(iso, time);
             if (item && dueAt) {
               item.dueTime = time;
@@ -1606,6 +1621,8 @@ html[data-docket-page="announcements"] main > div {
                     meta: item.meta,
                     category: item.courseCode,
                     daysUntilDue: daysUntilInSchoolTimeZone(item.dateIso),
+                    dueLabel: item.opens && item.dueDateIso ? dueDateLabel(item.dueDateIso) : void 0,
+                    dueDaysUntil: item.dueDateIso ? daysUntilInSchoolTimeZone(item.dueDateIso) : void 0,
                     dueTime: item.dueTime,
                     dueAt: item.dueAt,
                     opensText: item.opens ? dueDateLabel(item.dateIso) : void 0,

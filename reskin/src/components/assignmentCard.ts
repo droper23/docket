@@ -69,11 +69,13 @@ export function assignmentCard(data: AssignmentCardData, onActivate?: () => void
     : null;
   // With a precise deadline the badge already says "Due in …"; keeping a second "Due today"
   // subtitle beside it is noisy, so retain only the clock as supporting detail.
-  const dueText = data.dueAt && data.dueTime
+  const dueText = data.opensText && data.dueLabel
     ? data.dueTime
-    : data.dueLabel
-      ? `Due ${data.dueLabel}${data.dueTime ? " " + data.dueTime : ""}`
-    : undefined;
+    : data.dueAt && data.dueTime
+      ? data.dueTime
+      : data.dueLabel
+        ? `Due ${data.dueLabel}${data.dueTime ? " " + data.dueTime : ""}`
+        : undefined;
   const categoryText = data.category
     ? data.category + (data.categoryWeight ? ` (${data.categoryWeight} of grade)` : "")
     : undefined;

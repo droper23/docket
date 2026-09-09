@@ -163,6 +163,24 @@ test("homeAdapter reads Combined Schedule items within the lookahead window", ()
   }
 });
 
+test("homeAdapter pairs an opening item with its matching closing date", () => {
+  const today = new Date();
+  const due = new Date(today.getTime() + 2 * 86_400_000);
+  const md = (date: Date) => `${date.getMonth() + 1}/${date.getDate()}`;
+  const html = `<main>
+    <div class="listViewDay"><div>${md(today)} - Today</div><div class="flex-4"><a class="cursor-pointer block truncate"><i class="fa-circle"></i>Video Quiz Opens</a></div><div>MATH 113</div></div>
+    <div class="listViewDay"><div>${md(due)} - Friday</div><div class="flex-4"><a class="cursor-pointer block truncate"><i class="fa-circle"></i>Video Quiz Closes</a></div><div>MATH 113</div></div>
+  </main>`;
+  setupDom(html, "https://learningsuite.byu.edu/.sess1/student/top/schedule");
+  try {
+    homeAdapter.mount(false);
+    const opening = Array.from(document.querySelectorAll(".docket-row")).find((row) => row.querySelector(".docket-row-title")?.textContent === "Video Quiz")!;
+    assert.deepEqual(Array.from(opening.querySelectorAll(".docket-badge"), (badge) => badge.textContent), ["Opens today", `Due ${dueDateLabel(formatIsoDate(due))}`]);
+  } finally {
+    homeAdapter.unmount();
+  }
+});
+
 test("homeAdapter loads a course section's exact deadline onto today's Combined Schedule card", async () => {
   const today = new Date();
   const md = `${today.getMonth() + 1}/${today.getDate()}`;
