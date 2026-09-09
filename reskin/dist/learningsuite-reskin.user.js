@@ -1,15 +1,15 @@
 // ==UserScript==
 // @name         LearningSuite Reskin
 // @namespace    https://github.com/droper23/docket
-// @version      0.1.8
+// @version      0.1.9
 // @description  A visual/interaction layer over BYU LearningSuite, styled like an Apple-designed app. LearningSuite stays the real backend — nothing is replaced. See reskin/README.md.
 // @author       Docket contributors
 // @match        https://learningsuite.byu.edu/*
 // @run-at       document-start
 // @grant        GM_getValue
 // @grant        GM_setValue
-// @updateURL    https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.8
-// @downloadURL  https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.8
+// @updateURL    https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.9
+// @downloadURL  https://raw.githubusercontent.com/droper23/docket/main/reskin/dist/learningsuite-reskin.user.js?v=0.1.9
 // ==/UserScript==
 
 "use strict";
@@ -1266,6 +1266,9 @@ html[data-docket-page="announcements"] main > div {
   var DIALOG_POLL_MS = 150;
   var DIALOG_POLL_TIMEOUT_MS = 15e3;
   var loadingDueTimes = false;
+  function courseCodeFromLabel(text) {
+    return text.match(/^[A-Z]+(?:\s+[A-Z]+)*\s+\d{3,4}/)?.[0] ?? text.trim();
+  }
   async function loadDueTimes(compatibilityMode, button) {
     if (loadingDueTimes) return;
     loadingDueTimes = true;
@@ -1277,7 +1280,7 @@ html[data-docket-page="announcements"] main > div {
       const courses = new DOMParser().parseFromString(await (await fetch(courseListUrl)).text(), "text/html");
       const needed = new Set(mergedItemsSorted().filter((i) => i.kind === "due" && !i.opens).map((i) => i.courseCode));
       const links = Array.from(courses.querySelectorAll('a[href*="/cid-"]')).map((a) => ({
-        code: (a.textContent ?? "").split(" - ")[0].replace(/\s*\(\d+\)\s*$/, "").trim(),
+        code: courseCodeFromLabel(a.textContent ?? ""),
         href: a.href
       })).filter((c) => needed.has(c.code));
       const normalized = (title) => title.replace(/\s+(?:closes?|opens?)$/i, "").replace(/\s+/g, " ").trim().toLowerCase();

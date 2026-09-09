@@ -181,6 +181,13 @@ const DIALOG_POLL_TIMEOUT_MS = 15000;
 
 let loadingDueTimes = false;
 
+/** Course List labels are e.g. "MATH 113 (016) Calculus 2", while Combined Schedule
+ * shows only "MATH 113". Extract that shared catalog code without relying on a separator
+ * that LearningSuite does not consistently render. */
+function courseCodeFromLabel(text: string): string {
+  return text.match(/^[A-Z]+(?:\s+[A-Z]+)*\s+\d{3,4}/)?.[0] ?? text.trim();
+}
+
 async function loadDueTimes(compatibilityMode: boolean, button: HTMLButtonElement): Promise<void> {
   if (loadingDueTimes) return;
   loadingDueTimes = true;
@@ -192,7 +199,7 @@ async function loadDueTimes(compatibilityMode: boolean, button: HTMLButtonElemen
     const courses = new DOMParser().parseFromString(await (await fetch(courseListUrl)).text(), "text/html");
     const needed = new Set(mergedItemsSorted().filter((i) => i.kind === "due" && !i.opens).map((i) => i.courseCode));
     const links = Array.from(courses.querySelectorAll('a[href*="/cid-"]')).map((a) => ({
-      code: (a.textContent ?? "").split(" - ")[0]!.replace(/\s*\(\d+\)\s*$/, "").trim(), href: (a as HTMLAnchorElement).href,
+      code: courseCodeFromLabel(a.textContent ?? ""), href: (a as HTMLAnchorElement).href,
     })).filter((c) => needed.has(c.code));
     const normalized = (title: string) => title.replace(/\s+(?:closes?|opens?)$/i, "").replace(/\s+/g, " ").trim().toLowerCase();
     for (let index = 0; index < links.length; index++) {
