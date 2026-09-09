@@ -7,6 +7,8 @@ import { setupDom } from "./testUtil.js";
 import {
   looksLikeCourseListPage,
   looksLikeAssignmentsPage,
+  looksLikeCompactAssignmentsPage,
+  looksLikeAnnouncementsPage,
   looksLikeGradesPage,
   looksLikeGradeSummaryPage,
   looksLikeDashboardPage,
@@ -59,6 +61,36 @@ test("looksLikeAssignmentsPage: false on the Grades page, which shares the ident
   ${assignmentsHtml}`;
   setupDom(gradesHtml, "https://learningsuite.byu.edu/cid-abc123/student/gradebook");
   assert.equal(looksLikeAssignmentsPage(), false);
+});
+
+test("looksLikeCompactAssignmentsPage: true on LearningSuite's live narrow category-disclosure shape", () => {
+  const compactAssignmentsHtml = `<main><div id="assignmentsComponent">
+    <h1>Assignments</h1>
+    <div class="lineHeight"><div class="cursor-pointer">Video Quizzes</div></div>
+    <div class="lineHeight"><div class="cursor-pointer">YPoll Quizzes</div></div>
+  </div></main>`;
+  setupDom(compactAssignmentsHtml, "https://learningsuite.byu.edu/cid-abc123/student/home/assignments");
+  assert.equal(looksLikeCompactAssignmentsPage(), true);
+});
+
+test("looksLikeCompactAssignmentsPage: rejects a Gradebook with coincidental disclosure rows", () => {
+  const compactGradesHtml = `<div class="bg-top-nav-highlight">Grades</div><main><div id="assignmentsComponent">
+    <h1>Assignments</h1>
+    <div class="lineHeight"><div class="cursor-pointer">Video Quizzes</div></div>
+    <div class="lineHeight"><div class="cursor-pointer">YPoll Quizzes</div></div>
+  </div></main>`;
+  setupDom(compactGradesHtml, "https://learningsuite.byu.edu/cid-abc123/student/gradebook");
+  assert.equal(looksLikeCompactAssignmentsPage(), false);
+});
+
+test("looksLikeAnnouncementsPage: matches only the real course announcement rich-text shape", () => {
+  setupDom(`<main><div><h1>Announcements</h1><div class="instructorText font-nunito">A real announcement</div></div></main>`, "https://learningsuite.byu.edu/cid-abc123/student/home/announcements");
+  assert.equal(looksLikeAnnouncementsPage(), true);
+});
+
+test("looksLikeAnnouncementsPage: rejects an unrelated course page with rich text", () => {
+  setupDom(`<main><h1>Syllabus</h1><div class="instructorText font-nunito">Course material</div></main>`, "https://learningsuite.byu.edu/cid-abc123/student/home/syllabus");
+  assert.equal(looksLikeAnnouncementsPage(), false);
 });
 
 test("courseIdFromUrl extracts LearningSuite's own opaque courseID", () => {

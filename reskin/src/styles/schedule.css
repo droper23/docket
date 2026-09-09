@@ -127,3 +127,41 @@
   font-family: var(--docket-font) !important;
   font-weight: 600 !important;
 }
+
+/* ── Phone Table view: retain cells, reflow their real order ─────────────
+ * On a live 390px view the native inline `128px 1fr 1fr` grid reduced each
+ * content column to ~120px: every title wrapped into a tall, hard-to-scan
+ * vertical strip. `markScheduleTableGrids()` identifies the real header and
+ * each repeating Date / Column 1 / Column 2 trio; at this breakpoint only,
+ * retain those native elements and simply stack them. No data, link, menu,
+ * or click handler is recreated or removed. */
+@media (max-width: 560px) {
+  [data-docket-page="schedule"] main .grid[data-docket-schedule-header="true"] {
+    display: none !important;
+  }
+  [data-docket-page="schedule"] main .grid[data-docket-schedule-reflow="true"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: none !important;
+    margin: 0 !important;
+  }
+  [data-docket-page="schedule"] main .grid[data-docket-schedule-reflow="true"] > [data-docket-schedule-cell] {
+    grid-column: 1 !important;
+    min-width: 0;
+    border-right: 0 !important;
+    padding: 10px 12px !important;
+  }
+  [data-docket-page="schedule"] main .grid[data-docket-schedule-reflow="true"] > [data-docket-schedule-empty="true"] {
+    display: none;
+  }
+  [data-docket-page="schedule"] main .grid[data-docket-schedule-reflow="true"] > [data-docket-schedule-cell="date"] {
+    background-color: var(--docket-surface-2);
+    color: var(--docket-label-secondary) !important;
+    font-weight: 600;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+  }
+  [data-docket-page="schedule"] main .grid[data-docket-schedule-reflow="true"] > [data-docket-schedule-cell="primary"],
+  [data-docket-page="schedule"] main .grid[data-docket-schedule-reflow="true"] > [data-docket-schedule-cell="secondary"] {
+    background-color: var(--docket-surface-1);
+  }
+}

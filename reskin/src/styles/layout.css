@@ -14,6 +14,19 @@
 .docket-header {
   margin-bottom: 32px;
 }
+
+/* Course Announcements stays native by design: its instructor-authored content can include
+   arbitrary rich text and links. Live audit (Sep 2026) confirmed the page's one real wrapper
+   and `.instructorText.font-nunito` document body, which global.css already renders as opaque
+   paper. Its default 1200px-plus measure made a long announcement tiring to scan; constrain
+   only this verified page shape to the same calm reading width as the rest of Docket's content
+   surfaces. The native DOM, links, embeds, and all interaction are completely untouched. */
+html[data-docket-page="announcements"] main > div {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 40px 28px 72px;
+}
+
 .docket-section { margin: 26px 0 10px; }
 .docket-day-header {
   display: flex; align-items: baseline; gap: 8px;

@@ -1,5 +1,49 @@
 # LearningSuite Reskin — Roadmap
 
+## Seventeenth pass: compact mobile Assignments keeps native controls, gains usable hierarchy (Sep 2026)
+
+Fresh live audit at a real 390px viewport confirmed the roadmap's long-standing mobile
+deferral: Assignments is **not** the desktop `.bg-base.text-highlight` row table compressed
+down. LearningSuite replaces it with `#assignmentsComponent`, seven native
+`.lineHeight > div.cursor-pointer` category disclosures, a homework-ID menu, and a real Course
+Progress footer; no desktop assignment rows exist until the student expands a category. The
+existing card adapter therefore correctly and safely fell back, but the native five-column grid
+still reserved blank Due/Score columns and forced ordinary category names such as “WebAssign
+Homework” onto two cramped lines.
+
+`looksLikeCompactAssignmentsPage()` now recognizes only that live-confirmed, course-scoped
+shape (and explicitly rejects Grades), with focused positive/negative fixtures. `index.ts`
+threads the result to an HTML data attribute; a ≤560px CSS treatment uses that narrow scope to
+hide the empty header, reclaim the unused columns for the category title, and turn each existing
+disclosure into a comfortably sized, token-based card. It intentionally never overlays, deletes,
+or recreates the native DOM: expanders, the ellipsis menus, Course Homework ID menu, Course
+Progress, and all LearningSuite click behavior remain the originals. Keyboard-visible focus is
+also added to the real category and menu triggers. Live preview verification confirmed the
+one-line cards at 390px and that opening a category still rendered its real assignments and
+native action controls.
+
+**Announcements readability:** the course Announcements detail page was already correctly left
+native (instructor-authored rich text can carry real links/embeds), but its verified one-wrapper
+layout allowed a 1200px-plus line length. A title + real `.instructorText.font-nunito` detector
+now scopes a reading-width layout to this one page shape—no content, markup, link, or behavior is
+recreated. It reads as a calm document surface at 1440px, has no horizontal overflow at 834px,
+and collapses to the normal mobile padding at 390px.
+
+**Schedule Table view on phones:** live mobile inspection caught a much more serious existing
+issue than a cosmetic mismatch. The native Table view keeps its inline `128px 1fr 1fr` grid at
+390px, reducing both content columns to narrow vertical strips. `markScheduleTableGrids()` marks
+only the confirmed `Date / Column 1 / Column 2` cell sequence under Schedule's own week panels;
+the phone stylesheet then stacks the original cells, retaining every native title, link, popup,
+and listener. Literal em-dash empty-column placeholders disappear only on that reflow. The
+native List switcher was also exercised live: it remains readable, has no horizontal overflow,
+and the Table choice was restored after testing.
+
+`npm run typecheck && npm run build && npm test` pass (67/67); bundle: 237.4 KB. Verified live
+against the authenticated account in Dark theme at desktop, tablet, and 390px mobile. Temporary
+preview styles were removed and the browser viewport restored after each inspection. A full
+Light-theme visual sweep remains a worthwhile follow-up because this pass consumes existing
+theme tokens only.
+
 ## Sixteenth pass: mobile FAB overlap, orphaned chevron, course-grid density, dashboard hierarchy (Sep 2026)
 
 Same two-independent-critique methodology as the fifteenth pass, this time reading live

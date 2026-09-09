@@ -94,6 +94,37 @@ export function looksLikeAssignmentsPage(doc: Document = document): boolean {
 }
 
 /**
+ * Compact Assignments is a separate, mobile-only native rendering, not a
+ * squeezed version of the desktop row table. Confirmed live at 390px (Sep
+ * 2026): it replaces `.bg-base.text-highlight` rows with `#assignmentsComponent`
+ * category disclosure rows, so the full card adapter must deliberately leave
+ * it alone. This narrow detector lets CSS improve that real native control
+ * surface without hiding or recreating its expandable categories, homework-ID
+ * menu, or Course Progress panel.
+ */
+export function looksLikeCompactAssignmentsPage(doc: Document = document): boolean {
+  if (!courseIdFromUrl()) return false;
+  const activeTab = doc.querySelector(".bg-top-nav-highlight")?.textContent?.trim();
+  if (activeTab === "Grades") return false;
+  const component = doc.querySelector("main #assignmentsComponent");
+  const title = component?.querySelector("h1")?.textContent?.trim() ?? "";
+  const categories = component?.querySelectorAll(":scope > .lineHeight > div.cursor-pointer").length ?? 0;
+  return title === "Assignments" && categories > 1;
+}
+
+/**
+ * Course Announcements detail pages deliberately remain native: their authored rich text can
+ * contain arbitrary links, embeds, and inline formatting. The live shape is still safe to
+ * identify for a layout-only readability treatment: an exact native heading plus the same
+ * instructor-authored rich-text compound global.css already themes as an opaque paper surface.
+ */
+export function looksLikeAnnouncementsPage(doc: Document = document): boolean {
+  if (!courseIdFromUrl()) return false;
+  const title = doc.querySelector("main h1")?.textContent?.trim() ?? "";
+  return title === "Announcements" && !!doc.querySelector("main .instructorText.font-nunito");
+}
+
+/**
  * Grades page (its default "Assignments" sub-view, `/student/gradebook`) — confirmed live
  * (Sep 2026) it renders the identical `main .bg-base.text-highlight` row grid as the real
  * Assignments page (see gradesAdapter.ts), so the DOM shape alone can't tell them apart. The

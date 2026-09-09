@@ -71,6 +71,19 @@
 .docket-header {
   margin-bottom: 32px;
 }
+
+/* Course Announcements stays native by design: its instructor-authored content can include
+   arbitrary rich text and links. Live audit (Sep 2026) confirmed the page's one real wrapper
+   and \`.instructorText.font-nunito\` document body, which global.css already renders as opaque
+   paper. Its default 1200px-plus measure made a long announcement tiring to scan; constrain
+   only this verified page shape to the same calm reading width as the rest of Docket's content
+   surfaces. The native DOM, links, embeds, and all interaction are completely untouched. */
+html[data-docket-page="announcements"] main > div {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 40px 28px 72px;
+}
+
 .docket-section { margin: 26px 0 10px; }
 .docket-day-header {
   display: flex; align-items: baseline; gap: 8px;
@@ -337,6 +350,7 @@
   // src/styles/responsive.css
   var responsive_default = `@media (max-width: 480px) {
   .docket-page { padding: 18px 14px 60px; }
+  html[data-docket-page="announcements"] main > div { padding: 18px 14px 60px; }
   /* .docket-display no longer needs a fixed override here \u2014 its clamp() in
      typography.css already scales down on narrow viewports. */
   .docket-course-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -373,6 +387,45 @@
        38px content-start convention elsewhere in this file's sibling, cards.css. */
     padding-left: 38px;
   }
+
+  /* LearningSuite swaps the desktop assignment grid for this confirmed compact DOM at
+     phone width: \`#assignmentsComponent > .lineHeight > div.cursor-pointer\` is its real
+     category disclosure control, while the native Due/Score columns are empty. Keep that
+     control and its own click/keyboard behavior intact, but reclaim the unused columns so
+     titles no longer wrap into a cramped two-line table. The data attribute is only set by
+     looksLikeCompactAssignmentsPage() after verifying the real course-scoped H1/component/
+     category shape \u2014 these intentionally are not broad LearningSuite utility selectors. */
+  html[data-docket-compact-assignments="true"] #assignmentsComponent > .w-full.mt-4 {
+    display: none !important;
+  }
+  html[data-docket-compact-assignments="true"] #assignmentsComponent > .lineHeight {
+    margin: 0 0 8px;
+  }
+  html[data-docket-compact-assignments="true"] #assignmentsComponent > .lineHeight > div.cursor-pointer {
+    grid-template-columns: 1.5rem minmax(0, 1fr) 2.75rem !important;
+    grid-template-areas: "icon title ellipsis" !important;
+    min-height: 56px;
+    padding: 12px 14px;
+    border: 1px solid var(--docket-separator);
+    border-radius: var(--docket-radius-sm);
+    background-color: var(--docket-surface-1) !important;
+    transition: background-color var(--docket-dur-fast) var(--docket-ease-standard);
+  }
+  html[data-docket-compact-assignments="true"] #assignmentsComponent > .lineHeight > div.cursor-pointer:hover {
+    background-color: var(--docket-surface-2) !important;
+  }
+  html[data-docket-compact-assignments="true"] #assignmentsComponent > .lineHeight > div.cursor-pointer:focus-visible,
+  html[data-docket-compact-assignments="true"] #assignmentsComponent .trigger:focus-visible {
+    outline: 2px solid var(--docket-accent);
+    outline-offset: 2px;
+  }
+  html[data-docket-compact-assignments="true"] #assignmentsComponent > .lineHeight > div.cursor-pointer > .justify-self-start {
+    min-width: 0;
+    font-weight: 600;
+  }
+  html[data-docket-compact-assignments="true"] #assignmentsComponent > .lineHeight > div.cursor-pointer > [style*="grid-column-start: ellipsis"] {
+    grid-column-start: ellipsis !important;
+  }
 }
 
 /* Touch targets stay >=44px regardless of viewport per Apple HIG, spec \xA718/\xA730. */
@@ -383,7 +436,7 @@
 `;
 
   // src/styles/schedule.css
-  var schedule_default = '/**\n * Course-scoped Schedule page (issue #6, Sep 2026 pass). All selectors are\n * traced to live DOM (tools/audit/37\u201340, real DANCE 280 Schedule page, Table\n * view), and the whole file is gated behind `[data-docket-page="schedule"]`,\n * which src/index.ts derives each pass from a live-confirmed page-unique\n * signal (`main .innerBox` \u2014 the view switcher; 1 hit on Schedule, 0 on the\n * seven other page types censused). The earlier "no stable class names" note\n * about this page was outdated: it renders LearningSuite\'s own Tailwind-ish\n * utilities, and the compounds below were verified unique to this page.\n *\n * What was actually wrong (measured live): colors already remapped fine via\n * global.css\'s sitewide .bg-accent/.bg-gray1/.bg-primary rules, but shape did\n * not \u2014 the Table/List view switcher trigger and its dropdown menu compute\n * radius 0px (dropdown bg solid rgb(36,36,36), off-palette in both themes),\n * the blue "today" day chip is a sharp-cornered square, and the view switcher\n * being bg-accent = bg-gray1 made the active view indistinguishable. The\n * `border-collapse: separate` bare-table suspicion from the brief was checked\n * and ruled out live: this page contains zero <table> elements in either of\n * its views (the grid is CSS-grid divs), so the bare-table rule never fires\n * here.\n *\n * Live numbers below were measured on the injected page (audit 37/38/39).\n */\n\n/* \u2500\u2500 The Table/List view switcher \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n * Confirmed structure: div.relative.outerBox > div.relative.inline-block...bg-base\n * > div.flex.justify-between.items-center.border.px-2.innerBox (trigger,\n * h-8) + div.bg-base...border.border-gray3.rounded (menu, -z-10 invisible\n * until opened). `.innerBox`/`.outerBox` are Schedule-unique (census 40), so\n * `main .innerBox` can only mean this control. The trigger keeps the\n * sitewide .bg-base treatment from global.css (neutral fill, like macOS\'s\n * segmented-control well); the OPEN choice inside the menu carries\n * `bg-accent`, which the sitewide rule turns into the same neutral fill as\n * the inactive rows \u2014 killing the only active-state signal the control has.\n * Restore an Apple-style selected state there specifically. */\n[data-docket-page="schedule"] main .innerBox {\n  border-radius: var(--docket-radius-sm) !important;\n  border-color: var(--docket-separator) !important;\n  background-color: var(--docket-fill) !important;\n  font-family: var(--docket-font) !important;\n  overflow: hidden;\n}\n/* The dropdown menu: off-palette solid rgb(36,36,36) in both themes, 0px\n * radius natively (`border-gray3 rounded` \u2014 its own `rounded` class is 4px,\n * off-scale). Elevated surface: canvas + hairline + shadow, like every other\n * menu/dropdown the redesign owns (navigation.css\'s dropdown treatment). */\n[data-docket-page="schedule"] main .outerBox > .bg-base.border-gray3 {\n  border-radius: var(--docket-radius-md) !important;\n  background-color: var(--docket-bg-elevated) !important;\n  box-shadow: var(--docket-shadow);\n  border-color: var(--docket-separator) !important;\n  overflow: hidden;\n}\n/* Selected view inside the open menu \u2014 confirmed live as\n * `div.bg-accent.cursor-pointer.text-primary.hover:bg-accent.flex.flex-col.px-3`.\n * Apple segmented-control semantics: the selected segment gets the accent\n * fill, not the same fill as the rest. */\n[data-docket-page="schedule"] main .outerBox > .bg-base.border-gray3 > .bg-accent {\n  background-color: var(--docket-accent) !important;\n  color: var(--docket-on-accent) !important;\n}\n\n/* \u2500\u2500 Week header rows (Table view) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n * Confirmed live: `div.text-primary.bg-gray1.px-4.py-2.cursor-pointer`,\n * one per week (16 on the audited page), sitting directly above each week\'s\n * content wrapper. Gated to the schedule scope because the plain\n * `.bg-gray1.px-4.py-2` compound also appears on the course Dashboard (6\xD7,\n * census 40). Grouped-list section header treatment: tinted fill, rounded\n * group corners, no border. */\n[data-docket-page="schedule"] main .bg-gray1.px-4.py-2 {\n  border-radius: var(--docket-radius-sm) var(--docket-radius-sm) 0 0 !important;\n  font-family: var(--docket-font) !important;\n  font-weight: 600 !important;\n  color: var(--docket-label) !important;\n  background-color: var(--docket-fill) !important;\n}\n/* Week content wrapper (the `.bg-base.p-1.pt-4` grid panel under each week\n * header \u2014 Schedule-unique per census 40; 15 of them = 15 weeks + 1 header).\n * Rounds the BOTTOM of each week group so header+content read as one card\n * (the header rule above rounds the top). p-1/pt-4 margins pull the inner\n * grid up over the wrapper\'s own edges (-mx-1 -mt-4), so clip the wrapper\'s\n * corners: without overflow hidden the grid\'s cell borders poke past the\n * rounded corners as sharp pixels. */\n[data-docket-page="schedule"] main .bg-base.p-1.pt-4 {\n  border-radius: 0 0 var(--docket-radius-sm) var(--docket-radius-sm) !important;\n  overflow: hidden;\n  box-shadow: var(--docket-shadow);\n  margin-bottom: 10px;\n}\n/* \u2500\u2500 Grid cells (day rows inside each week) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n * Confirmed live: rows are `div.grid.-mx-1.-mt-4` of cells\n * `div.pb-2.border-gray2.border-b[.border-r]` \u2014 hairline shared edges. The\n * gray-cell borders get the token treatment; the underlying panel (rule\n * above) is what reads as the card. */\n[data-docket-page="schedule"] main .bg-base.p-1.pt-4 .border-b {\n  border-color: var(--docket-separator) !important;\n}\n/* Day/date label cells (first cell of each row) \u2014 secondary label weight so\n * the entry text reads as the primary content. */\n[data-docket-page="schedule"] main .bg-base.p-1.pt-4 .border-b:first-child {\n  color: var(--docket-label-secondary) !important;\n}\n\n/* \u2500\u2500 "Today" markers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n * Two confirmed live shapes, both native accent-blue with sharp corners:\n * 1. The Table view\'s blue day chip `div.bg-primary.hover:border-primary-alt`\n *    (global.css already remaps .bg-primary to --docket-blue + white text \u2014\n *    this adds the missing shape/typography).\n * 2. The mini-calendar\'s today cell (same `.bg-primary` utility).\n * Apple Calendar\'s today treatment: accent pill, white text, no visible\n * border. */\n[data-docket-page="schedule"] main .bg-primary.hover\\:border-primary-alt {\n  border-radius: var(--docket-radius-sm) !important;\n  border: none !important;\n  font-family: var(--docket-font) !important;\n  font-weight: 600 !important;\n  box-shadow: none !important;\n}\n\n/* \u2500\u2500 "Go to Combined Schedule" button \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n * Confirmed live: `button.bg-action...` (the only one on the page), already\n * filled/remapped by global.css\'s .bg-action rule \u2014 but its computed radius\n * was 0px natively on this page (census 37) because that rule doesn\'t reach\n * it (see note there); this guarantees the token radius and font. */\n[data-docket-page="schedule"] main button.bg-action {\n  border-radius: var(--docket-radius-sm) !important;\n  font-family: var(--docket-font) !important;\n  font-weight: 600 !important;\n}\n';
+  var schedule_default = '/**\n * Course-scoped Schedule page (issue #6, Sep 2026 pass). All selectors are\n * traced to live DOM (tools/audit/37\u201340, real DANCE 280 Schedule page, Table\n * view), and the whole file is gated behind `[data-docket-page="schedule"]`,\n * which src/index.ts derives each pass from a live-confirmed page-unique\n * signal (`main .innerBox` \u2014 the view switcher; 1 hit on Schedule, 0 on the\n * seven other page types censused). The earlier "no stable class names" note\n * about this page was outdated: it renders LearningSuite\'s own Tailwind-ish\n * utilities, and the compounds below were verified unique to this page.\n *\n * What was actually wrong (measured live): colors already remapped fine via\n * global.css\'s sitewide .bg-accent/.bg-gray1/.bg-primary rules, but shape did\n * not \u2014 the Table/List view switcher trigger and its dropdown menu compute\n * radius 0px (dropdown bg solid rgb(36,36,36), off-palette in both themes),\n * the blue "today" day chip is a sharp-cornered square, and the view switcher\n * being bg-accent = bg-gray1 made the active view indistinguishable. The\n * `border-collapse: separate` bare-table suspicion from the brief was checked\n * and ruled out live: this page contains zero <table> elements in either of\n * its views (the grid is CSS-grid divs), so the bare-table rule never fires\n * here.\n *\n * Live numbers below were measured on the injected page (audit 37/38/39).\n */\n\n/* \u2500\u2500 The Table/List view switcher \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n * Confirmed structure: div.relative.outerBox > div.relative.inline-block...bg-base\n * > div.flex.justify-between.items-center.border.px-2.innerBox (trigger,\n * h-8) + div.bg-base...border.border-gray3.rounded (menu, -z-10 invisible\n * until opened). `.innerBox`/`.outerBox` are Schedule-unique (census 40), so\n * `main .innerBox` can only mean this control. The trigger keeps the\n * sitewide .bg-base treatment from global.css (neutral fill, like macOS\'s\n * segmented-control well); the OPEN choice inside the menu carries\n * `bg-accent`, which the sitewide rule turns into the same neutral fill as\n * the inactive rows \u2014 killing the only active-state signal the control has.\n * Restore an Apple-style selected state there specifically. */\n[data-docket-page="schedule"] main .innerBox {\n  border-radius: var(--docket-radius-sm) !important;\n  border-color: var(--docket-separator) !important;\n  background-color: var(--docket-fill) !important;\n  font-family: var(--docket-font) !important;\n  overflow: hidden;\n}\n/* The dropdown menu: off-palette solid rgb(36,36,36) in both themes, 0px\n * radius natively (`border-gray3 rounded` \u2014 its own `rounded` class is 4px,\n * off-scale). Elevated surface: canvas + hairline + shadow, like every other\n * menu/dropdown the redesign owns (navigation.css\'s dropdown treatment). */\n[data-docket-page="schedule"] main .outerBox > .bg-base.border-gray3 {\n  border-radius: var(--docket-radius-md) !important;\n  background-color: var(--docket-bg-elevated) !important;\n  box-shadow: var(--docket-shadow);\n  border-color: var(--docket-separator) !important;\n  overflow: hidden;\n}\n/* Selected view inside the open menu \u2014 confirmed live as\n * `div.bg-accent.cursor-pointer.text-primary.hover:bg-accent.flex.flex-col.px-3`.\n * Apple segmented-control semantics: the selected segment gets the accent\n * fill, not the same fill as the rest. */\n[data-docket-page="schedule"] main .outerBox > .bg-base.border-gray3 > .bg-accent {\n  background-color: var(--docket-accent) !important;\n  color: var(--docket-on-accent) !important;\n}\n\n/* \u2500\u2500 Week header rows (Table view) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n * Confirmed live: `div.text-primary.bg-gray1.px-4.py-2.cursor-pointer`,\n * one per week (16 on the audited page), sitting directly above each week\'s\n * content wrapper. Gated to the schedule scope because the plain\n * `.bg-gray1.px-4.py-2` compound also appears on the course Dashboard (6\xD7,\n * census 40). Grouped-list section header treatment: tinted fill, rounded\n * group corners, no border. */\n[data-docket-page="schedule"] main .bg-gray1.px-4.py-2 {\n  border-radius: var(--docket-radius-sm) var(--docket-radius-sm) 0 0 !important;\n  font-family: var(--docket-font) !important;\n  font-weight: 600 !important;\n  color: var(--docket-label) !important;\n  background-color: var(--docket-fill) !important;\n}\n/* Week content wrapper (the `.bg-base.p-1.pt-4` grid panel under each week\n * header \u2014 Schedule-unique per census 40; 15 of them = 15 weeks + 1 header).\n * Rounds the BOTTOM of each week group so header+content read as one card\n * (the header rule above rounds the top). p-1/pt-4 margins pull the inner\n * grid up over the wrapper\'s own edges (-mx-1 -mt-4), so clip the wrapper\'s\n * corners: without overflow hidden the grid\'s cell borders poke past the\n * rounded corners as sharp pixels. */\n[data-docket-page="schedule"] main .bg-base.p-1.pt-4 {\n  border-radius: 0 0 var(--docket-radius-sm) var(--docket-radius-sm) !important;\n  overflow: hidden;\n  box-shadow: var(--docket-shadow);\n  margin-bottom: 10px;\n}\n/* \u2500\u2500 Grid cells (day rows inside each week) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n * Confirmed live: rows are `div.grid.-mx-1.-mt-4` of cells\n * `div.pb-2.border-gray2.border-b[.border-r]` \u2014 hairline shared edges. The\n * gray-cell borders get the token treatment; the underlying panel (rule\n * above) is what reads as the card. */\n[data-docket-page="schedule"] main .bg-base.p-1.pt-4 .border-b {\n  border-color: var(--docket-separator) !important;\n}\n/* Day/date label cells (first cell of each row) \u2014 secondary label weight so\n * the entry text reads as the primary content. */\n[data-docket-page="schedule"] main .bg-base.p-1.pt-4 .border-b:first-child {\n  color: var(--docket-label-secondary) !important;\n}\n\n/* \u2500\u2500 "Today" markers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n * Two confirmed live shapes, both native accent-blue with sharp corners:\n * 1. The Table view\'s blue day chip `div.bg-primary.hover:border-primary-alt`\n *    (global.css already remaps .bg-primary to --docket-blue + white text \u2014\n *    this adds the missing shape/typography).\n * 2. The mini-calendar\'s today cell (same `.bg-primary` utility).\n * Apple Calendar\'s today treatment: accent pill, white text, no visible\n * border. */\n[data-docket-page="schedule"] main .bg-primary.hover\\:border-primary-alt {\n  border-radius: var(--docket-radius-sm) !important;\n  border: none !important;\n  font-family: var(--docket-font) !important;\n  font-weight: 600 !important;\n  box-shadow: none !important;\n}\n\n/* \u2500\u2500 "Go to Combined Schedule" button \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n * Confirmed live: `button.bg-action...` (the only one on the page), already\n * filled/remapped by global.css\'s .bg-action rule \u2014 but its computed radius\n * was 0px natively on this page (census 37) because that rule doesn\'t reach\n * it (see note there); this guarantees the token radius and font. */\n[data-docket-page="schedule"] main button.bg-action {\n  border-radius: var(--docket-radius-sm) !important;\n  font-family: var(--docket-font) !important;\n  font-weight: 600 !important;\n}\n\n/* \u2500\u2500 Phone Table view: retain cells, reflow their real order \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n * On a live 390px view the native inline `128px 1fr 1fr` grid reduced each\n * content column to ~120px: every title wrapped into a tall, hard-to-scan\n * vertical strip. `markScheduleTableGrids()` identifies the real header and\n * each repeating Date / Column 1 / Column 2 trio; at this breakpoint only,\n * retain those native elements and simply stack them. No data, link, menu,\n * or click handler is recreated or removed. */\n@media (max-width: 560px) {\n  [data-docket-page="schedule"] main .grid[data-docket-schedule-header="true"] {\n    display: none !important;\n  }\n  [data-docket-page="schedule"] main .grid[data-docket-schedule-reflow="true"] {\n    grid-template-columns: minmax(0, 1fr) !important;\n    grid-template-rows: none !important;\n    margin: 0 !important;\n  }\n  [data-docket-page="schedule"] main .grid[data-docket-schedule-reflow="true"] > [data-docket-schedule-cell] {\n    grid-column: 1 !important;\n    min-width: 0;\n    border-right: 0 !important;\n    padding: 10px 12px !important;\n  }\n  [data-docket-page="schedule"] main .grid[data-docket-schedule-reflow="true"] > [data-docket-schedule-empty="true"] {\n    display: none;\n  }\n  [data-docket-page="schedule"] main .grid[data-docket-schedule-reflow="true"] > [data-docket-schedule-cell="date"] {\n    background-color: var(--docket-surface-2);\n    color: var(--docket-label-secondary) !important;\n    font-weight: 600;\n    padding-top: 8px !important;\n    padding-bottom: 8px !important;\n  }\n  [data-docket-page="schedule"] main .grid[data-docket-schedule-reflow="true"] > [data-docket-schedule-cell="primary"],\n  [data-docket-page="schedule"] main .grid[data-docket-schedule-reflow="true"] > [data-docket-schedule-cell="secondary"] {\n    background-color: var(--docket-surface-1);\n  }\n}\n';
 
   // src/core/pageDetector.ts
   function courseIdFromUrl(pathname = location.pathname) {
@@ -411,6 +464,20 @@
     const activeTab = doc.querySelector(".bg-top-nav-highlight")?.textContent?.trim();
     if (activeTab === "Grades") return false;
     return doc.querySelectorAll("main .bg-base.text-highlight").length > 0;
+  }
+  function looksLikeCompactAssignmentsPage(doc = document) {
+    if (!courseIdFromUrl()) return false;
+    const activeTab = doc.querySelector(".bg-top-nav-highlight")?.textContent?.trim();
+    if (activeTab === "Grades") return false;
+    const component = doc.querySelector("main #assignmentsComponent");
+    const title = component?.querySelector("h1")?.textContent?.trim() ?? "";
+    const categories = component?.querySelectorAll(":scope > .lineHeight > div.cursor-pointer").length ?? 0;
+    return title === "Assignments" && categories > 1;
+  }
+  function looksLikeAnnouncementsPage(doc = document) {
+    if (!courseIdFromUrl()) return false;
+    const title = doc.querySelector("main h1")?.textContent?.trim() ?? "";
+    return title === "Announcements" && !!doc.querySelector("main .instructorText.font-nunito");
   }
   function looksLikeGradesPage(doc = document) {
     if (!courseIdFromUrl()) return false;
@@ -2035,6 +2102,26 @@
     };
   }
 
+  // src/lib/scheduleLayout.ts
+  function markScheduleTableGrids(main) {
+    for (const grid of Array.from(main.querySelectorAll(".bg-base.p-1.pt-4 > .grid"))) {
+      const cells = Array.from(grid.children);
+      const headings = cells.slice(0, 3).map((cell) => cell.textContent?.replace(/\s+/g, " ").trim());
+      if (headings.join("|") === "Date|Column 1|Column 2") {
+        grid.setAttribute("data-docket-schedule-header", "true");
+        continue;
+      }
+      if (cells.length < 3 || cells.length % 3 !== 0) continue;
+      grid.setAttribute("data-docket-schedule-reflow", "true");
+      cells.forEach((cell, index) => {
+        cell.setAttribute("data-docket-schedule-cell", index % 3 === 0 ? "date" : index % 3 === 1 ? "primary" : "secondary");
+        const text = cell.textContent?.replace(/\s+/g, " ").trim();
+        if (text === "\u2014") cell.setAttribute("data-docket-schedule-empty", "true");
+        else cell.removeAttribute("data-docket-schedule-empty");
+      });
+    }
+  }
+
   // src/index.ts
   function injectStyles() {
     if (document.getElementById("docket-reskin-styles")) return;
@@ -2077,10 +2164,17 @@
     diagnostics.pageKind = location.pathname;
     applyTheme(settings.appearance);
     applyBackground(settings);
-    if (document.querySelector("main .innerBox")) {
-      document.documentElement.setAttribute("data-docket-page", "schedule");
+    const pageKind = document.querySelector("main .innerBox") ? "schedule" : looksLikeAnnouncementsPage() ? "announcements" : void 0;
+    if (pageKind) document.documentElement.setAttribute("data-docket-page", pageKind);
+    else document.documentElement.removeAttribute("data-docket-page");
+    if (pageKind === "schedule") {
+      const main = document.querySelector("main");
+      if (main) markScheduleTableGrids(main);
+    }
+    if (looksLikeCompactAssignmentsPage()) {
+      document.documentElement.setAttribute("data-docket-compact-assignments", "true");
     } else {
-      document.documentElement.removeAttribute("data-docket-page");
+      document.documentElement.removeAttribute("data-docket-compact-assignments");
     }
     document.documentElement.setAttribute("data-docket-reduced-motion", String(settings.reducedMotion));
     document.documentElement.setAttribute("data-docket-ready", "true");

@@ -1,5 +1,6 @@
 @media (max-width: 480px) {
   .docket-page { padding: 18px 14px 60px; }
+  html[data-docket-page="announcements"] main > div { padding: 18px 14px 60px; }
   /* .docket-display no longer needs a fixed override here — its clamp() in
      typography.css already scales down on narrow viewports. */
   .docket-course-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -35,6 +36,45 @@
     /* Aligns under the title text, past the checkbox column — matches .docket-row-body's own
        38px content-start convention elsewhere in this file's sibling, cards.css. */
     padding-left: 38px;
+  }
+
+  /* LearningSuite swaps the desktop assignment grid for this confirmed compact DOM at
+     phone width: `#assignmentsComponent > .lineHeight > div.cursor-pointer` is its real
+     category disclosure control, while the native Due/Score columns are empty. Keep that
+     control and its own click/keyboard behavior intact, but reclaim the unused columns so
+     titles no longer wrap into a cramped two-line table. The data attribute is only set by
+     looksLikeCompactAssignmentsPage() after verifying the real course-scoped H1/component/
+     category shape — these intentionally are not broad LearningSuite utility selectors. */
+  html[data-docket-compact-assignments="true"] #assignmentsComponent > .w-full.mt-4 {
+    display: none !important;
+  }
+  html[data-docket-compact-assignments="true"] #assignmentsComponent > .lineHeight {
+    margin: 0 0 8px;
+  }
+  html[data-docket-compact-assignments="true"] #assignmentsComponent > .lineHeight > div.cursor-pointer {
+    grid-template-columns: 1.5rem minmax(0, 1fr) 2.75rem !important;
+    grid-template-areas: "icon title ellipsis" !important;
+    min-height: 56px;
+    padding: 12px 14px;
+    border: 1px solid var(--docket-separator);
+    border-radius: var(--docket-radius-sm);
+    background-color: var(--docket-surface-1) !important;
+    transition: background-color var(--docket-dur-fast) var(--docket-ease-standard);
+  }
+  html[data-docket-compact-assignments="true"] #assignmentsComponent > .lineHeight > div.cursor-pointer:hover {
+    background-color: var(--docket-surface-2) !important;
+  }
+  html[data-docket-compact-assignments="true"] #assignmentsComponent > .lineHeight > div.cursor-pointer:focus-visible,
+  html[data-docket-compact-assignments="true"] #assignmentsComponent .trigger:focus-visible {
+    outline: 2px solid var(--docket-accent);
+    outline-offset: 2px;
+  }
+  html[data-docket-compact-assignments="true"] #assignmentsComponent > .lineHeight > div.cursor-pointer > .justify-self-start {
+    min-width: 0;
+    font-weight: 600;
+  }
+  html[data-docket-compact-assignments="true"] #assignmentsComponent > .lineHeight > div.cursor-pointer > [style*="grid-column-start: ellipsis"] {
+    grid-column-start: ellipsis !important;
   }
 }
 

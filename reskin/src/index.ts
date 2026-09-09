@@ -11,10 +11,12 @@ import scheduleCss from "./styles/schedule.css";
 import { adapters } from "./adapters/registry.js";
 import { mountShell, refreshShell } from "./adapters/shell.js";
 import { loadSettings } from "./core/settings.js";
+import { looksLikeAnnouncementsPage, looksLikeCompactAssignmentsPage } from "./core/pageDetector.js";
 import type { ReskinSettings, Appearance } from "./core/settings.js";
 import { BACKGROUND_CHOICES } from "./core/settings.js";
 import { diagnostics, resetDiagnostics } from "./core/diagnostics.js";
 import { observeMutations } from "./lib/observe.js";
+import { markScheduleTableGrids } from "./lib/scheduleLayout.js";
 import type { Adapter } from "./adapters/types.js";
 import { getSetting, setSetting } from "./lib/storage.js";
 
@@ -150,10 +152,28 @@ function runAdapters(settings: ReskinSettings): void {
   // announcements/assignments/gradebook/syllabus/pages 0). Re-checked every pass, so the
   // attribute (and with it the scoped styles) self-corrects if LearningSuite ever changes
   // that page's chrome.
-  if (document.querySelector("main .innerBox")) {
-    document.documentElement.setAttribute("data-docket-page", "schedule");
+  const pageKind = document.querySelector("main .innerBox")
+    ? "schedule"
+    : looksLikeAnnouncementsPage()
+      ? "announcements"
+      : undefined;
+  if (pageKind) document.documentElement.setAttribute("data-docket-page", pageKind);
+  else document.documentElement.removeAttribute("data-docket-page");
+  if (pageKind === "schedule") {
+    // The Schedule Table view's mobile grid is reshaped only by CSS; these markers identify
+    // its confirmed repeating Date / Column 1 / Column 2 cells without touching their content
+    // or listeners. See lib/scheduleLayout.ts and schedule.css.
+    const main = document.querySelector("main");
+    if (main) markScheduleTableGrids(main);
+  }
+  // LearningSuite serves a genuinely different compact Assignments DOM at phone widths:
+  // category disclosure rows replace the desktop assignment rows, so the card adapter
+  // correctly falls back. Scope the native-control polish to the live-confirmed shape rather
+  // than attempting to recreate its expanders, homework-ID menu, or Course Progress panel.
+  if (looksLikeCompactAssignmentsPage()) {
+    document.documentElement.setAttribute("data-docket-compact-assignments", "true");
   } else {
-    document.documentElement.removeAttribute("data-docket-page");
+    document.documentElement.removeAttribute("data-docket-compact-assignments");
   }
   // Threaded onto <html> so both the main page (tokens.css) and any shadow-DOM panel
   // (settingsPanel.ts/diagnosticsPanel.ts read this same attribute at open time) can
