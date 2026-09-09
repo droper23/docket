@@ -122,7 +122,7 @@
    from the same tokens a due row uses (never a new color) so it reads as non-actionable
    context at a glance, the same distinction Combined Schedule's own native page draws with a
    gold dot vs. no dot at all. */
-.docket-row-info .docket-row-title { font-weight: 500; color: var(--docket-label-secondary); }
+.docket-row-info .docket-row-title { font-weight: 500; font-style: italic; color: var(--docket-label-secondary); }
 .docket-row-info .docket-row-subtitle { color: var(--docket-label-tertiary); }
 .docket-checkbox-done { border-color: var(--docket-green); background: var(--docket-green); }
 .docket-checkbox-done::after {

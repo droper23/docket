@@ -6,7 +6,7 @@ import { assignmentCard } from "../components/assignmentCard.js";
 import { parseAssignmentDueText } from "../lib/parseDueText.js";
 import { diagnostics } from "../core/diagnostics.js";
 import { dueDateLabel } from "../../../src/core/agendaFormatting.js";
-import { daysUntilInSchoolTimeZone } from "../../../src/core/schoolTime.js";
+import { daysUntilInSchoolTimeZone, schoolDateTime } from "../../../src/core/schoolTime.js";
 
 export interface RowData {
   el: HTMLElement;
@@ -137,6 +137,7 @@ export function buildCard(reveal: () => void, r: RowData): HTMLElement {
       categoryWeight: r.categoryWeight,
       dueLabel: iso ? dueDateLabel(iso) : undefined,
       dueTime: time,
+      dueAt: iso && time && !r.opensText ? schoolDateTime(iso, time) : undefined,
       daysUntilDue,
       completed: r.completed,
       opensText: opensIso ? dueDateLabel(opensIso) : r.opensText,

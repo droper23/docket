@@ -50,3 +50,35 @@ export function daysBetween(fromDateStr: string, toDateStr: string): number {
 export function daysUntilInSchoolTimeZone(dateStr: string): number {
   return daysBetween(todayInSchoolTimeZone(), dateStr);
 }
+
+/**
+ * Turns a LearningSuite date and its Mountain-time clock label into an instant. The date is
+ * deliberately interpreted in BYU's timezone rather than the viewer's, just like the calendar
+ * helpers above. `time` may include LearningSuite's trailing MDT/MST abbreviation.
+ */
+export function schoolDateTime(dateStr: string, time: string): Date | undefined {
+  const date = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const clock = time.match(/^(\d{1,2}):(\d{2})\s*([ap]m)\b/i);
+  if (!date || !clock) return undefined;
+  const year = Number(date[1]);
+  const month = Number(date[2]);
+  const day = Number(date[3]);
+  let hour = Number(clock[1]);
+  const minute = Number(clock[2]);
+  if (month < 1 || month > 12 || day < 1 || day > 31 || hour < 1 || hour > 12 || minute > 59) return undefined;
+  hour = (hour % 12) + (clock[3]!.toLowerCase() === "pm" ? 12 : 0);
+
+  const wallClockUtc = Date.UTC(year, month - 1, day, hour, minute);
+  const offsetAt = (instant: number) => {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: SCHOOL_TIME_ZONE,
+      year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    }).formatToParts(new Date(instant));
+    const part = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+    return Date.UTC(part("year"), part("month") - 1, part("day"), part("hour"), part("minute")) - instant;
+  };
+  // Recheck the offset at the candidate instant so DST changes on the date itself are correct.
+  let instant = wallClockUtc - offsetAt(wallClockUtc);
+  instant = wallClockUtc - offsetAt(instant);
+  return new Date(instant);
+}

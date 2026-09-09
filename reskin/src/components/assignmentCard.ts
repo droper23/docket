@@ -8,6 +8,8 @@ export interface AssignmentCardData {
   categoryWeight?: string;
   dueLabel?: string; // e.g. "today", "Friday" — from dueDateLabel()
   dueTime?: string;
+  /** Exact deadline when LearningSuite supplies a clock time; powers the relative badge. */
+  dueAt?: Date;
   daysUntilDue?: number;
   completed?: boolean;
   courseAccent?: string; // CSS color for the leading dot
@@ -57,9 +59,13 @@ export function assignmentCard(data: AssignmentCardData, onActivate?: () => void
   // this, a graded-and-completed assignment past its due date showed a green completion mark
   // AND a red "Overdue" badge on the same row, contradicting itself (confirmed live, Sep 2026:
   // MATH 113's "Syllabus Video Quiz," due Sep 2, Completed, still due-badged "Overdue by 4 days").
-  const badge = data.completed || infoLike ? null : dueBadge(data.daysUntilDue, data.opensText);
-  const dueText = data.dueLabel
-    ? `Due ${data.dueLabel}${data.dueTime ? " " + data.dueTime : ""}`
+  const badge = data.completed || infoLike ? null : dueBadge(data.daysUntilDue, data.opensText, data.dueAt);
+  // With a precise deadline the badge already says "Due in …"; keeping a second "Due today"
+  // subtitle beside it is noisy, so retain only the clock as supporting detail.
+  const dueText = data.dueAt && data.dueTime
+    ? data.dueTime
+    : data.dueLabel
+      ? `Due ${data.dueLabel}${data.dueTime ? " " + data.dueTime : ""}`
     : undefined;
   const categoryText = data.category
     ? data.category + (data.categoryWeight ? ` (${data.categoryWeight} of grade)` : "")

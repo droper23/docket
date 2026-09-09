@@ -10,8 +10,17 @@ import { daysBetween, todayInSchoolTimeZone } from "./schoolTime.js";
 import type { AgendaItem } from "./academicViews.js";
 
 /** "Due in 3 days" / "Due today" / "Overdue by 2 days" — the countdown itself, not just a due-date string, is what makes it obvious what needs doing now vs. later. */
-export function dueCountdown(daysUntilDue: number | undefined): string | undefined {
+export function dueCountdown(daysUntilDue: number | undefined, dueAt?: Date, now = new Date()): string | undefined {
   if (daysUntilDue === undefined) return undefined;
+  if (dueAt) {
+    const minutes = Math.max(1, Math.ceil(Math.abs(dueAt.getTime() - now.getTime()) / 60000));
+    const duration = minutes < 60
+      ? `${minutes} minute${minutes === 1 ? "" : "s"}`
+      : minutes < 24 * 60
+        ? `${Math.ceil(minutes / 60)} hour${Math.ceil(minutes / 60) === 1 ? "" : "s"}`
+        : `${Math.floor(minutes / (24 * 60))} day${Math.floor(minutes / (24 * 60)) === 1 ? "" : "s"}${minutes % (24 * 60) >= 60 ? ` ${Math.ceil((minutes % (24 * 60)) / 60)} hour${Math.ceil((minutes % (24 * 60)) / 60) === 1 ? "" : "s"}` : ""}`;
+    return dueAt > now ? `Due in ${duration}` : `Overdue by ${duration}`;
+  }
   if (daysUntilDue < 0) {
     const n = Math.abs(daysUntilDue);
     return `Overdue by ${n} day${n === 1 ? "" : "s"}`;

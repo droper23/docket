@@ -19,6 +19,12 @@ test("dueBadge never bands an availability date as overdue, regardless of the si
   assert.equal(opens?.className, "docket-badge docket-badge-neutral", "must never use the red/urgency treatment");
 });
 
+test("dueBadge uses an exact clock deadline when LearningSuite provides one", () => {
+  setupDom("<div></div>");
+  const dueAt = new Date(Date.now() + 2 * 60 * 60 * 1000);
+  assert.equal(dueBadge(0, undefined, dueAt)?.textContent, "Due in 2 hours");
+});
+
 test("gradeBadge renders a neutral 'Not yet graded' chip, never the failing-red treatment, when nothing has been scored", () => {
   setupDom("<div></div>");
   const unscored = gradeBadge("0%", false);
