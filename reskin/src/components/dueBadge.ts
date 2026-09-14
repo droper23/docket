@@ -1,5 +1,5 @@
 import { h } from "../lib/dom.js";
-import { dueCountdown } from "../../../src/core/agendaFormatting.js";
+import { dueCountdown } from "../core/agendaFormatting.js";
 
 /**
  * Reminders/Calendar-app-style urgency bands, reusing the exact wording

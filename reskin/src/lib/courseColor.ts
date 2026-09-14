@@ -56,15 +56,19 @@ export const PALETTE = [
  */
 function codeKey(raw: string): string {
   const idx = raw.indexOf(" - ");
-  return (idx >= 0 ? raw.slice(0, idx) : raw).trim();
+  // Course List identifies an enrollment with its section ("MATH 113 (016)"),
+  // while Schedule and Grade Summary commonly use only "MATH 113". Settings
+  // must address the course consistently across those views.
+  return (idx >= 0 ? raw.slice(0, idx) : raw).trim().replace(/\s+\(\d+\)$/, "");
 }
 
 export function assignCourseColors(codes: string[], overrides: Record<string, string> = {}): Map<string, string> {
   const sorted = [...new Set(codes)].sort();
+  const normalizedOverrides = new Map(Object.entries(overrides).map(([code, color]) => [codeKey(code), color]));
   const map = new Map<string, string>();
   for (let i = 0; i < sorted.length; i++) {
     const code = sorted[i]!;
-    map.set(code, overrides[codeKey(code)] || PALETTE[i % PALETTE.length]!);
+    map.set(code, normalizedOverrides.get(codeKey(code)) || PALETTE[i % PALETTE.length]!);
   }
   return map;
 }

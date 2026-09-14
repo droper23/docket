@@ -246,6 +246,11 @@ function boot(): void {
     // live-toggleable attributes elsewhere in the codebase; this just stops throwing that away
     // with an unconditional reload.
     const needsRemount = next.useCompanionNav !== currentSettings.useCompanionNav || next.compatibilityMode !== currentSettings.compatibilityMode;
+    // Course-color overrides are baked into the enhanced cards when their adapter mounts;
+    // unlike theme/background, there is no document-level CSS token to update. Remount the
+    // current adapter so the selected color is visible immediately (and remains backed by the
+    // settings value already saved by the panel).
+    const courseColorsChanged = next.courseColors !== currentSettings.courseColors;
     currentSettings = next;
     if (needsRemount) {
       location.reload();
@@ -254,6 +259,11 @@ function boot(): void {
     applyTheme(next.appearance);
     applyBackground(next);
     document.documentElement.setAttribute("data-docket-reduced-motion", String(next.reducedMotion));
+    if (courseColorsChanged) {
+      activeAdapter?.unmount();
+      activeAdapter = null;
+      runAdapters(next);
+    }
   });
 
   runAdapters(currentSettings);

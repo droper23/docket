@@ -134,5 +134,6 @@ export const gradeSummaryAdapter: Adapter = {
   unmount() {
     overlay?.remove();
     overlay = null;
+    document.querySelector("main")?.removeAttribute("data-docket-gradesummary");
   },
 };

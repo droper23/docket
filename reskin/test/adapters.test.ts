@@ -11,7 +11,7 @@ import { gradesAdapter } from "../src/adapters/gradesAdapter.js";
 import { gradeSummaryAdapter } from "../src/adapters/gradeSummaryAdapter.js";
 import { dashboardAdapter } from "../src/adapters/dashboardAdapter.js";
 import { formatIsoDate } from "../src/lib/parseDueText.js";
-import { dueDateLabel } from "../../src/core/agendaFormatting.js";
+import { dueDateLabel } from "../src/core/agendaFormatting.js";
 import { DEFAULT_SETTINGS, saveSettings } from "../src/core/settings.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">LearningSuite Reskin</title>
+  <defs>
+    <linearGradient id="background" x1="88" y1="52" x2="424" y2="460" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3a86ff"/>
+      <stop offset="1" stop-color="#174ea6"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#background)"/>
+  <rect x="112" y="118" width="288" height="276" rx="42" fill="#fff" fill-opacity=".96"/>
+  <rect x="154" y="166" width="204" height="24" rx="12" fill="#2262c5"/>
+  <rect x="154" y="218" width="142" height="18" rx="9" fill="#8ab6f2"/>
+  <rect x="154" y="260" width="204" height="18" rx="9" fill="#c5dbf8"/>
+  <rect x="154" y="302" width="172" height="18" rx="9" fill="#c5dbf8"/>
+  <circle cx="348" cy="311" r="26" fill="#2262c5"/>
+</svg>

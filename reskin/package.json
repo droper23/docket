@@ -1,8 +1,8 @@
 {
   "name": "learningsuite-reskin",
-  "version": "0.1.15",
-  "private": true,
-  "description": "Safari userscript: an Apple-HIG-styled visual/interaction layer over BYU LearningSuite. LearningSuite stays the real backend.",
+  "version": "0.2.0",
+  "private": false,
+  "description": "A cross-browser userscript that gives BYU LearningSuite an Apple-inspired interface while preserving its original functionality.",
   "type": "module",
   "scripts": {
     "build": "node build.mjs",

@@ -1,7 +1,6 @@
 # Privacy — LearningSuite Reskin
 
-Plain language, not legal boilerplate. See `../docs/THREAT_MODEL.md` for the fuller
-technical analysis this inherits from the rest of the project.
+Plain language, not legal boilerplate.
 
 ## What this reads
 

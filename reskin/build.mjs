@@ -22,15 +22,15 @@ const pkg = JSON.parse(readFileSync(join(__dirname, "package.json"), "utf8"));
 // Where the built file is published for install/update — update this if the project is
 // forked or moved. The version query prevents userscript managers from serving a stale cached
 // bundle during update checks (a real Safari Userscripts failure observed in Sep 2026).
-const REPO = "droper23/docket";
-const SCRIPT_PATH = "reskin/dist/learningsuite-reskin.user.js";
+const REPO = "droper23/learningsuite-reskin";
+const SCRIPT_PATH = "dist/learningsuite-reskin.user.js";
 
 const metadata = `// ==UserScript==
 // @name         LearningSuite Reskin
 // @namespace    https://github.com/${REPO}
 // @version      ${pkg.version}
-// @description  A visual/interaction layer over BYU LearningSuite, styled like an Apple-designed app. LearningSuite stays the real backend — nothing is replaced. See reskin/README.md.
-// @author       Docket contributors
+// @description  An Apple-inspired visual and interaction layer for BYU LearningSuite. LearningSuite stays the real backend — nothing is replaced.
+// @author       LearningSuite Reskin contributors
 // @match        https://learningsuite.byu.edu/*
 // @run-at       document-start
 // @grant        GM_getValue

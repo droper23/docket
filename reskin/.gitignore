@@ -1,12 +1,12 @@
 node_modules/
 dist-test/
 tools/.chrome-audit-profile/
-# Live-audit screenshots contain the real authenticated account's name and courses —
-# referenced by ROADMAP.md as local artifacts, never committed (public repo).
+# Live-audit screenshots can contain authenticated account details; never commit them.
 tools/shots/
-.DS_Store
-
-# Scratch page for the no-CDP live-injection method (see ROADMAP.md's thirteenth pass): a
-# hand-written dist/ page that stashes the built script in window.name and navigates to
-# learningsuite.byu.edu, where it's eval'd in page context. Not a build output — never commit.
+# Local, hand-written injection scratchpad; not a build output.
 dist/inject.html
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example

@@ -5,8 +5,8 @@ import type { Overlay, OverlayToggle } from "../lib/dom.js";
 import { assignmentCard } from "../components/assignmentCard.js";
 import { parseAssignmentDueText } from "../lib/parseDueText.js";
 import { diagnostics } from "../core/diagnostics.js";
-import { dueDateLabel } from "../../../src/core/agendaFormatting.js";
-import { daysUntilInSchoolTimeZone, schoolDateTime } from "../../../src/core/schoolTime.js";
+import { dueDateLabel } from "../core/agendaFormatting.js";
+import { daysUntilInSchoolTimeZone, schoolDateTime } from "../core/schoolTime.js";
 
 export interface RowData {
   el: HTMLElement;

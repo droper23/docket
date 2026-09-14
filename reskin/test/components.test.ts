@@ -191,6 +191,15 @@ test("assignCourseColors assigns distinct colors up to the palette size, determi
   }
 });
 
+test("assignCourseColors applies a sectioned Course List override to schedule-style course codes", () => {
+  const colors = assignCourseColors(["MATH 113", "MATH 113 (016)", "MATH 113 - Calculus 2"], {
+    "MATH 113 (016)": "#b3261e",
+  });
+  assert.equal(colors.get("MATH 113"), "#b3261e");
+  assert.equal(colors.get("MATH 113 (016)"), "#b3261e");
+  assert.equal(colors.get("MATH 113 - Calculus 2"), "#b3261e");
+});
+
 function hexToHue(hex: string): number {
   const r = parseInt(hex.slice(1, 3), 16) / 255;
   const g = parseInt(hex.slice(3, 5), 16) / 255;
