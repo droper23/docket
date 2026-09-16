@@ -21,6 +21,14 @@
 
  *   cdp.mjs shot <out.png> [--full]     Screenshot the page (full = whole
  *                                       scrollable page).
+ *   cdp.mjs watch [path]                Inject once, then keep the process
+ *                                       alive and auto-re-inject on every
+ *                                       full page load — LearningSuite
+ *                                       reloads the whole page between
+ *                                       sections, which otherwise means
+ *                                       re-running `inject` by hand after
+ *                                       every navigation during a live
+ *                                       audit. Ctrl-C to stop.
  *   cdp.mjs tabs                        List open page targets.
  *
  * Everything is driven over the HTTP /json + WebSocket endpoints — no npm
@@ -160,22 +168,55 @@ async function cmdOpen(url) {
 
 // Live-verify the built bundle on the real authenticated page (the established loop
 // from prior passes): strip the ==UserScript== metadata block, eval the rest.
-async function cmdInject(path) {
-  const code = readFileSync(path, "utf8");
+function stripUserScriptHeader(code) {
   const idx = code.indexOf('"use strict";');
-  const body = idx >= 0 ? code.slice(idx) : code;
-  const out = await withCdp(async (cdp) => {
-    const r = await cdp.send("Runtime.evaluate", {
-      expression: body,
-      awaitPromise: true,
-      returnByValue: true,
-    });
-    if (r.exceptionDetails) {
-      throw new Error("Inject threw: " + JSON.stringify(r.exceptionDetails.exception?.description ?? r.exceptionDetails.text));
-    }
-    return r.result?.value;
-  });
+  return idx >= 0 ? code.slice(idx) : code;
+}
+
+async function evalInPage(cdp, body) {
+  const r = await cdp.send("Runtime.evaluate", { expression: body, awaitPromise: true, returnByValue: true });
+  if (r.exceptionDetails) {
+    throw new Error("Inject threw: " + JSON.stringify(r.exceptionDetails.exception?.description ?? r.exceptionDetails.text));
+  }
+  return r.result?.value;
+}
+
+async function cmdInject(path) {
+  const body = stripUserScriptHeader(readFileSync(path, "utf8"));
+  const out = await withCdp((cdp) => evalInPage(cdp, body));
   console.log(`injected ${path}`, out === undefined ? "" : JSON.stringify(out));
+}
+
+// Keeps one CDP connection open and re-injects on every full page load, so a live
+// audit doesn't need `inject` re-run by hand after each navigation (LearningSuite
+// reloads the whole page between sections, which wipes the previous injection).
+async function cmdWatch(path) {
+  const scriptPath = path ?? join(__dirname, "../dist/learningsuite-reskin.user.js");
+  const target = await pageTarget();
+  const cdp = new CDP(target.webSocketDebuggerUrl);
+  await cdp.connect();
+
+  const inject = async () => {
+    try {
+      const body = stripUserScriptHeader(readFileSync(scriptPath, "utf8"));
+      await evalInPage(cdp, body);
+      console.log(`[${new Date().toLocaleTimeString()}] injected ${scriptPath}`);
+    } catch (err) {
+      console.error(`[${new Date().toLocaleTimeString()}] inject failed:`, err.message);
+    }
+  };
+
+  await cdp.send("Page.enable");
+  cdp.ws.addEventListener("message", (ev) => {
+    const msg = JSON.parse(ev.data);
+    // One load event per full navigation, main frame or not-yet-navigated initial
+    // page alike — simpler and more reliable than frame-tracking frameNavigated.
+    if (msg.method === "Page.loadEventFired") inject();
+  });
+
+  await inject();
+  console.log(`watching ${target.url} for navigations — re-injecting on every page load (Ctrl-C to stop)`);
+  await new Promise(() => {}); // keep the process alive; user stops with Ctrl-C
 }
 
 async function cmdLaunch(profileDir, url) {
@@ -265,6 +306,9 @@ switch (command) {
     break;
   case "shot":
     await cmdShot(rest[0], rest.includes("--full"));
+    break;
+  case "watch":
+    await cmdWatch(rest[0]);
     break;
   case "resize":
     await cmdResize(rest[0], rest[1], rest.includes("--mobile"));
