@@ -55,7 +55,7 @@ Install [Tampermonkey](https://www.tampermonkey.net/) or
 - Assignments become a readable grouped list while preserving the original LearningSuite actions.
 - Combined Schedule becomes a day-grouped agenda.
 - Light mode, dark mode, reduced motion, backgrounds, and Compatibility Mode are available from the in-page settings button.
-- MAX gets a non-destructive semantic polish for course home, syllabus, content, notes, schedules, and grades. It uses headings, tables, lists, links, and focus states—not course-specific selectors—so it works across instructors and courses.
+- MAX gets a dark-by-default, non-destructive LearningSuite-style reskin across its course chrome, navigation, dashboards, content, schedules, and grades. It uses stable layout and semantic selectors—not course-specific selectors—so it works across instructors and courses.
 
 Pages not yet redesigned stay in their native LearningSuite form.
 

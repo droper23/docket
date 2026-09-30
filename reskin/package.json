@@ -1,6 +1,6 @@
 {
   "name": "learningsuite-reskin",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": false,
   "description": "A cross-browser userscript that gives BYU LearningSuite and MAX a polished interface while preserving their original functionality.",
   "type": "module",

@@ -39,7 +39,7 @@ function injectMaxStyles(): void {
   if (document.getElementById("docket-max-reskin-styles")) return;
   const style = document.createElement("style");
   style.id = "docket-max-reskin-styles";
-  style.textContent = maxCss;
+  style.textContent = [fontInterCss, maxCss].join("\n");
   (document.head ?? document.documentElement).appendChild(style);
 }
 
