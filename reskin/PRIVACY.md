@@ -4,16 +4,15 @@ Plain language, not legal boilerplate.
 
 ## What this reads
 
-Whatever LearningSuite has already rendered into the page you're looking at — course names/
-links, an assignment's title/due text/category/completion status, a schedule item's title
+Whatever LearningSuite or MAX has already rendered into the page you're looking at — course
+names/links, an assignment's title/due text/category/completion status, a schedule item's title
 and date. Never a password, a Duo code, a session cookie, or a `subsessionID`.
 
 ## What this sends, and to whom
 
 Nothing, to anyone, by default. This reskin's core behavior makes no network requests of
 its own at all — it only reads and restyles the DOM of a page your own browser already
-loaded from `learningsuite.byu.edu`. No backend, no analytics, no third-party service, no
-external AI.
+loaded from LearningSuite or MAX. No backend, no analytics, no third-party service, no external AI.
 
 **The one opt-in exception: External Calendars (Settings).** If you add a course's
 iCalendar feed URL there (e.g. a BYU MAX course, which has no LearningSuite page to read at
@@ -27,11 +26,10 @@ discovered or guessed.
 
 ## Where settings live
 
-Appearance, navigation, and Compatibility Mode preferences are stored on your own device
-only — in the Userscripts extension's own storage if available, otherwise in
-`learningsuite.byu.edu`'s own `localStorage` under a namespaced key. Never transmitted
-anywhere, never readable by LearningSuite's own JavaScript (a different storage key), never
-synced to any account.
+LearningSuite appearance, navigation, and Compatibility Mode preferences are stored on your own
+device only — in the Userscripts extension's own storage if available, otherwise in
+`learningsuite.byu.edu`'s own `localStorage` under a namespaced key. MAX's CSS-only layer stores
+no settings. Nothing is transmitted or synced to an account.
 
 ## Diagnostics
 

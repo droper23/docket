@@ -1,0 +1,114 @@
+/*
+ * MAX deliberately gets a CSS-only layer. Course content varies by instructor,
+ * so this targets semantic HTML (headings, tables, lists, and links) rather than
+ * course names, URLs, or implementation classes. It never moves, hides, or
+ * replaces a native control; MAX remains the source of truth for every action.
+ */
+html[data-docket-max-reskin] {
+  color-scheme: light dark;
+  --docket-max-canvas: #f7f9fc;
+  --docket-max-surface: #ffffff;
+  --docket-max-table-head: #e8f0fe;
+  --docket-max-label: #1f2937;
+  --docket-max-secondary: #536170;
+  --docket-max-border: #d9e1ea;
+  --docket-max-accent: #0057b8;
+}
+
+@media (prefers-color-scheme: dark) {
+  html[data-docket-max-reskin] {
+    --docket-max-canvas: #111827;
+    --docket-max-surface: #182235;
+    --docket-max-table-head: #243a58;
+    --docket-max-label: #e6edf7;
+    --docket-max-secondary: #b4c0d0;
+    --docket-max-border: #334155;
+    --docket-max-accent: #8fc2ff;
+  }
+}
+
+html[data-docket-max-reskin],
+html[data-docket-max-reskin] body {
+  background: var(--docket-max-canvas) !important;
+  color: var(--docket-max-label) !important;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif !important;
+  line-height: 1.5;
+}
+
+/* Course home, syllabus, content, notes, schedule, and grades all expose real headings. */
+html[data-docket-max-reskin] :is(h1, h2, h3) {
+  color: var(--docket-max-label) !important;
+  font-family: inherit !important;
+}
+
+html[data-docket-max-reskin] h1 {
+  font-size: clamp(1.5rem, 1.2rem + 1vw, 2rem);
+  letter-spacing: -0.02em;
+}
+
+html[data-docket-max-reskin] h2 {
+  font-size: clamp(1.15rem, 1rem + 0.5vw, 1.4rem);
+  margin-top: 1.75rem;
+}
+
+html[data-docket-max-reskin] :is(p, li, td, th) {
+  color: var(--docket-max-label);
+}
+
+html[data-docket-max-reskin] :is(ul, ol) {
+  padding-inline-start: 1.4rem;
+}
+
+html[data-docket-max-reskin] li + li {
+  margin-top: 0.35rem;
+}
+
+/* Syllabus, schedule, grade summary, score detail, and accessible chart data use tables. */
+html[data-docket-max-reskin] table {
+  background: var(--docket-max-surface);
+  border: 1px solid var(--docket-max-border);
+  border-collapse: separate;
+  border-radius: 12px;
+  border-spacing: 0;
+  overflow: hidden;
+}
+
+html[data-docket-max-reskin] th,
+html[data-docket-max-reskin] td {
+  border-color: var(--docket-max-border);
+  padding: 0.7rem 0.85rem;
+  text-align: start;
+  vertical-align: top;
+}
+
+html[data-docket-max-reskin] th {
+  background: var(--docket-max-table-head);
+  font-weight: 650;
+}
+
+html[data-docket-max-reskin] tr + tr :is(th, td) {
+  border-top: 1px solid var(--docket-max-border);
+}
+
+html[data-docket-max-reskin] a {
+  color: var(--docket-max-accent);
+}
+
+html[data-docket-max-reskin] a:hover {
+  text-decoration-thickness: 0.14em;
+}
+
+html[data-docket-max-reskin] :focus-visible {
+  /* Keep this to broadly supported CSS: Safari 14 is still a build target. */
+  outline: 3px solid var(--docket-max-accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  /* Preserve every score/schedule column by making the native table scrollable. */
+  html[data-docket-max-reskin] table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}

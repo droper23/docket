@@ -7,6 +7,7 @@ import navigationCss from "./styles/navigation.css";
 import cardsCss from "./styles/cards.css";
 import responsiveCss from "./styles/responsive.css";
 import scheduleCss from "./styles/schedule.css";
+import maxCss from "./styles/max.css";
 
 import { adapters } from "./adapters/registry.js";
 import { mountShell, refreshShell } from "./adapters/shell.js";
@@ -19,6 +20,7 @@ import { observeMutations } from "./lib/observe.js";
 import { markScheduleTableGrids } from "./lib/scheduleLayout.js";
 import type { Adapter } from "./adapters/types.js";
 import { getSetting, setSetting } from "./lib/storage.js";
+import { isLearningSuiteHost, isMaxHost } from "./core/hosts.js";
 
 function injectStyles(): void {
   if (document.getElementById("docket-reskin-styles")) return;
@@ -31,6 +33,26 @@ function injectStyles(): void {
   // appended to <html> still applies (CSS doesn't care where it lives), which is the
   // whole point: kill the native-typeface flash BEFORE first paint instead of after it.
   (document.head ?? document.documentElement).appendChild(style);
+}
+
+function injectMaxStyles(): void {
+  if (document.getElementById("docket-max-reskin-styles")) return;
+  const style = document.createElement("style");
+  style.id = "docket-max-reskin-styles";
+  style.textContent = maxCss;
+  (document.head ?? document.documentElement).appendChild(style);
+}
+
+/**
+ * MAX support intentionally starts as a non-destructive CSS layer. Its views are
+ * not LearningSuite-shaped, so none of the LearningSuite shell/adapters/settings
+ * run here. This keeps every MAX link, menu, row, and form native while giving the
+ * dashboard's observed semantic surfaces a consistent accessible presentation.
+ */
+function bootMax(): void {
+  if (!isMaxHost(location.hostname)) return;
+  document.documentElement.setAttribute("data-docket-max-reskin", "true");
+  injectMaxStyles();
 }
 
 /**
@@ -224,7 +246,7 @@ function runAdapters(settings: ReskinSettings): void {
 }
 
 function boot(): void {
-  if (!/learningsuite\.byu\.edu$/.test(location.hostname)) return;
+  if (!isLearningSuiteHost(location.hostname)) return;
 
   document.documentElement.setAttribute("data-docket-reskin", "true");
   injectStyles();
@@ -363,9 +385,12 @@ function earlyInject(): void {
   else setTimeout(tick, 0);
 }
 
-if (!/learningsuite\.byu\.edu$/.test(location.hostname)) {
-  // Not LearningSuite: do nothing at all (same guard boot() had — hoisted so even
-  // the style injection never happens on another origin).
+if (isMaxHost(location.hostname)) {
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bootMax);
+  else bootMax();
+} else if (!isLearningSuiteHost(location.hostname)) {
+  // Not a supported learning product: do nothing at all. Exact host checks avoid
+  // styling lookalike subdomains or unrelated BYU properties.
 } else if (document.readyState === "loading") {
   earlyInject();
   document.addEventListener("DOMContentLoaded", boot);

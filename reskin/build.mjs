@@ -29,9 +29,10 @@ const metadata = `// ==UserScript==
 // @name         LearningSuite Reskin
 // @namespace    https://github.com/${REPO}
 // @version      ${pkg.version}
-// @description  An Apple-inspired visual and interaction layer for BYU LearningSuite. LearningSuite stays the real backend — nothing is replaced.
+// @description  A visual and interaction layer for BYU LearningSuite and MAX. BYU's own applications stay in control — nothing is replaced.
 // @author       LearningSuite Reskin contributors
 // @match        https://learningsuite.byu.edu/*
+// @match        https://max.byu.edu/*
 // @run-at       document-start
 // @grant        GM_getValue
 // @grant        GM_setValue

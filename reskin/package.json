@@ -1,8 +1,8 @@
 {
   "name": "learningsuite-reskin",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": false,
-  "description": "A cross-browser userscript that gives BYU LearningSuite an Apple-inspired interface while preserving its original functionality.",
+  "description": "A cross-browser userscript that gives BYU LearningSuite and MAX a polished interface while preserving their original functionality.",
   "type": "module",
   "scripts": {
     "build": "node build.mjs",

@@ -2,24 +2,25 @@
 
 ![LearningSuite Reskin Combined Schedule, captured in Google Chrome](assets/screenshots/chrome-schedule.png)
 
-LearningSuite Reskin is a free, open-source userscript that makes BYU LearningSuite easier to
-scan and use. It is a visual layer over the normal site—not a replacement. Sign-in, assignments,
-quizzes, grades, and links still use LearningSuite itself.
+LearningSuite Reskin is a free, open-source userscript that makes BYU LearningSuite and MAX easier
+to scan and use. It is a visual layer over the normal sites—not a replacement. Sign-in,
+assignments, quizzes, grades, and links still use BYU's own applications.
 
 > BYU LearningSuite Reskin is an independent student project. It is not affiliated with or
 > endorsed by Brigham Young University.
 
 ## Install
 
-Choose your device. The script runs only on `https://learningsuite.byu.edu/*`.
+Choose your device. The script runs only on `https://learningsuite.byu.edu/*` and
+`https://max.byu.edu/*`.
 
 ### Chrome on Windows
 
 1. Install [Tampermonkey](https://www.tampermonkey.net/index.php?browser=chrome) from the Chrome Web Store.
 2. Right-click its toolbar icon → **Manage extension** → turn on **Allow User Scripts**. If Chrome does not show that option, open `chrome://extensions` and enable **Developer mode**.
-3. Open Tampermonkey's **Details** page. Under **Site access**, select **On specific sites** and add `https://learningsuite.byu.edu/*`.
+3. Open Tampermonkey's **Details** page. Under **Site access**, select **On specific sites** and add both `https://learningsuite.byu.edu/*` and `https://max.byu.edu/*`.
 4. Open [Install LearningSuite Reskin](https://raw.githubusercontent.com/droper23/learningsuite-reskin/main/dist/learningsuite-reskin.user.js) and choose **Install** in Tampermonkey.
-5. Open or refresh LearningSuite.
+5. Open or refresh LearningSuite or MAX.
 
 To disable it, open Tampermonkey → Dashboard and toggle off **LearningSuite Reskin**.
 
@@ -36,7 +37,7 @@ chosen folder, so the release download and Files app are the supported installat
 
 ### macOS Safari
 
-1. Install [Userscripts](https://apps.apple.com/us/app/userscripts/id1463298887) and enable it for LearningSuite in Safari Settings → Extensions.
+1. Install [Userscripts](https://apps.apple.com/us/app/userscripts/id1463298887) and enable it for LearningSuite and MAX in Safari Settings → Extensions.
 2. Open a new tab, click the Userscripts toolbar icon, then click **Open Extension Page**.
 3. Click the **+** button and choose **New Remote**.
 4. Paste in the raw GitHub URL for the script: `https://raw.githubusercontent.com/droper23/learningsuite-reskin/main/dist/learningsuite-reskin.user.js`
@@ -54,6 +55,7 @@ Install [Tampermonkey](https://www.tampermonkey.net/) or
 - Assignments become a readable grouped list while preserving the original LearningSuite actions.
 - Combined Schedule becomes a day-grouped agenda.
 - Light mode, dark mode, reduced motion, backgrounds, and Compatibility Mode are available from the in-page settings button.
+- MAX gets a non-destructive semantic polish for course home, syllabus, content, notes, schedules, and grades. It uses headings, tables, lists, links, and focus states—not course-specific selectors—so it works across instructors and courses.
 
 Pages not yet redesigned stay in their native LearningSuite form.
 
@@ -66,7 +68,7 @@ Pages not yet redesigned stay in their native LearningSuite form.
 ## Privacy and safety
 
 The script does not collect analytics, use a backend, read passwords, cookies, Duo codes, or
-session IDs. It reads only content LearningSuite has already rendered in the current page.
+session IDs. It reads only content LearningSuite or MAX has already rendered in the current page.
 
 External Calendars are optional and off by default. If enabled, the script reads only the calendar
 feed URL a student explicitly provides. See [PRIVACY.md](PRIVACY.md) for details.
