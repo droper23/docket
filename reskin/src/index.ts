@@ -66,11 +66,104 @@ function applyMaxTheme(settings: ReskinSettings): void {
   document.documentElement.setAttribute("data-docket-reduced-motion", String(settings.reducedMotion));
 }
 
+function maxAncestors(element: Element): HTMLElement[] {
+  const ancestors: HTMLElement[] = [];
+  for (let current = element.parentElement; current; current = current.parentElement) ancestors.push(current);
+  return ancestors;
+}
+
+/**
+ * MAX's production views use generated class names, so its shell cannot be
+ * styled safely with a Bootstrap selector list. Mark the actual visible roles
+ * from their stable semantics and measured positions instead. This only adds
+ * classes; MAX retains all existing links, menus, and handlers.
+ */
+function markMaxStructure(): void {
+  const anchors = Array.from(document.querySelectorAll<HTMLAnchorElement>("a"));
+  const courseSegment = location.pathname.split("/").filter(Boolean)[0];
+  const courseLink = anchors.find((anchor) => courseSegment && new URL(anchor.href).pathname === `/${courseSegment}/`);
+  const navLinks = anchors.filter((anchor) => ["Home", "Content", "Grades", "Courses"].includes(anchor.textContent?.trim() ?? ""));
+
+  if (courseLink) {
+    courseLink.classList.add("docket-max-course-context");
+    const courseHeader = maxAncestors(courseLink).find((element) => {
+      const rect = element.getBoundingClientRect();
+      return rect.top < 130 && rect.width > 500 && rect.height <= 150;
+    });
+    courseHeader?.classList.add("docket-max-course-header");
+  }
+
+  const navigationToggle = Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find((button) =>
+    /toggle navigation/i.test(button.getAttribute("aria-label") ?? button.textContent ?? ""),
+  );
+  navigationToggle?.classList.add("docket-max-menu-toggle");
+
+  const userLink = anchors.find((anchor) => anchor.textContent?.trim() === "Derek Roper");
+  userLink?.classList.add("docket-max-user-menu");
+
+  Array.from(document.querySelectorAll<HTMLInputElement>("input")).filter((input) =>
+    /navigate/i.test(input.getAttribute("placeholder") ?? input.getAttribute("aria-label") ?? ""),
+  ).forEach((input) => input.classList.add("docket-max-empty-search"));
+
+  const firstNavLink = navLinks[0];
+  if (firstNavLink && navLinks.length >= 3) {
+    const primaryNav = maxAncestors(firstNavLink).find((element) => {
+      const rect = element.getBoundingClientRect();
+      return rect.width > 500 && rect.height <= 140 && navLinks.every((link) => element.contains(link));
+    });
+    primaryNav?.classList.add("docket-max-primary-nav");
+    navLinks.forEach((link) => {
+      if (link.textContent?.trim() === "Content") link.classList.add("docket-max-active-nav");
+    });
+  }
+
+  const contentHeading = Array.from(document.querySelectorAll<HTMLElement>("h1, h2, h3")).find((heading) => heading.textContent?.trim() === "Content");
+  if (contentHeading) {
+    maxAncestors(contentHeading).find((element) => {
+      const rect = element.getBoundingClientRect();
+      return rect.left < 300 && rect.width < 380 && rect.height > 400;
+    })?.classList.add("docket-max-sidebar");
+  }
+
+  const readingHeading = Array.from(document.querySelectorAll<HTMLElement>("h1")).find((heading) => heading.textContent?.trim() !== "");
+  if (readingHeading) {
+    maxAncestors(readingHeading).find((element) => {
+      const rect = element.getBoundingClientRect();
+      return rect.left >= 200 && rect.width > 1000 && rect.height > 400;
+    })?.classList.add("docket-max-main-pane");
+  }
+
+  const contentRows = anchors.filter((anchor) => {
+    const path = new URL(anchor.href).pathname;
+    return path.startsWith(`${location.pathname}/`) && path !== location.pathname;
+  });
+  contentRows.forEach((link) => {
+    maxAncestors(link).find((element) => {
+      const rect = element.getBoundingClientRect();
+      return rect.width > 360 && rect.height > 20 && rect.height < 110 &&
+        contentRows.filter((row) => element.contains(row)).length === 1;
+    })?.classList.add("docket-max-content-row");
+  });
+
+  // Content exposes the same outline three ways: rail, a native select, and
+  // the reading list. Keep the rail as the contextual outline and remove this
+  // duplicate only when its options plainly mirror the rail's Reading view.
+  Array.from(document.querySelectorAll<HTMLSelectElement>("select")).forEach((select) => {
+    const mirrorsReadingOutline = Array.from(select.options).some((option) => option.textContent?.trim() === "Reading Instructions");
+    if (!mirrorsReadingOutline) return;
+    maxAncestors(select).find((element) => {
+      const rect = element.getBoundingClientRect();
+      return rect.width > 500 && rect.height < 120;
+    })?.classList.add("docket-max-redundant-outline");
+  });
+}
+
 function bootMax(): void {
   if (!isMaxHost(location.hostname)) return;
   document.documentElement.setAttribute("data-docket-max-reskin", "true");
   injectMaxStyles();
   applyMaxTheme(loadSettings());
+  requestAnimationFrame(() => requestAnimationFrame(markMaxStructure));
 }
 
 /**

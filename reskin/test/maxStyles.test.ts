@@ -27,6 +27,12 @@ test("MAX styles use shared appearance, accessibility, and surface primitives", 
     "[aria-current=\"page\"]",
     "[aria-expanded=\"true\"]",
     ".skip-link",
+    ".docket-max-main-pane",
+    ".docket-max-primary-nav",
+    ".docket-max-content-row",
+    ".docket-max-redundant-outline",
+    ".docket-max-course-context",
+    ".docket-max-empty-search",
   ]) {
     assert.match(css, new RegExp(selector.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")));
   }

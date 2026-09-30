@@ -488,6 +488,50 @@ html[data-docket-max-reskin] body :is(p, div, span, li, dt, dd, td, th, label, l
 html[data-docket-max-reskin] :is(#app, #root, main, #main, #content, #main-content, #page-content, .content, .content-wrapper, .container, .container-fluid) {
   width: auto; max-width: min(1440px, calc(100% - 3rem)); margin-inline: auto; background: transparent !important; color: var(--docket-max-label) !important;
 }
+html[data-docket-max-reskin] .docket-max-course-header {
+  display: flex !important; align-items: center !important; min-height: 56px !important; padding: 0 1.25rem !important;
+  background: var(--docket-max-surface-1) !important; border-bottom: 1px solid var(--docket-max-border) !important;
+}
+html[data-docket-max-reskin] .docket-max-menu-toggle {
+  position: static !important; display: none !important; align-items: center !important; justify-content: center !important;
+  width: 40px !important; min-width: 40px !important; min-height: 40px !important; margin: 0 .6rem 0 0 !important; padding: 0 !important;
+  background: transparent !important; border: 1px solid transparent !important; border-radius: var(--docket-max-radius-sm) !important; color: var(--docket-max-secondary) !important; font-size: 0 !important;
+}
+html[data-docket-max-reskin] .docket-max-menu-toggle::before { content: "\u2630"; font-size: 1.1rem; line-height: 1; }
+html[data-docket-max-reskin] .docket-max-menu-toggle:hover { background: var(--docket-max-fill) !important; color: var(--docket-max-label) !important; }
+html[data-docket-max-reskin] .docket-max-course-context {
+  display: inline-flex !important; align-items: center !important; min-height: 42px !important; margin-right: auto !important; color: var(--docket-max-label) !important;
+  font-size: .9375rem !important; font-weight: 650 !important; text-decoration: none !important; white-space: nowrap !important;
+}
+html[data-docket-max-reskin] .docket-max-user-menu { color: var(--docket-max-secondary) !important; font-size: .875rem !important; font-weight: 600 !important; }
+html[data-docket-max-reskin] .docket-max-empty-search { display: none !important; }
+html[data-docket-max-reskin] .docket-max-primary-nav {
+  display: flex !important; align-items: stretch !important; min-height: 42px !important; padding: 0 .75rem !important;
+  background: var(--docket-max-surface-1) !important; border-bottom: 1px solid var(--docket-max-border) !important;
+}
+html[data-docket-max-reskin] .docket-max-primary-nav a {
+  display: flex !important; align-items: center !important; min-height: 42px !important; padding: 0 .8rem !important;
+  background: transparent !important; border: 0 !important; border-bottom: 2px solid transparent !important; color: var(--docket-max-secondary) !important;
+  font-size: .875rem !important; font-weight: 600 !important; text-decoration: none !important;
+}
+html[data-docket-max-reskin] .docket-max-primary-nav a:hover { background: var(--docket-max-fill) !important; color: var(--docket-max-label) !important; }
+html[data-docket-max-reskin] .docket-max-primary-nav .docket-max-active-nav { background: transparent !important; border-bottom-color: var(--docket-max-accent) !important; color: var(--docket-max-accent) !important; }
+html[data-docket-max-reskin] .docket-max-sidebar {
+  padding: .4rem !important; background: var(--docket-max-surface-1) !important; border: 1px solid var(--docket-max-border) !important;
+  border-radius: var(--docket-max-radius) !important;
+}
+html[data-docket-max-reskin] .docket-max-sidebar :is(div, ul, li) { background: transparent !important; border-color: transparent !important; }
+html[data-docket-max-reskin] .docket-max-sidebar :is(a, [role="link"]) { display: flex !important; align-items: center !important; min-height: 44px !important; padding: .5rem .75rem !important; border: 0 !important; border-radius: var(--docket-max-radius-sm) !important; color: var(--docket-max-secondary) !important; }
+html[data-docket-max-reskin] .docket-max-main-pane { width: calc(100% - 2rem) !important; max-width: none !important; margin: 1rem !important; }
+html[data-docket-max-reskin] .docket-max-content-row {
+  position: relative !important; display: block !important; min-height: 52px !important; line-height: 1.4 !important; list-style-position: inside !important;
+  margin: .35rem 0 !important; padding: .45rem .75rem .45rem 1rem !important; background: var(--docket-max-surface-1) !important;
+  border: 1px solid var(--docket-max-border) !important; border-radius: var(--docket-max-radius-sm) !important;
+}
+html[data-docket-max-reskin] .docket-max-content-row::before { position: absolute; inset: 0 auto 0 0; width: 3px; border-radius: var(--docket-max-radius-sm) 0 0 var(--docket-max-radius-sm); background: var(--docket-max-accent); content: ""; }
+html[data-docket-max-reskin] .docket-max-content-row:hover { background: var(--docket-max-surface-2) !important; }
+html[data-docket-max-reskin] .docket-max-content-row a { color: var(--docket-max-label) !important; font-weight: 600 !important; text-decoration: none !important; }
+html[data-docket-max-reskin] .docket-max-redundant-outline { display: none !important; }
 /* The Reading view's production content pane uses a generated content/main
  * class rather than MAX's older Bootstrap container names. Scope this only to
  * role-named page regions; it replaces the former unsafe all-div reset. */
@@ -537,7 +581,7 @@ html[data-docket-max-reskin] :is(.activity a, .announcement a, .schedule-item a,
 html[data-docket-max-reskin] :is(.activity:hover, .announcement:hover, .schedule-item:hover, .event:hover, .content-item:hover) { background: var(--docket-max-surface-2) !important; }
 html[data-docket-max-reskin] :is(.meta, .metadata, .date, .due-date, time, .text-muted, .help-block, .subtitle) { color: var(--docket-max-muted) !important; font-size: .8125rem; }
 
-html[data-docket-max-reskin] :is(h1, h2, h3, h4, h5, h6) { color: var(--docket-max-label) !important; font-family: var(--docket-max-font) !important; font-weight: 650 !important; letter-spacing: -.015em; }
+html[data-docket-max-reskin] :is(h1, h2, h3, h4, h5, h6) { color: var(--docket-max-label) !important; font-family: var(--docket-max-font) !important; font-weight: 650 !important; letter-spacing: -.015em; text-decoration: none !important; border-bottom: 0 !important; }
 html[data-docket-max-reskin] h1 { margin: 1.25rem 0 1rem; font-size: clamp(1.5rem, 1.2rem + 1vw, 2rem); }
 html[data-docket-max-reskin] h2 { margin: 1.25rem 0 .75rem; font-size: clamp(1.2rem, 1.05rem + .5vw, 1.45rem); }
 html[data-docket-max-reskin] :is(p, li, dt, dd, td, th, label, legend, small) { color: var(--docket-max-label) !important; font-family: var(--docket-max-font) !important; }
@@ -573,6 +617,7 @@ html[data-docket-max-reskin] :is(a, button, input, textarea, select, .panel, .ca
 @media (prefers-reduced-motion: reduce) { html[data-docket-max-reskin] * { animation-duration: .001ms !important; transition-duration: .001ms !important; } }
 html[data-docket-max-reskin][data-docket-reduced-motion="true"] * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
 @media (max-width: 640px) {
+  html[data-docket-max-reskin] .docket-max-menu-toggle { display: inline-flex !important; }
   html[data-docket-max-reskin] :is(#app, #root, main, #main, #content, #main-content, #page-content, .content, .content-wrapper, .container, .container-fluid) { max-width: calc(100% - 1.5rem); }
   html[data-docket-max-reskin] :is(#sidebar, .sidebar, .left-nav, .sidenav) { margin: .75rem; }
   html[data-docket-max-reskin] :is(table, .table) { display: block; max-width: 100%; overflow-x: auto; white-space: nowrap; }
@@ -2648,11 +2693,83 @@ html[data-docket-max-reskin][data-docket-reduced-motion="true"] * { animation-du
     }
     document.documentElement.setAttribute("data-docket-reduced-motion", String(settings.reducedMotion));
   }
+  function maxAncestors(element) {
+    const ancestors = [];
+    for (let current = element.parentElement; current; current = current.parentElement) ancestors.push(current);
+    return ancestors;
+  }
+  function markMaxStructure() {
+    const anchors = Array.from(document.querySelectorAll("a"));
+    const courseSegment = location.pathname.split("/").filter(Boolean)[0];
+    const courseLink = anchors.find((anchor) => courseSegment && new URL(anchor.href).pathname === `/${courseSegment}/`);
+    const navLinks = anchors.filter((anchor) => ["Home", "Content", "Grades", "Courses"].includes(anchor.textContent?.trim() ?? ""));
+    if (courseLink) {
+      courseLink.classList.add("docket-max-course-context");
+      const courseHeader = maxAncestors(courseLink).find((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.top < 130 && rect.width > 500 && rect.height <= 150;
+      });
+      courseHeader?.classList.add("docket-max-course-header");
+    }
+    const navigationToggle = Array.from(document.querySelectorAll("button")).find(
+      (button) => /toggle navigation/i.test(button.getAttribute("aria-label") ?? button.textContent ?? "")
+    );
+    navigationToggle?.classList.add("docket-max-menu-toggle");
+    const userLink = anchors.find((anchor) => anchor.textContent?.trim() === "Derek Roper");
+    userLink?.classList.add("docket-max-user-menu");
+    Array.from(document.querySelectorAll("input")).filter(
+      (input) => /navigate/i.test(input.getAttribute("placeholder") ?? input.getAttribute("aria-label") ?? "")
+    ).forEach((input) => input.classList.add("docket-max-empty-search"));
+    const firstNavLink = navLinks[0];
+    if (firstNavLink && navLinks.length >= 3) {
+      const primaryNav = maxAncestors(firstNavLink).find((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.width > 500 && rect.height <= 140 && navLinks.every((link) => element.contains(link));
+      });
+      primaryNav?.classList.add("docket-max-primary-nav");
+      navLinks.forEach((link) => {
+        if (link.textContent?.trim() === "Content") link.classList.add("docket-max-active-nav");
+      });
+    }
+    const contentHeading = Array.from(document.querySelectorAll("h1, h2, h3")).find((heading) => heading.textContent?.trim() === "Content");
+    if (contentHeading) {
+      maxAncestors(contentHeading).find((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.left < 300 && rect.width < 380 && rect.height > 400;
+      })?.classList.add("docket-max-sidebar");
+    }
+    const readingHeading = Array.from(document.querySelectorAll("h1")).find((heading) => heading.textContent?.trim() !== "");
+    if (readingHeading) {
+      maxAncestors(readingHeading).find((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.left >= 200 && rect.width > 1e3 && rect.height > 400;
+      })?.classList.add("docket-max-main-pane");
+    }
+    const contentRows = anchors.filter((anchor) => {
+      const path = new URL(anchor.href).pathname;
+      return path.startsWith(`${location.pathname}/`) && path !== location.pathname;
+    });
+    contentRows.forEach((link) => {
+      maxAncestors(link).find((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.width > 360 && rect.height > 20 && rect.height < 110 && contentRows.filter((row2) => element.contains(row2)).length === 1;
+      })?.classList.add("docket-max-content-row");
+    });
+    Array.from(document.querySelectorAll("select")).forEach((select) => {
+      const mirrorsReadingOutline = Array.from(select.options).some((option) => option.textContent?.trim() === "Reading Instructions");
+      if (!mirrorsReadingOutline) return;
+      maxAncestors(select).find((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.width > 500 && rect.height < 120;
+      })?.classList.add("docket-max-redundant-outline");
+    });
+  }
   function bootMax() {
     if (!isMaxHost(location.hostname)) return;
     document.documentElement.setAttribute("data-docket-max-reskin", "true");
     injectMaxStyles();
     applyMaxTheme(loadSettings());
+    requestAnimationFrame(() => requestAnimationFrame(markMaxStructure));
   }
   function ensureStylesLast() {
     const style = document.getElementById("docket-reskin-styles");
