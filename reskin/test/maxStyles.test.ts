@@ -17,3 +17,18 @@ test("MAX styles preserve mobile access to wide native tables", () => {
   assert.match(css, /@media \(max-width: 640px\)/);
   assert.match(css, /overflow-x: auto/);
 });
+
+test("MAX styles use shared appearance, accessibility, and surface primitives", () => {
+  for (const selector of [
+    '[data-docket-theme="light"]',
+    '[data-docket-theme="dark"]',
+    "data-docket-background",
+    "data-docket-reduced-motion",
+    "[aria-current=\"page\"]",
+    "[aria-expanded=\"true\"]",
+    ".skip-link",
+  ]) {
+    assert.match(css, new RegExp(selector.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")));
+  }
+  assert.doesNotMatch(css, /body div\s*\{\s*background-color:\s*transparent/);
+});

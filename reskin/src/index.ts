@@ -39,6 +39,9 @@ function injectMaxStyles(): void {
   if (document.getElementById("docket-max-reskin-styles")) return;
   const style = document.createElement("style");
   style.id = "docket-max-reskin-styles";
+  // MAX does not share LearningSuite's markup, but it does share the same
+  // settings and token vocabulary. MAX-specific CSS maps those tokens onto its
+  // legacy selectors without mounting the LearningSuite shell.
   style.textContent = [fontInterCss, maxCss].join("\n");
   (document.head ?? document.documentElement).appendChild(style);
 }
@@ -49,10 +52,25 @@ function injectMaxStyles(): void {
  * run here. This keeps every MAX link, menu, row, and form native while giving the
  * dashboard's observed semantic surfaces a consistent accessible presentation.
  */
+function applyMaxTheme(settings: ReskinSettings): void {
+  // MAX's production baseline is dark and has no site-side appearance signal.
+  // Keep System aligned with that baseline; an explicit Light/Dark setting
+  // remains available through the shared reskin settings.
+  const dark = settings.appearance !== "light";
+  document.documentElement.setAttribute("data-docket-theme", dark ? "dark" : "light");
+  if (BACKGROUND_CHOICES.includes(settings.background)) {
+    document.documentElement.setAttribute("data-docket-background", settings.background);
+  } else {
+    document.documentElement.removeAttribute("data-docket-background");
+  }
+  document.documentElement.setAttribute("data-docket-reduced-motion", String(settings.reducedMotion));
+}
+
 function bootMax(): void {
   if (!isMaxHost(location.hostname)) return;
   document.documentElement.setAttribute("data-docket-max-reskin", "true");
   injectMaxStyles();
+  applyMaxTheme(loadSettings());
 }
 
 /**
