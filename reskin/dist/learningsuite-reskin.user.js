@@ -489,8 +489,9 @@ html[data-docket-max-reskin] :is(#app, #root, main, #main, #content, #main-conte
   width: auto; max-width: min(1440px, calc(100% - 3rem)); margin-inline: auto; background: transparent !important; color: var(--docket-max-label) !important;
 }
 html[data-docket-max-reskin] .docket-max-course-header {
-  display: flex !important; align-items: center !important; min-height: 56px !important; padding: 0 1.25rem !important;
+  display: flex !important; align-items: center !important; height: 56px !important; min-height: 56px !important; max-height: 56px !important; padding: 0 1.25rem !important;
   background: var(--docket-max-surface-1) !important; border-bottom: 1px solid var(--docket-max-border) !important;
+  box-sizing: border-box !important; overflow: hidden !important;
 }
 html[data-docket-max-reskin] .docket-max-menu-toggle {
   position: static !important; display: none !important; align-items: center !important; justify-content: center !important;
@@ -504,7 +505,9 @@ html[data-docket-max-reskin] .docket-max-course-context {
   font-size: .9375rem !important; font-weight: 650 !important; text-decoration: none !important; white-space: nowrap !important;
 }
 html[data-docket-max-reskin] .docket-max-user-menu { color: var(--docket-max-secondary) !important; font-size: .875rem !important; font-weight: 600 !important; }
-html[data-docket-max-reskin] .docket-max-empty-search { display: none !important; }
+html[data-docket-max-reskin] .docket-max-empty-search,
+html[data-docket-max-reskin] .docket-max-empty-search-shell,
+html[data-docket-max-reskin] .docket-max-shortcuts { display: none !important; }
 html[data-docket-max-reskin] .docket-max-primary-nav {
   display: flex !important; align-items: stretch !important; min-height: 42px !important; padding: 0 .75rem !important;
   background: var(--docket-max-surface-1) !important; border-bottom: 1px solid var(--docket-max-border) !important;
@@ -596,8 +599,8 @@ html[data-docket-max-reskin] :is(th, thead > tr > th, thead > tr > td) { backgro
 html[data-docket-max-reskin] tr + tr :is(th, td) { border-top: 1px solid var(--docket-max-border) !important; }
 html[data-docket-max-reskin] .table-striped > tbody > tr:nth-of-type(odd) > * { background: var(--docket-max-surface-2) !important; }
 html[data-docket-max-reskin] .table-hover > tbody > tr:hover > * { background: var(--docket-max-fill) !important; }
-html[data-docket-max-reskin] :is(.fc-event, .calendar-event, .timetable-event, .schedule-event) { background: var(--docket-max-accent-container) !important; border: 1px solid var(--docket-max-accent) !important; color: var(--docket-max-on-accent-container) !important; }
-html[data-docket-max-reskin] :is(.fc-event *, .calendar-event *, .timetable-event *, .schedule-event *) { color: inherit !important; }
+html[data-docket-max-reskin] :is(.fc-event, .calendar-event, .timetable-event, .schedule-event, .docket-max-schedule-event) { background: var(--docket-max-accent-container) !important; border: 1px solid var(--docket-max-accent) !important; color: var(--docket-max-on-accent-container) !important; }
+html[data-docket-max-reskin] :is(.fc-event *, .calendar-event *, .timetable-event *, .schedule-event *, .docket-max-schedule-event *) { color: inherit !important; }
 
 html[data-docket-max-reskin] :is(input, textarea, select) { min-height: 40px; padding: .45rem .65rem; background: var(--docket-max-surface-1) !important; border: 1px solid var(--docket-max-border) !important; border-radius: var(--docket-max-radius-sm) !important; color: var(--docket-max-label) !important; font-family: var(--docket-max-font) !important; }
 html[data-docket-max-reskin] :is(input, textarea, select):hover { border-color: var(--docket-max-secondary) !important; }
@@ -2705,11 +2708,6 @@ html[data-docket-max-reskin][data-docket-reduced-motion="true"] * { animation-du
     const navLinks = anchors.filter((anchor) => ["Home", "Content", "Grades", "Courses"].includes(anchor.textContent?.trim() ?? ""));
     if (courseLink) {
       courseLink.classList.add("docket-max-course-context");
-      const courseHeader = maxAncestors(courseLink).find((element) => {
-        const rect = element.getBoundingClientRect();
-        return rect.top < 130 && rect.width > 500 && rect.height <= 150;
-      });
-      courseHeader?.classList.add("docket-max-course-header");
     }
     const navigationToggle = Array.from(document.querySelectorAll("button")).find(
       (button) => /toggle navigation/i.test(button.getAttribute("aria-label") ?? button.textContent ?? "")
@@ -2717,9 +2715,25 @@ html[data-docket-max-reskin][data-docket-reduced-motion="true"] * { animation-du
     navigationToggle?.classList.add("docket-max-menu-toggle");
     const userLink = anchors.find((anchor) => anchor.textContent?.trim() === "Derek Roper");
     userLink?.classList.add("docket-max-user-menu");
-    Array.from(document.querySelectorAll("input")).filter(
-      (input) => /navigate/i.test(input.getAttribute("placeholder") ?? input.getAttribute("aria-label") ?? "")
-    ).forEach((input) => input.classList.add("docket-max-empty-search"));
+    const textControls = Array.from(document.querySelectorAll("input, [role='searchbox'], [role='textbox'], [contenteditable='true'], [aria-label], [placeholder]"));
+    const navigateControl = textControls.find(
+      (element) => /navigate/i.test([
+        element.getAttribute("placeholder"),
+        element.getAttribute("aria-label"),
+        element.textContent,
+        element instanceof HTMLInputElement ? element.value : ""
+      ].filter(Boolean).join(" "))
+    ) ?? textControls.find((element) => {
+      const rect = element.getBoundingClientRect();
+      return rect.top < 250 && rect.width >= 100 && rect.width <= 700 && rect.height >= 20 && rect.height <= 120;
+    });
+    if (navigateControl) {
+      navigateControl.classList.add("docket-max-empty-search");
+      maxAncestors(navigateControl).find((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.top < 250 && rect.width >= 100 && rect.width <= 700 && rect.height >= 20 && rect.height <= 120;
+      })?.classList.add("docket-max-empty-search-shell");
+    }
     const firstNavLink = navLinks[0];
     if (firstNavLink && navLinks.length >= 3) {
       const primaryNav = maxAncestors(firstNavLink).find((element) => {
@@ -2729,6 +2743,29 @@ html[data-docket-max-reskin][data-docket-reduced-motion="true"] * { animation-du
       primaryNav?.classList.add("docket-max-primary-nav");
       navLinks.forEach((link) => {
         if (link.textContent?.trim() === "Content") link.classList.add("docket-max-active-nav");
+      });
+    }
+    const shortcutNames = ["Syllabus", "Notes", "Schedule", "Content", "Grade"];
+    const shortcuts = anchors.filter((anchor) => shortcutNames.includes(anchor.textContent?.trim() ?? ""));
+    const shortcutFirst = shortcuts[0];
+    if (shortcutFirst && shortcuts.length >= shortcutNames.length) {
+      maxAncestors(shortcutFirst).find((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.top > 180 && rect.width > 700 && rect.height > 16 && rect.height < 90 && shortcuts.every((link) => element.contains(link));
+      })?.classList.add("docket-max-shortcuts");
+    }
+    const scheduleTable = Array.from(document.querySelectorAll("table")).find((table) => {
+      const text = table.textContent ?? "";
+      const rect = table.getBoundingClientRect();
+      return rect.width > 400 && /Reading|Homework|iClicker/.test(text);
+    });
+    if (scheduleTable) {
+      Array.from(scheduleTable.querySelectorAll("td *, [role='cell'] *")).forEach((element) => {
+        const rect = element.getBoundingClientRect();
+        const background = getComputedStyle(element).backgroundColor;
+        if (rect.width > 100 && rect.height > 18 && rect.height < 220 && background !== "transparent" && background !== "rgba(0, 0, 0, 0)") {
+          element.classList.add("docket-max-schedule-event");
+        }
       });
     }
     const contentHeading = Array.from(document.querySelectorAll("h1, h2, h3")).find((heading) => heading.textContent?.trim() === "Content");

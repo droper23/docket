@@ -86,11 +86,6 @@ function markMaxStructure(): void {
 
   if (courseLink) {
     courseLink.classList.add("docket-max-course-context");
-    const courseHeader = maxAncestors(courseLink).find((element) => {
-      const rect = element.getBoundingClientRect();
-      return rect.top < 130 && rect.width > 500 && rect.height <= 150;
-    });
-    courseHeader?.classList.add("docket-max-course-header");
   }
 
   const navigationToggle = Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find((button) =>
@@ -101,9 +96,27 @@ function markMaxStructure(): void {
   const userLink = anchors.find((anchor) => anchor.textContent?.trim() === "Derek Roper");
   userLink?.classList.add("docket-max-user-menu");
 
-  Array.from(document.querySelectorAll<HTMLInputElement>("input")).filter((input) =>
-    /navigate/i.test(input.getAttribute("placeholder") ?? input.getAttribute("aria-label") ?? ""),
-  ).forEach((input) => input.classList.add("docket-max-empty-search"));
+  // MAX renders its unused "Navigate" search control differently across views.
+  // Mark its small, top-level shell rather than changing the header's DOM.
+  const textControls = Array.from(document.querySelectorAll<HTMLElement>("input, [role='searchbox'], [role='textbox'], [contenteditable='true'], [aria-label], [placeholder]"));
+  const navigateControl = textControls.find((element) =>
+    /navigate/i.test([
+      element.getAttribute("placeholder"),
+      element.getAttribute("aria-label"),
+      element.textContent,
+      element instanceof HTMLInputElement ? element.value : "",
+    ].filter(Boolean).join(" ")),
+  ) ?? textControls.find((element) => {
+    const rect = element.getBoundingClientRect();
+    return rect.top < 250 && rect.width >= 100 && rect.width <= 700 && rect.height >= 20 && rect.height <= 120;
+  });
+  if (navigateControl) {
+    navigateControl.classList.add("docket-max-empty-search");
+    maxAncestors(navigateControl).find((element) => {
+      const rect = element.getBoundingClientRect();
+      return rect.top < 250 && rect.width >= 100 && rect.width <= 700 && rect.height >= 20 && rect.height <= 120;
+    })?.classList.add("docket-max-empty-search-shell");
+  }
 
   const firstNavLink = navLinks[0];
   if (firstNavLink && navLinks.length >= 3) {
@@ -114,6 +127,37 @@ function markMaxStructure(): void {
     primaryNav?.classList.add("docket-max-primary-nav");
     navLinks.forEach((link) => {
       if (link.textContent?.trim() === "Content") link.classList.add("docket-max-active-nav");
+    });
+  }
+
+  // Dashboard repeats the rail's essential links in a legacy light strip.
+  // Hide only that short, fully duplicated group; the rail remains the context nav.
+  const shortcutNames = ["Syllabus", "Notes", "Schedule", "Content", "Grade"];
+  const shortcuts = anchors.filter((anchor) => shortcutNames.includes(anchor.textContent?.trim() ?? ""));
+  const shortcutFirst = shortcuts[0];
+  if (shortcutFirst && shortcuts.length >= shortcutNames.length) {
+    maxAncestors(shortcutFirst).find((element) => {
+      const rect = element.getBoundingClientRect();
+      return rect.top > 180 && rect.width > 700 && rect.height > 16 && rect.height < 90 &&
+        shortcuts.every((link) => element.contains(link));
+    })?.classList.add("docket-max-shortcuts");
+  }
+
+  // Legacy schedule events use course-provided pastel fills. Detect only visible
+  // painted descendants inside the dated schedule table and apply the shared,
+  // contrast-safe event treatment without altering any event handlers.
+  const scheduleTable = Array.from(document.querySelectorAll<HTMLTableElement>("table")).find((table) => {
+    const text = table.textContent ?? "";
+    const rect = table.getBoundingClientRect();
+    return rect.width > 400 && /Reading|Homework|iClicker/.test(text);
+  });
+  if (scheduleTable) {
+    Array.from(scheduleTable.querySelectorAll<HTMLElement>("td *, [role='cell'] *")).forEach((element) => {
+      const rect = element.getBoundingClientRect();
+      const background = getComputedStyle(element).backgroundColor;
+      if (rect.width > 100 && rect.height > 18 && rect.height < 220 && background !== "transparent" && background !== "rgba(0, 0, 0, 0)") {
+        element.classList.add("docket-max-schedule-event");
+      }
     });
   }
 
