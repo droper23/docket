@@ -46,6 +46,15 @@ function injectMaxStyles(): void {
   (document.head ?? document.documentElement).appendChild(style);
 }
 
+// MAX's legacy styles are loaded after a document-start userscript. Move our
+// layer to the end of <head> once, so equal-specificity native rules cannot
+// reclaim the course chrome after the page finishes streaming.
+function ensureMaxStylesLast(): void {
+  const style = document.getElementById("docket-max-reskin-styles");
+  if (!style || !document.head || document.head.lastElementChild === style) return;
+  document.head.appendChild(style);
+}
+
 /**
  * MAX support intentionally starts as a non-destructive CSS layer. Its views are
  * not LearningSuite-shaped, so none of the LearningSuite shell/adapters/settings
@@ -72,6 +81,29 @@ function maxAncestors(element: Element): HTMLElement[] {
   return ancestors;
 }
 
+function maxPathMatchScore(current: string, href: string): number {
+  const path = new URL(href, document.baseURI).pathname.replace(/\/+$/, "");
+  const here = current.replace(/\/+$/, "");
+  if (path === here) return path.length + 1000;
+  return here.startsWith(path + "/") || path.startsWith(here + "/") ? path.length : -1;
+}
+
+function markMaxAncestor(
+  element: Element,
+  className: string,
+  predicate: (candidate: HTMLElement, rect: DOMRect) => boolean,
+): HTMLElement | undefined {
+  const match = maxAncestors(element).find((candidate) => predicate(candidate, candidate.getBoundingClientRect()));
+  match?.classList.add(className);
+  return match;
+}
+
+function setMaxStyle(element: HTMLElement, properties: Record<string, string>): void {
+  for (const [property, value] of Object.entries(properties)) {
+    element.style.setProperty(property, value, "important");
+  }
+}
+
 /**
  * MAX's production views use generated class names, so its shell cannot be
  * styled safely with a Bootstrap selector list. Mark the actual visible roles
@@ -86,6 +118,10 @@ function markMaxStructure(): void {
 
   if (courseLink) {
     courseLink.classList.add("docket-max-course-context");
+    const courseHeader = markMaxAncestor(courseLink, "docket-max-course-header", (_candidate, rect) =>
+      rect.top < 180 && rect.width > 480 && rect.height >= 42 && rect.height <= 120,
+    );
+    courseHeader?.classList.add("docket-max-course-header");
   }
 
   const navigationToggle = Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find((button) =>
@@ -93,8 +129,18 @@ function markMaxStructure(): void {
   );
   navigationToggle?.classList.add("docket-max-menu-toggle");
 
-  const userLink = anchors.find((anchor) => anchor.textContent?.trim() === "Derek Roper");
-  userLink?.classList.add("docket-max-user-menu");
+  const userLink = anchors.find((anchor) => {
+    const label = anchor.textContent?.trim() ?? "";
+    const rect = anchor.getBoundingClientRect();
+    return anchor !== courseLink && label.length > 2 && rect.top < 260 &&
+      !["Home", "Content", "Grades", "Courses", "iCalendar", "Print"].includes(label);
+  });
+  if (userLink) {
+    userLink.classList.add("docket-max-user-menu");
+  }
+
+  anchors.filter((anchor) => ["iCalendar", "Print"].includes(anchor.textContent?.trim() ?? ""))
+    .forEach((anchor) => anchor.classList.add("docket-max-utility-link"));
 
   // MAX renders its unused "Navigate" search control differently across views.
   // Mark its small, top-level shell rather than changing the header's DOM.
@@ -125,23 +171,26 @@ function markMaxStructure(): void {
       return rect.width > 500 && rect.height <= 140 && navLinks.every((link) => element.contains(link));
     });
     primaryNav?.classList.add("docket-max-primary-nav");
-    navLinks.forEach((link) => {
-      if (link.textContent?.trim() === "Content") link.classList.add("docket-max-active-nav");
-    });
+    let activeNav: HTMLAnchorElement | undefined;
+    let activeScore = -1;
+    for (const link of navLinks) {
+      const score = maxPathMatchScore(location.pathname, link.href);
+      if (score > activeScore) {
+        activeScore = score;
+        activeNav = link;
+      }
+    }
+    activeNav?.classList.add("docket-max-active-nav");
   }
 
   // Dashboard repeats the rail's essential links in a legacy light strip.
   // Hide only that short, fully duplicated group; the rail remains the context nav.
   const shortcutNames = ["Syllabus", "Notes", "Schedule", "Content", "Grade"];
-  const shortcuts = anchors.filter((anchor) => shortcutNames.includes(anchor.textContent?.trim() ?? ""));
-  const shortcutFirst = shortcuts[0];
-  if (shortcutFirst && shortcuts.length >= shortcutNames.length) {
-    maxAncestors(shortcutFirst).find((element) => {
-      const rect = element.getBoundingClientRect();
-      return rect.top > 180 && rect.width > 700 && rect.height > 16 && rect.height < 90 &&
-        shortcuts.every((link) => element.contains(link));
+  anchors.find((anchor) => anchor.textContent?.trim() === shortcutNames[0])
+    && Array.from(document.querySelectorAll<HTMLElement>("body *")).find((element) => {
+      const labels = Array.from(element.querySelectorAll("a"), (link) => link.textContent?.trim());
+      return labels.length === shortcutNames.length && shortcutNames.every((label, index) => labels[index] === label);
     })?.classList.add("docket-max-shortcuts");
-  }
 
   // Legacy schedule events use course-provided pastel fills. Detect only visible
   // painted descendants inside the dated schedule table and apply the shared,
@@ -152,13 +201,74 @@ function markMaxStructure(): void {
     return rect.width > 400 && /Reading|Homework|iClicker/.test(text);
   });
   if (scheduleTable) {
-    Array.from(scheduleTable.querySelectorAll<HTMLElement>("td *, [role='cell'] *")).forEach((element) => {
-      const rect = element.getBoundingClientRect();
-      const background = getComputedStyle(element).backgroundColor;
-      if (rect.width > 100 && rect.height > 18 && rect.height < 220 && background !== "transparent" && background !== "rgba(0, 0, 0, 0)") {
-        element.classList.add("docket-max-schedule-event");
+    scheduleTable.classList.add("docket-max-schedule-table");
+    // MAX applies fixed row heights inline on this legacy table. A 1px table
+    // row is allowed to expand for its contents but cannot retain that empty
+    // vertical allocation.
+    for (const row of Array.from(scheduleTable.rows)) {
+      setMaxStyle(row, { height: "1px", "min-height": "0" });
+      for (const cell of Array.from(row.cells)) {
+        setMaxStyle(cell, { height: "1px", "min-height": "0", padding: "8px 16px" });
       }
-    });
+    }
+    markMaxAncestor(scheduleTable, "docket-max-main-pane", (_candidate, rect) =>
+      rect.left > 180 && rect.width > scheduleTable.getBoundingClientRect().width + 80 && rect.height > 400,
+    );
+    const eventSurfaces = new Map<HTMLElement, string>();
+    for (const cell of Array.from(scheduleTable.querySelectorAll<HTMLElement>("td, [role='cell']"))) {
+      const cellRect = cell.getBoundingClientRect();
+      const isPaintedEvent = (candidate: HTMLElement): string | undefined => {
+        const rect = candidate.getBoundingClientRect();
+        const background = getComputedStyle(candidate).backgroundColor;
+        const fillsCell = rect.width >= cellRect.width - 4 && rect.height >= cellRect.height - 4;
+        return rect.width > 100 && rect.height > 18 && rect.height < 220 && !fillsCell
+          && background !== "transparent" && background !== "rgba(0, 0, 0, 0)"
+          ? background
+          : undefined;
+      };
+
+      for (const element of Array.from(cell.querySelectorAll<HTMLElement>("*"))) {
+        const background = isPaintedEvent(element);
+        if (!background) continue;
+        // Several nested descendants can inherit one event's color. Keep the
+        // outermost painted wrapper only, so each event receives exactly one
+        // rail, width, and left padding.
+        let eventSurface = element;
+        let eventBackground = background;
+        for (let candidate = element.parentElement; candidate && candidate !== cell; candidate = candidate.parentElement) {
+          const candidateBackground = isPaintedEvent(candidate);
+          if (candidateBackground) {
+            eventSurface = candidate;
+            eventBackground = candidateBackground;
+          }
+        }
+        eventSurfaces.set(eventSurface, eventBackground);
+      }
+    }
+
+    for (const [eventSurface, background] of eventSurfaces) {
+      eventSurface.classList.add("docket-max-schedule-event");
+      // MAX paints event categories with inline colors. Keep each category as a thin
+      // LearningSuite-style rail, but clear the large legacy color block itself.
+      eventSurface.style.setProperty("--docket-max-rail", background);
+      setMaxStyle(eventSurface, {
+        display: "block",
+        float: "none",
+        clear: "both",
+        width: "100%",
+        "max-width": "100%",
+        margin: "3px 0",
+        // Reading/Homework labels arrive in a nested text wrapper; iClicker is
+        // direct text. Give the latter the same final text start column.
+        padding: /^iClicker\b/i.test(eventSurface.textContent?.trim() ?? "")
+          ? "6px 10px 6px 30px"
+          : "6px 10px 6px 14px",
+        background: "transparent",
+        "background-color": "transparent",
+        "background-image": "none",
+        "border-left": `4px solid ${background}`,
+      });
+    }
   }
 
   const contentHeading = Array.from(document.querySelectorAll<HTMLElement>("h1, h2, h3")).find((heading) => heading.textContent?.trim() === "Content");
@@ -169,12 +279,49 @@ function markMaxStructure(): void {
     })?.classList.add("docket-max-sidebar");
   }
 
+  const sidebarHeading = Array.from(document.querySelectorAll<HTMLElement>("h1, h2, h3")).find((heading) => heading.textContent?.trim() === "Home");
+  if (sidebarHeading) {
+    const sidebar = markMaxAncestor(sidebarHeading, "docket-max-sidebar", (_candidate, rect) =>
+      rect.left < 320 && rect.width >= 180 && rect.width <= 360 && rect.height > 360,
+    );
+    if (sidebar) {
+      setMaxStyle(sidebar, { background: "var(--docket-max-canvas)", "border-right": "1px solid var(--docket-max-border)" });
+      const activeLabel = location.pathname.includes("/schedule") ? "Schedule" : location.pathname.includes("/calendar") ? "Calendar" : "Dashboard";
+      const activeItem = Array.from(sidebar.querySelectorAll<HTMLElement>("a, button, div")).find((item) => {
+        const rect = item.getBoundingClientRect();
+        return item.textContent?.trim() === activeLabel && rect.width > 120 && rect.height >= 28 && rect.height < 90;
+      });
+      if (activeItem) {
+        activeItem.classList.add("docket-max-sidebar-active");
+        setMaxStyle(activeItem, { background: "var(--docket-max-accent-container)", color: "var(--docket-max-on-accent-container)" });
+      }
+    }
+  }
+
+  const railAnchor = anchors.find((anchor) => ["Dashboard", "Schedule", "Syllabus"].includes(anchor.textContent?.trim() ?? ""));
+  if (railAnchor) {
+    const sidebar = markMaxAncestor(railAnchor, "docket-max-sidebar", (_candidate, rect) =>
+      rect.left < 320 && rect.width >= 180 && rect.width <= 360 && rect.height > 360,
+    );
+    const currentRail = Array.from(sidebar?.querySelectorAll<HTMLAnchorElement>("a") ?? []).reduce<HTMLAnchorElement | undefined>((best, link) =>
+      maxPathMatchScore(location.pathname, link.href) > maxPathMatchScore(location.pathname, best?.href ?? "") ? link : best,
+    undefined);
+    currentRail?.classList.add("docket-max-sidebar-active");
+  }
+
   const readingHeading = Array.from(document.querySelectorAll<HTMLElement>("h1")).find((heading) => heading.textContent?.trim() !== "");
   if (readingHeading) {
     maxAncestors(readingHeading).find((element) => {
       const rect = element.getBoundingClientRect();
       return rect.left >= 200 && rect.width > 1000 && rect.height > 400;
     })?.classList.add("docket-max-main-pane");
+  }
+
+  const dashboardHeading = Array.from(document.querySelectorAll<HTMLElement>("h1, h2, h3")).find((heading) => /^(Upcoming Week|Announcements)$/i.test(heading.textContent?.trim() ?? ""));
+  if (dashboardHeading) {
+    markMaxAncestor(dashboardHeading, "docket-max-main-pane", (_candidate, rect) =>
+      rect.left >= 180 && rect.width > 900 && rect.height > 380,
+    );
   }
 
   const contentRows = anchors.filter((anchor) => {
@@ -206,8 +353,14 @@ function bootMax(): void {
   if (!isMaxHost(location.hostname)) return;
   document.documentElement.setAttribute("data-docket-max-reskin", "true");
   injectMaxStyles();
+  ensureMaxStylesLast();
   applyMaxTheme(loadSettings());
-  requestAnimationFrame(() => requestAnimationFrame(markMaxStructure));
+  // MAX streams its course chrome and schedule after DOMContentLoaded. A two-frame
+  // pass catches a warm cache, while this child-list observer catches the normal
+  // delayed render without observing our own class/style writes.
+  const mark = () => markMaxStructure();
+  requestAnimationFrame(() => requestAnimationFrame(mark));
+  observeMutations(document.body, mark);
 }
 
 /**

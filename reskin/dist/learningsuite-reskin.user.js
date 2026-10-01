@@ -502,12 +502,19 @@ html[data-docket-max-reskin] .docket-max-menu-toggle::before { content: "\u2630"
 html[data-docket-max-reskin] .docket-max-menu-toggle:hover { background: var(--docket-max-fill) !important; color: var(--docket-max-label) !important; }
 html[data-docket-max-reskin] .docket-max-course-context {
   display: inline-flex !important; align-items: center !important; min-height: 42px !important; margin-right: auto !important; color: var(--docket-max-label) !important;
-  font-size: .9375rem !important; font-weight: 650 !important; text-decoration: none !important; white-space: nowrap !important;
+  font-size: .9375rem !important; font-weight: 650 !important; text-decoration: none !important; white-space: nowrap !important; border: 0 !important; box-shadow: none !important;
 }
-html[data-docket-max-reskin] .docket-max-user-menu { color: var(--docket-max-secondary) !important; font-size: .875rem !important; font-weight: 600 !important; }
+html[data-docket-max-reskin] .docket-max-user-menu { color: var(--docket-max-secondary) !important; font-size: .875rem !important; font-weight: 600 !important; border: 0 !important; box-shadow: none !important; text-decoration: none !important; }
 html[data-docket-max-reskin] .docket-max-empty-search,
 html[data-docket-max-reskin] .docket-max-empty-search-shell,
-html[data-docket-max-reskin] .docket-max-shortcuts { display: none !important; }
+html[data-docket-max-reskin] .docket-max-shortcuts,
+html[data-docket-max-reskin] .docket-max-shortcut { display: none !important; }
+/* The Dashboard's legacy "Navigate" search is a decorative header control;
+ * target its stable native value as a fallback while its generated wrapper is
+ * still streaming into the page. */
+html[data-docket-max-reskin] :is(input, textarea)[value="Navigate" i],
+html[data-docket-max-reskin] :is(input, textarea)[aria-label*="Navigate" i],
+html[data-docket-max-reskin] :is(input, textarea)[placeholder*="Navigate" i] { display: none !important; }
 html[data-docket-max-reskin] .docket-max-primary-nav {
   display: flex !important; align-items: stretch !important; min-height: 42px !important; padding: 0 .75rem !important;
   background: var(--docket-max-surface-1) !important; border-bottom: 1px solid var(--docket-max-border) !important;
@@ -624,6 +631,285 @@ html[data-docket-max-reskin][data-docket-reduced-motion="true"] * { animation-du
   html[data-docket-max-reskin] :is(#app, #root, main, #main, #content, #main-content, #page-content, .content, .content-wrapper, .container, .container-fluid) { max-width: calc(100% - 1.5rem); }
   html[data-docket-max-reskin] :is(#sidebar, .sidebar, .left-nav, .sidenav) { margin: .75rem; }
   html[data-docket-max-reskin] :is(table, .table) { display: block; max-width: 100%; overflow-x: auto; white-space: nowrap; }
+}
+
+/* LearningSuite visual parity pass: these role-specific rules deliberately come
+ * last, so they win over MAX's old server styles while leaving its behavior intact. */
+html[data-docket-max-reskin] {
+  --docket-max-radius-sm: 10px;
+  --docket-max-radius: 14px;
+  --docket-max-dur: 120ms;
+}
+html[data-docket-max-reskin] .docket-max-course-header {
+  display: flex !important;
+  align-items: center !important;
+  min-height: 56px !important;
+  /* Break MAX's centered application shell so the course chrome reaches both viewport edges. */
+  width: 100vw !important;
+  max-width: none !important;
+  margin-left: calc(50% - 50vw) !important;
+  margin-right: 0 !important;
+  padding: 0 28px !important;
+  background: var(--docket-max-canvas) !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--docket-max-border) !important;
+  box-sizing: border-box !important;
+}
+html[data-docket-max-reskin] .docket-max-course-context {
+  min-height: 44px !important;
+  color: var(--docket-max-label) !important;
+  font-size: .9375rem !important;
+  font-weight: 650 !important;
+  letter-spacing: -.01em;
+}
+html[data-docket-max-reskin] .docket-max-course-header {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+html[data-docket-max-reskin] .docket-max-top-shell {
+  position: relative !important;
+  left: calc(50% - 50vw) !important;
+  width: 100vw !important;
+  max-width: none !important;
+  margin-inline: 0 !important;
+  background: var(--docket-max-canvas) !important;
+  border-bottom: 1px solid var(--docket-max-border) !important;
+  box-sizing: border-box !important;
+}
+html[data-docket-max-reskin] .docket-max-course-header .docket-max-course-context {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  line-height: 1.15 !important;
+}
+html[data-docket-max-reskin] .docket-max-course-header .docket-max-course-context :is(span, div) {
+  position: static !important;
+  display: block !important;
+  margin: 0 !important;
+  line-height: 1.15 !important;
+}
+html[data-docket-max-reskin] .docket-max-user-menu {
+  margin-left: auto !important;
+  padding-inline: 16px !important;
+  position: relative !important;
+  z-index: 2 !important;
+  white-space: nowrap !important;
+  color: var(--docket-max-secondary) !important;
+  font-size: .875rem !important;
+  font-weight: 600 !important;
+}
+html[data-docket-max-reskin] .docket-max-primary-nav {
+  gap: 4px;
+  width: 100vw !important;
+  max-width: none !important;
+  margin-left: calc(50% - 50vw) !important;
+  margin-right: 0 !important;
+  min-height: 40px !important;
+  padding: 0 16px !important;
+  background: var(--docket-max-canvas) !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--docket-max-border) !important;
+}
+html[data-docket-max-reskin] .docket-max-primary-nav a {
+  min-height: 40px !important;
+  padding: 0 14px !important;
+  background: transparent !important;
+  border-bottom: 2px solid transparent !important;
+  color: var(--docket-max-secondary) !important;
+  font-size: .8125rem !important;
+  font-weight: 650 !important;
+}
+html[data-docket-max-reskin] .docket-max-primary-nav a:hover { background: var(--docket-max-fill) !important; color: var(--docket-max-label) !important; }
+html[data-docket-max-reskin] .docket-max-primary-nav :is(.docket-max-active-nav, [aria-current="page"]) { color: var(--docket-max-accent) !important; border-bottom-color: var(--docket-max-accent) !important; }
+html[data-docket-max-reskin] .docket-max-utility-link {
+  position: relative !important;
+  top: 10px !important;
+  z-index: 1 !important;
+  display: inline-flex !important;
+  margin-right: 18px !important;
+}
+
+html[data-docket-max-reskin] .docket-max-sidebar,
+html[data-docket-max-reskin] :is(#sidebar, .sidebar, .left-nav, .sidenav) {
+  width: 280px !important;
+  min-width: 280px !important;
+  min-height: calc(100vh - 96px) !important;
+  margin: 0 !important;
+  padding: 28px 20px !important;
+  box-sizing: border-box !important;
+  background: var(--docket-max-canvas) !important;
+  border: 0 !important;
+  border-right: 1px solid var(--docket-max-border) !important;
+  border-radius: 0 !important;
+}
+html[data-docket-max-reskin] :is(.docket-max-sidebar, #sidebar, .sidebar, .left-nav, .sidenav) :is(a, [role="link"], .list-group-item) {
+  min-height: 42px !important;
+  margin: 0 0 4px !important;
+  padding: 0 14px !important;
+  border: 0 !important;
+  border-radius: var(--docket-max-radius-sm) !important;
+  background: transparent !important;
+  color: var(--docket-max-secondary) !important;
+  font-size: .875rem !important;
+  font-weight: 600 !important;
+}
+html[data-docket-max-reskin] :is(.docket-max-sidebar, #sidebar, .sidebar, .left-nav, .sidenav) :is(a, [role="link"], .list-group-item):hover { background: var(--docket-max-fill) !important; color: var(--docket-max-label) !important; }
+html[data-docket-max-reskin] :is(.docket-max-sidebar, #sidebar, .sidebar, .left-nav, .sidenav) :is(.docket-max-sidebar-active, .active > a, .list-group-item.active) { background: var(--docket-max-accent-container) !important; color: var(--docket-max-on-accent-container) !important; font-weight: 650 !important; }
+
+html[data-docket-max-reskin] .docket-max-main-pane {
+  width: auto !important;
+  max-width: 1164px !important;
+  min-width: 0 !important;
+  margin: 0 auto !important;
+  padding: 36px 28px 72px !important;
+  background: transparent !important;
+  box-sizing: border-box !important;
+}
+html[data-docket-max-reskin] :is(main, #main, #content, #main-content, #page-content, .content, .content-wrapper) { max-width: 1164px !important; min-width: 0 !important; margin-inline: auto !important; padding-inline: 28px !important; box-sizing: border-box !important; }
+html[data-docket-max-reskin] :is(h1, h2, h3, h4, h5, h6) { font-weight: 650 !important; letter-spacing: -.025em !important; }
+html[data-docket-max-reskin] h1 { margin: 0 0 24px !important; font-size: clamp(1.7rem, 1.4rem + .8vw, 2.1rem) !important; line-height: 1.18 !important; }
+html[data-docket-max-reskin] h2 { margin: 34px 0 14px !important; font-size: 1.35rem !important; line-height: 1.25 !important; }
+html[data-docket-max-reskin] h3 { margin: 26px 0 10px !important; font-size: 1rem !important; line-height: 1.35 !important; }
+html[data-docket-max-reskin] :is(.meta, .metadata, .date, .due-date, time, .text-muted, .help-block, .subtitle) { color: var(--docket-max-muted) !important; font-size: .8125rem !important; font-weight: 500 !important; }
+
+html[data-docket-max-reskin] :is(.panel, .well, .card, .box, .innerBox, .alert, .activity, .announcement, .schedule-item, .event, .content-item) {
+  margin-block: 12px !important;
+  padding: 20px !important;
+  background: var(--docket-max-surface-1) !important;
+  border: 1px solid var(--docket-max-border) !important;
+  border-radius: var(--docket-max-radius) !important;
+}
+html[data-docket-max-reskin] :is(.activity, .announcement, .schedule-item, .event, .content-item)::before { width: 4px !important; }
+html[data-docket-max-reskin] :is(.panel-heading, .panel-footer, .card-header, .box-header) { margin: -20px -20px 16px !important; padding: 13px 20px !important; background: var(--docket-max-surface-2) !important; }
+
+html[data-docket-max-reskin] .docket-max-schedule-table {
+  width: 100% !important;
+  max-width: 1164px !important;
+  margin: 0 auto 34px !important;
+  background: var(--docket-max-surface-1) !important;
+  border: 1px solid var(--docket-max-border) !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  border-radius: var(--docket-max-radius) !important;
+  overflow: hidden !important;
+}
+html[data-docket-max-reskin] .docket-max-schedule-table :is(td, th) { padding: 16px 20px !important; background: transparent !important; border: 0 !important; }
+html[data-docket-max-reskin] .docket-max-schedule-table :is(td, th) { padding: 12px 16px !important; }
+html[data-docket-max-reskin] .docket-max-schedule-table tr,
+html[data-docket-max-reskin] .docket-max-schedule-table :is(td, th) {
+  height: auto !important;
+  min-height: 0 !important;
+}
+/* MAX marks the current day by painting the table row itself. Keep the state
+ * readable through its event rails without letting that legacy fill dominate
+ * the full-width dashboard card. */
+html[data-docket-max-reskin] .docket-max-schedule-table tr { background: var(--docket-max-surface-1) !important; }
+html[data-docket-max-reskin] table tr { background: var(--docket-max-surface-1) !important; }
+html[data-docket-max-reskin] .docket-max-schedule-table tr + tr :is(td, th) { border-top: 1px solid var(--docket-max-border) !important; }
+html[data-docket-max-reskin] .docket-max-schedule-table :is(td, th):first-child { width: 142px !important; color: var(--docket-max-secondary) !important; font-size: .875rem !important; font-weight: 650 !important; white-space: nowrap; }
+html[data-docket-max-reskin] .docket-max-schedule-event,
+html[data-docket-max-reskin] :is(.fc-event, .calendar-event, .timetable-event, .schedule-event) {
+  display: block !important;
+  width: auto !important;
+  min-height: 0 !important;
+  margin: 3px 0 !important;
+  padding: 7px 10px 7px 14px !important;
+  box-sizing: border-box !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-left: 4px solid var(--docket-max-rail) !important;
+  border-radius: 0 !important;
+  color: var(--docket-max-label) !important;
+  font-size: .9375rem !important;
+  font-weight: 600 !important;
+}
+html[data-docket-max-reskin] .docket-max-schedule-event:hover,
+html[data-docket-max-reskin] :is(.fc-event, .calendar-event, .timetable-event, .schedule-event):hover { background: var(--docket-max-fill) !important; border-radius: 0 var(--docket-max-radius-xs) var(--docket-max-radius-xs) 0 !important; }
+html[data-docket-max-reskin] :is(.table-striped > tbody > tr:nth-of-type(odd) > *, .table-hover > tbody > tr:hover > *) { background: transparent !important; }
+html[data-docket-max-reskin] :is(.badge, .label, .status, .status-chip) { background: var(--docket-max-surface-3) !important; color: var(--docket-max-secondary) !important; }
+
+@media (max-width: 760px) {
+  html[data-docket-max-reskin] .docket-max-course-header { min-height: 52px !important; padding-inline: 16px !important; }
+  html[data-docket-max-reskin] .docket-max-primary-nav { padding-inline: 8px !important; }
+  html[data-docket-max-reskin] :is(.docket-max-sidebar, #sidebar, .sidebar, .left-nav, .sidenav) { width: 100% !important; min-width: 0 !important; min-height: 0 !important; padding: 10px 12px !important; border-right: 0 !important; border-bottom: 1px solid var(--docket-max-border) !important; }
+  html[data-docket-max-reskin] .docket-max-main-pane,
+  html[data-docket-max-reskin] :is(main, #main, #content, #main-content, #page-content, .content, .content-wrapper) { padding: 24px 16px 48px !important; }
+}
+
+/* MAX course chrome follows the same two-band pattern as LearningSuite: a
+ * compact course context row, then the primary tabs. These selectors override
+ * the earlier experimental viewport-offset rules without moving native nodes. */
+html[data-docket-max-reskin] .docket-max-course-header {
+  position: static !important;
+  display: flex !important;
+  align-items: center !important;
+  /* These roles live inside MAX's centered app shell. Deliberately break only
+   * the two chrome rows out of it, matching LearningSuite's full-width header. */
+  width: 100vw !important;
+  min-height: 56px !important;
+  height: 56px !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 0 0 calc(50% - 50vw) !important;
+  padding: 0 28px !important;
+  overflow: hidden !important;
+  background: var(--docket-max-surface-1) !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--docket-max-border) !important;
+  box-sizing: border-box !important;
+}
+html[data-docket-max-reskin] .docket-max-course-context {
+  display: flex !important;
+  align-items: center !important;
+  min-height: 44px !important;
+  color: var(--docket-max-label) !important;
+  font-size: .9375rem !important;
+  font-weight: 650 !important;
+  line-height: 1.2 !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+}
+html[data-docket-max-reskin] .docket-max-primary-nav {
+  position: static !important;
+  display: flex !important;
+  align-items: stretch !important;
+  gap: 0 !important;
+  width: 100vw !important;
+  min-height: 48px !important;
+  max-width: none !important;
+  margin: 0 0 0 calc(50% - 50vw) !important;
+  padding: 0 28px !important;
+  overflow: visible !important;
+  background: var(--docket-max-surface-1) !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--docket-max-border) !important;
+  box-sizing: border-box !important;
+}
+html[data-docket-max-reskin] .docket-max-primary-nav a {
+  display: flex !important;
+  align-items: center !important;
+  min-height: 48px !important;
+  margin: 0 !important;
+  padding: 0 14px !important;
+  color: var(--docket-max-secondary) !important;
+  font-size: .875rem !important;
+  font-weight: 600 !important;
+  text-decoration: none !important;
+  border: 0 !important;
+  border-bottom: 2px solid transparent !important;
+}
+html[data-docket-max-reskin] .docket-max-primary-nav .docket-max-active-nav {
+  color: var(--docket-max-accent) !important;
+  border-bottom-color: var(--docket-max-accent) !important;
+}
+html[data-docket-max-reskin] .docket-max-user-menu {
+  margin-left: auto !important;
+  padding-inline: 14px !important;
+  transform: none !important;
+  color: var(--docket-max-secondary) !important;
+  text-decoration: none !important;
 }
 `;
 
@@ -2686,6 +2972,11 @@ html[data-docket-max-reskin][data-docket-reduced-motion="true"] * { animation-du
     style.textContent = [font_inter_default, max_default].join("\n");
     (document.head ?? document.documentElement).appendChild(style);
   }
+  function ensureMaxStylesLast() {
+    const style = document.getElementById("docket-max-reskin-styles");
+    if (!style || !document.head || document.head.lastElementChild === style) return;
+    document.head.appendChild(style);
+  }
   function applyMaxTheme(settings) {
     const dark = settings.appearance !== "light";
     document.documentElement.setAttribute("data-docket-theme", dark ? "dark" : "light");
@@ -2701,6 +2992,22 @@ html[data-docket-max-reskin][data-docket-reduced-motion="true"] * { animation-du
     for (let current = element.parentElement; current; current = current.parentElement) ancestors.push(current);
     return ancestors;
   }
+  function maxPathMatchScore(current, href) {
+    const path = new URL(href, document.baseURI).pathname.replace(/\/+$/, "");
+    const here = current.replace(/\/+$/, "");
+    if (path === here) return path.length + 1e3;
+    return here.startsWith(path + "/") || path.startsWith(here + "/") ? path.length : -1;
+  }
+  function markMaxAncestor(element, className, predicate) {
+    const match = maxAncestors(element).find((candidate) => predicate(candidate, candidate.getBoundingClientRect()));
+    match?.classList.add(className);
+    return match;
+  }
+  function setMaxStyle(element, properties) {
+    for (const [property, value] of Object.entries(properties)) {
+      element.style.setProperty(property, value, "important");
+    }
+  }
   function markMaxStructure() {
     const anchors = Array.from(document.querySelectorAll("a"));
     const courseSegment = location.pathname.split("/").filter(Boolean)[0];
@@ -2708,13 +3015,26 @@ html[data-docket-max-reskin][data-docket-reduced-motion="true"] * { animation-du
     const navLinks = anchors.filter((anchor) => ["Home", "Content", "Grades", "Courses"].includes(anchor.textContent?.trim() ?? ""));
     if (courseLink) {
       courseLink.classList.add("docket-max-course-context");
+      const courseHeader = markMaxAncestor(
+        courseLink,
+        "docket-max-course-header",
+        (_candidate, rect) => rect.top < 180 && rect.width > 480 && rect.height >= 42 && rect.height <= 120
+      );
+      courseHeader?.classList.add("docket-max-course-header");
     }
     const navigationToggle = Array.from(document.querySelectorAll("button")).find(
       (button) => /toggle navigation/i.test(button.getAttribute("aria-label") ?? button.textContent ?? "")
     );
     navigationToggle?.classList.add("docket-max-menu-toggle");
-    const userLink = anchors.find((anchor) => anchor.textContent?.trim() === "Derek Roper");
-    userLink?.classList.add("docket-max-user-menu");
+    const userLink = anchors.find((anchor) => {
+      const label = anchor.textContent?.trim() ?? "";
+      const rect = anchor.getBoundingClientRect();
+      return anchor !== courseLink && label.length > 2 && rect.top < 260 && !["Home", "Content", "Grades", "Courses", "iCalendar", "Print"].includes(label);
+    });
+    if (userLink) {
+      userLink.classList.add("docket-max-user-menu");
+    }
+    anchors.filter((anchor) => ["iCalendar", "Print"].includes(anchor.textContent?.trim() ?? "")).forEach((anchor) => anchor.classList.add("docket-max-utility-link"));
     const textControls = Array.from(document.querySelectorAll("input, [role='searchbox'], [role='textbox'], [contenteditable='true'], [aria-label], [placeholder]"));
     const navigateControl = textControls.find(
       (element) => /navigate/i.test([
@@ -2741,32 +3061,83 @@ html[data-docket-max-reskin][data-docket-reduced-motion="true"] * { animation-du
         return rect.width > 500 && rect.height <= 140 && navLinks.every((link) => element.contains(link));
       });
       primaryNav?.classList.add("docket-max-primary-nav");
-      navLinks.forEach((link) => {
-        if (link.textContent?.trim() === "Content") link.classList.add("docket-max-active-nav");
-      });
+      let activeNav;
+      let activeScore = -1;
+      for (const link of navLinks) {
+        const score = maxPathMatchScore(location.pathname, link.href);
+        if (score > activeScore) {
+          activeScore = score;
+          activeNav = link;
+        }
+      }
+      activeNav?.classList.add("docket-max-active-nav");
     }
     const shortcutNames = ["Syllabus", "Notes", "Schedule", "Content", "Grade"];
-    const shortcuts = anchors.filter((anchor) => shortcutNames.includes(anchor.textContent?.trim() ?? ""));
-    const shortcutFirst = shortcuts[0];
-    if (shortcutFirst && shortcuts.length >= shortcutNames.length) {
-      maxAncestors(shortcutFirst).find((element) => {
-        const rect = element.getBoundingClientRect();
-        return rect.top > 180 && rect.width > 700 && rect.height > 16 && rect.height < 90 && shortcuts.every((link) => element.contains(link));
-      })?.classList.add("docket-max-shortcuts");
-    }
+    anchors.find((anchor) => anchor.textContent?.trim() === shortcutNames[0]) && Array.from(document.querySelectorAll("body *")).find((element) => {
+      const labels = Array.from(element.querySelectorAll("a"), (link) => link.textContent?.trim());
+      return labels.length === shortcutNames.length && shortcutNames.every((label, index) => labels[index] === label);
+    })?.classList.add("docket-max-shortcuts");
     const scheduleTable = Array.from(document.querySelectorAll("table")).find((table) => {
       const text = table.textContent ?? "";
       const rect = table.getBoundingClientRect();
       return rect.width > 400 && /Reading|Homework|iClicker/.test(text);
     });
     if (scheduleTable) {
-      Array.from(scheduleTable.querySelectorAll("td *, [role='cell'] *")).forEach((element) => {
-        const rect = element.getBoundingClientRect();
-        const background = getComputedStyle(element).backgroundColor;
-        if (rect.width > 100 && rect.height > 18 && rect.height < 220 && background !== "transparent" && background !== "rgba(0, 0, 0, 0)") {
-          element.classList.add("docket-max-schedule-event");
+      scheduleTable.classList.add("docket-max-schedule-table");
+      for (const row2 of Array.from(scheduleTable.rows)) {
+        setMaxStyle(row2, { height: "1px", "min-height": "0" });
+        for (const cell of Array.from(row2.cells)) {
+          setMaxStyle(cell, { height: "1px", "min-height": "0", padding: "8px 16px" });
         }
-      });
+      }
+      markMaxAncestor(
+        scheduleTable,
+        "docket-max-main-pane",
+        (_candidate, rect) => rect.left > 180 && rect.width > scheduleTable.getBoundingClientRect().width + 80 && rect.height > 400
+      );
+      const eventSurfaces = /* @__PURE__ */ new Map();
+      for (const cell of Array.from(scheduleTable.querySelectorAll("td, [role='cell']"))) {
+        const cellRect = cell.getBoundingClientRect();
+        const isPaintedEvent = (candidate) => {
+          const rect = candidate.getBoundingClientRect();
+          const background = getComputedStyle(candidate).backgroundColor;
+          const fillsCell = rect.width >= cellRect.width - 4 && rect.height >= cellRect.height - 4;
+          return rect.width > 100 && rect.height > 18 && rect.height < 220 && !fillsCell && background !== "transparent" && background !== "rgba(0, 0, 0, 0)" ? background : void 0;
+        };
+        for (const element of Array.from(cell.querySelectorAll("*"))) {
+          const background = isPaintedEvent(element);
+          if (!background) continue;
+          let eventSurface = element;
+          let eventBackground = background;
+          for (let candidate = element.parentElement; candidate && candidate !== cell; candidate = candidate.parentElement) {
+            const candidateBackground = isPaintedEvent(candidate);
+            if (candidateBackground) {
+              eventSurface = candidate;
+              eventBackground = candidateBackground;
+            }
+          }
+          eventSurfaces.set(eventSurface, eventBackground);
+        }
+      }
+      for (const [eventSurface, background] of eventSurfaces) {
+        eventSurface.classList.add("docket-max-schedule-event");
+        eventSurface.style.setProperty("--docket-max-rail", background);
+        setMaxStyle(eventSurface, {
+          display: "block",
+          float: "none",
+          clear: "both",
+          width: "100%",
+          "max-width": "100%",
+          margin: "3px 0",
+          // Reading/Homework labels arrive in a nested text wrapper; iClicker is
+          // direct text. Give the latter the same final text start column.
+          padding: /^iClicker\b/i.test(eventSurface.textContent?.trim() ?? "") ? "6px 10px 6px 30px" : "6px 10px 6px 14px",
+          background: "transparent",
+          "background-color": "transparent",
+          "background-image": "none",
+          "border-left": `4px solid ${background}`
+        });
+      }
     }
     const contentHeading = Array.from(document.querySelectorAll("h1, h2, h3")).find((heading) => heading.textContent?.trim() === "Content");
     if (contentHeading) {
@@ -2775,12 +3146,53 @@ html[data-docket-max-reskin][data-docket-reduced-motion="true"] * { animation-du
         return rect.left < 300 && rect.width < 380 && rect.height > 400;
       })?.classList.add("docket-max-sidebar");
     }
+    const sidebarHeading = Array.from(document.querySelectorAll("h1, h2, h3")).find((heading) => heading.textContent?.trim() === "Home");
+    if (sidebarHeading) {
+      const sidebar = markMaxAncestor(
+        sidebarHeading,
+        "docket-max-sidebar",
+        (_candidate, rect) => rect.left < 320 && rect.width >= 180 && rect.width <= 360 && rect.height > 360
+      );
+      if (sidebar) {
+        setMaxStyle(sidebar, { background: "var(--docket-max-canvas)", "border-right": "1px solid var(--docket-max-border)" });
+        const activeLabel = location.pathname.includes("/schedule") ? "Schedule" : location.pathname.includes("/calendar") ? "Calendar" : "Dashboard";
+        const activeItem = Array.from(sidebar.querySelectorAll("a, button, div")).find((item) => {
+          const rect = item.getBoundingClientRect();
+          return item.textContent?.trim() === activeLabel && rect.width > 120 && rect.height >= 28 && rect.height < 90;
+        });
+        if (activeItem) {
+          activeItem.classList.add("docket-max-sidebar-active");
+          setMaxStyle(activeItem, { background: "var(--docket-max-accent-container)", color: "var(--docket-max-on-accent-container)" });
+        }
+      }
+    }
+    const railAnchor = anchors.find((anchor) => ["Dashboard", "Schedule", "Syllabus"].includes(anchor.textContent?.trim() ?? ""));
+    if (railAnchor) {
+      const sidebar = markMaxAncestor(
+        railAnchor,
+        "docket-max-sidebar",
+        (_candidate, rect) => rect.left < 320 && rect.width >= 180 && rect.width <= 360 && rect.height > 360
+      );
+      const currentRail = Array.from(sidebar?.querySelectorAll("a") ?? []).reduce(
+        (best, link) => maxPathMatchScore(location.pathname, link.href) > maxPathMatchScore(location.pathname, best?.href ?? "") ? link : best,
+        void 0
+      );
+      currentRail?.classList.add("docket-max-sidebar-active");
+    }
     const readingHeading = Array.from(document.querySelectorAll("h1")).find((heading) => heading.textContent?.trim() !== "");
     if (readingHeading) {
       maxAncestors(readingHeading).find((element) => {
         const rect = element.getBoundingClientRect();
         return rect.left >= 200 && rect.width > 1e3 && rect.height > 400;
       })?.classList.add("docket-max-main-pane");
+    }
+    const dashboardHeading = Array.from(document.querySelectorAll("h1, h2, h3")).find((heading) => /^(Upcoming Week|Announcements)$/i.test(heading.textContent?.trim() ?? ""));
+    if (dashboardHeading) {
+      markMaxAncestor(
+        dashboardHeading,
+        "docket-max-main-pane",
+        (_candidate, rect) => rect.left >= 180 && rect.width > 900 && rect.height > 380
+      );
     }
     const contentRows = anchors.filter((anchor) => {
       const path = new URL(anchor.href).pathname;
@@ -2805,8 +3217,11 @@ html[data-docket-max-reskin][data-docket-reduced-motion="true"] * { animation-du
     if (!isMaxHost(location.hostname)) return;
     document.documentElement.setAttribute("data-docket-max-reskin", "true");
     injectMaxStyles();
+    ensureMaxStylesLast();
     applyMaxTheme(loadSettings());
-    requestAnimationFrame(() => requestAnimationFrame(markMaxStructure));
+    const mark = () => markMaxStructure();
+    requestAnimationFrame(() => requestAnimationFrame(mark));
+    observeMutations(document.body, mark);
   }
   function ensureStylesLast() {
     const style = document.getElementById("docket-reskin-styles");
