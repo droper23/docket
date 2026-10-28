@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         LearningSuite Reskin
 // @namespace    https://github.com/droper23/learningsuite-reskin
-// @version      0.4.0
+// @version      0.4.2
 // @description  A visual and interaction layer for BYU LearningSuite and MAX. BYU's own applications stay in control — nothing is replaced.
 // @author       LearningSuite Reskin contributors
 // @match        https://learningsuite.byu.edu/*
@@ -11,8 +11,9 @@
 // @grant        GM_setValue
 // @grant        GM_xmlhttpRequest
 // @connect      max.byu.edu
-// @updateURL    https://raw.githubusercontent.com/droper23/learningsuite-reskin/main/dist/learningsuite-reskin.user.js?v=0.4.0
-// @downloadURL  https://raw.githubusercontent.com/droper23/learningsuite-reskin/main/dist/learningsuite-reskin.user.js?v=0.4.0
+// @connect      *
+// @updateURL    https://raw.githubusercontent.com/droper23/learningsuite-reskin/main/dist/learningsuite-reskin.user.js?v=0.4.2
+// @downloadURL  https://raw.githubusercontent.com/droper23/learningsuite-reskin/main/dist/learningsuite-reskin.user.js?v=0.4.2
 // ==/UserScript==
 
 (() => {
@@ -51,7 +52,7 @@
   var tokens_default = '/**\n * Eleventh-pass design tokens \u2014 a genuine break from the ten prior passes\' translucent\n * Apple-HIG app-chrome (shadow-heavy cards, a blue\u2192purple\u2192pink gradient signature). Sourced\n * from real, fetched apple.com/about.google/Material 3 production values (see\n * PASS11_PLAN.md\'s Phase 4), not memorized impressions: opaque tonal surface steps instead of\n * a translucent overlay, one flat interactive accent instead of a gradient, and\n * container/on-container pairs for status color so contrast is structurally guaranteed rather\n * than computed from a raw hue tint.\n *\n * Dark/light is resolved by src/index.ts, which always sets an explicit\n * data-docket-theme="dark"|"light" on <html> \u2014 never left to a bare `prefers-color-scheme`\n * media query (LearningSuite has its own independent dark-mode toggle, unrelated to the OS\n * setting \u2014 see index.ts\'s applyTheme() doc comment for the confirmed-live failure mode this\n * avoids).\n */\n[data-docket-reskin] {\n  /* Inter first: the previous stack only resolved to real San Francisco on Apple platforms \u2014\n   * on Windows/Android/Linux every keyword missed and text fell through to plain Arial. The\n   * bundled Inter (font-inter.css, base64 data: URI, zero network requests) guarantees the\n   * same well-drawn typeface on every platform/browser. */\n  --docket-font: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;\n  --docket-font-mono: ui-monospace, "SF Mono", Menlo, monospace;\n\n  /* Simplified radius scale \u2014 14px ("md") is the new default for any card/grouped surface,\n   * not the old 20/28px "editorial tile" scale, which read as an oversized novelty next to\n   * real content once the translucent-overlay backgrounds became opaque fills. */\n  --docket-radius-xs: 6px;\n  --docket-radius-sm: 10px;\n  --docket-radius-md: 14px;\n  --docket-radius-lg: 20px; /* sheets/modals only */\n  --docket-radius-pill: 999px;\n\n  /* Motion: role-specific curves/durations, replacing the single cubic-bezier(0.16,1,0.3,1)\n   * used sitewide (13 occurrences pre-pass-11). Both reduced-motion gates below already force\n   * near-zero durations regardless of which curve is used. */\n  --docket-ease-standard: cubic-bezier(0.2, 0, 0, 1);\n  --docket-ease-enter: cubic-bezier(0.05, 0.7, 0.1, 1);\n  --docket-ease-exit: cubic-bezier(0.3, 0, 0.8, 0.15);\n  --docket-dur-fast: 120ms;\n  --docket-dur-medium: 220ms;\n  --docket-dur-slow: 320ms;\n\n  /* Opaque tonal surface steps (Material 3\'s "surface container" model) \u2014 replaces the old\n   * `--docket-bg-elevated` translucent overlay (rgba(0,0,0,0.045) light / rgba(255,255,255,0.08)\n   * dark), which composited to roughly 1.1\u20131.3:1 contrast against real measured page\n   * backgrounds \u2014 barely visible in light mode, mud in dark mode. `--docket-bg-elevated`\n   * itself is kept as an alias (equal to `--docket-surface-1`) so every already-correct,\n   * live-confirmed selector that references it sitewide stays correct without a rename; new\n   * code should reach for `--docket-surface-1/2/3` directly. */\n  --docket-canvas: #ffffff;\n  --docket-surface-1: #f8f9fa; /* grouped-list ground */\n  --docket-surface-2: #f1f3f4; /* card fill / hover state */\n  --docket-surface-3: #e9eaee; /* pressed / selected */\n  --docket-bg-elevated: var(--docket-surface-1);\n  --docket-label: #1f1f1f; /* ~16.5:1 on canvas */\n  --docket-label-secondary: #444746; /* ~9.4:1 on canvas */\n  --docket-label-tertiary: #6c6f70; /* ~5.7:1 \u2014 use sparingly, prefer secondary */\n  --docket-separator: #dadce0;\n  --docket-fill: #eceef0; /* hover fill on transparent-background rows/nav */\n\n  /* Depth now comes from the surface-step difference plus a 1px separator border, not a\n   * shadow \u2014 apple.com\'s own production CSS ships exactly one shadow sitewide, reserved for\n   * photographed product renders, never UI chrome; about.google ships zero. One shadow token\n   * survives, reserved for genuinely floating chrome (dropdown menus, the settings sheet) \u2014\n   * those really do float over arbitrary page content underneath them. `--docket-shadow`/\n   * `--docket-highlight` stay defined (aliased to it) so any selector not yet migrated off\n   * them keeps a reasonable, much lighter appearance instead of a hard error. */\n  --docket-shadow-float: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 8px rgba(0, 0, 0, 0.15);\n  --docket-shadow: var(--docket-shadow-float);\n  --docket-highlight: none;\n\n  /* One flat interactive accent, split into fill/text and container/on-container pairs \u2014\n   * never a gradient. `--docket-blue` is kept as an alias (equal to `--docket-accent`) so\n   * every already-confirmed-live sitewide selector that reaches for it (focus rings, links,\n   * the native "today" marker, radio/checkbox checked states \u2014 ~25 occurrences across\n   * global.css/navigation.css/schedule.css) stays correct with zero behavior change; new code\n   * should reach for `--docket-accent`/`--docket-on-accent` directly. */\n  --docket-accent: #0b57d0;\n  --docket-on-accent: #ffffff;\n  --docket-accent-container: #d2e3fc;\n  --docket-on-accent-container: #174ea6;\n  --docket-blue: var(--docket-accent);\n\n  /* Status roles \u2014 container/on-container pairs, replacing the old badge system\'s same-hue\n   * fill+text construction (a ~16% tint of a raw system color as background, the full-strength\n   * color as text), which independently-computed contrast checks found failing WCAG AA in at\n   * least one theme for every single badge color. */\n  --docket-status-overdue-bg: #fce8e6;\n  --docket-status-overdue-fg: #a50e0e;\n  --docket-status-soon-bg: #fef7e0;\n  /* Darkened from Material 3\'s baseline #b06000 \u2014 that value computes at ~4.34:1 against this\n     background, just under WCAG AA\'s 4.5:1 for normal text (verified live, Sep 2026, via\n     tools/cdp.mjs against the real rendered badges). #9c5500 clears it at ~5.3:1. */\n  --docket-status-soon-fg: #9c5500;\n  --docket-status-upcoming-bg: #e8f0fe;\n  --docket-status-upcoming-fg: #174ea6;\n  --docket-status-done-bg: #e6f4ea;\n  --docket-status-done-fg: #0d652d;\n  --docket-status-neutral-bg: #f1f3f4;\n  --docket-status-neutral-fg: #3c4043;\n  /* Two intermediate due-urgency bands, sitting between "soon" (due today, the strongest\n     non-overdue color) and "neutral" (a week+ away) \u2014 same warm hue family as "soon", stepped\n     down in saturation rather than shifted to a different hue, so the ladder reads as one\n     continuous gradient of urgency rather than an arbitrary color swap. Contrast verified\n     >=4.5:1 (WCAG AA) the same way soon-fg\'s own comment documents. */\n  --docket-status-tomorrow-bg: #fbf1de;\n  --docket-status-tomorrow-fg: #8a6019; /* ~4.97:1 on tomorrow-bg */\n  --docket-status-week-bg: #f6f3ea;\n  --docket-status-week-fg: #6e6650; /* ~5.14:1 on week-bg */\n\n  /* Raw system hue \u2014 reserved for the checkbox-done fill; never for status/grade badge text,\n   * which uses the container/on-container pairs above instead. The native instructor-view\n   * banner (global.css\'s .bg-attention rule) reuses --docket-status-soon-bg/fg rather than a\n   * dedicated color of its own \u2014 see that rule\'s own comment. */\n  --docket-green: #146c2e;\n\n  color-scheme: light dark;\n}\n\n[data-docket-reskin][data-docket-theme="dark"] {\n  --docket-canvas: #131314;\n  --docket-surface-1: #1b1b1c;\n  --docket-surface-2: #1f1f20;\n  --docket-surface-3: #2a2a2c;\n  --docket-bg-elevated: var(--docket-surface-1);\n  --docket-label: #e3e3e3; /* ~14.5:1 on canvas */\n  --docket-label-secondary: #c4c7c5; /* ~10.9:1 on canvas */\n  --docket-label-tertiary: #9a9d9c; /* ~6:1 */\n  --docket-separator: #444746;\n  --docket-fill: #2a2a2c;\n\n  --docket-shadow-float: 0 1px 3px rgba(0, 0, 0, 0.5), 0 4px 8px rgba(0, 0, 0, 0.3);\n  --docket-shadow: var(--docket-shadow-float);\n  --docket-highlight: none;\n\n  /* Dark mode\'s accent is a light blue, so its own-accent text must be DARK, not a naive\n   * "always white" \u2014 white-on-light-blue fails contrast. */\n  --docket-accent: #a8c7fa;\n  --docket-on-accent: #062e6f;\n  --docket-accent-container: #0e2a4d;\n  --docket-on-accent-container: #aecbfa;\n  --docket-blue: var(--docket-accent);\n\n  /* Richer, mid-tone filled pills (bg lightness raised, fg pulled toward a soft cream/tint\n     instead of a bright saturated pastel) \u2014 replaces the earlier near-black-container +\n     bright-pastel-text pairing, which read as flat and washed out next to a mockup reference\n     showing solid, book-tab-colored badges. Every pair still clears WCAG AA (>=4.5:1 \u2014 verified\n     via the same relative-luminance formula prior passes used; each is currently 5.1\u20137:1). */\n  --docket-status-overdue-bg: #6b3a34;\n  --docket-status-overdue-fg: #f6cec6;\n  --docket-status-soon-bg: #6f5a32;\n  --docket-status-soon-fg: #f7e3ba;\n  --docket-status-upcoming-bg: #3a4f6e;\n  --docket-status-upcoming-fg: #c9daf2;\n  --docket-status-done-bg: #4c6350;\n  --docket-status-done-fg: #d7e8d3;\n  --docket-status-neutral-bg: #44454a;\n  --docket-status-neutral-fg: #dcdde0;\n  --docket-status-tomorrow-bg: #5c4a29;\n  --docket-status-tomorrow-fg: #ecd8a8; /* ~6.06:1 on tomorrow-bg */\n  --docket-status-week-bg: #4a4530;\n  --docket-status-week-fg: #d9d0ac; /* ~6.21:1 on week-bg */\n\n  --docket-green: #30d158;\n}\n\n/* Background tint overrides (Settings > Background) \u2014 same six curated choices in both\n   themes, kept close to the theme\'s own canvas so label text stays readable on every one. */\n[data-docket-reskin][data-docket-theme="dark"][data-docket-background="graphite"] { --docket-canvas: #000000; }\n[data-docket-reskin][data-docket-theme="dark"][data-docket-background="blue"] { --docket-canvas: #0b1220; }\n[data-docket-reskin][data-docket-theme="dark"][data-docket-background="purple"] { --docket-canvas: #150b20; }\n[data-docket-reskin][data-docket-theme="dark"][data-docket-background="rose"] { --docket-canvas: #1c0a10; }\n[data-docket-reskin][data-docket-theme="dark"][data-docket-background="sand"] { --docket-canvas: #16120a; }\n\n[data-docket-reskin][data-docket-theme="light"][data-docket-background="graphite"] { --docket-canvas: #e8e8ed; }\n[data-docket-reskin][data-docket-theme="light"][data-docket-background="blue"] { --docket-canvas: #e4edf8; }\n[data-docket-reskin][data-docket-theme="light"][data-docket-background="purple"] { --docket-canvas: #eee7f8; }\n[data-docket-reskin][data-docket-theme="light"][data-docket-background="rose"] { --docket-canvas: #f8e7ea; }\n[data-docket-reskin][data-docket-theme="light"][data-docket-background="sand"] { --docket-canvas: #f7f1e5; }\n\n@media (prefers-reduced-motion: reduce) {\n  .docket-scope * {\n    transition-duration: 0.001ms !important;\n    animation-duration: 0.001ms !important;\n  }\n}\n/**\n * The explicit user-facing "Reduce Motion" switch in Settings (settings.ts\'s\n * `reducedMotion`, threaded onto <html> as this attribute by\n * src/index.ts\'s runAdapters()) \u2014 distinct from the OS-level media query above, which\n * only reflects the system setting, not this reskin\'s own control. Both apply; either one\n * suppresses motion.\n */\n[data-docket-reskin][data-docket-reduced-motion="true"] .docket-scope * {\n  transition-duration: 0.001ms !important;\n  animation-duration: 0.001ms !important;\n}\n';
 
   // src/styles/global.css
-  var global_default = "/**\n * Sitewide overrides applied directly to LearningSuite's OWN existing\n * markup and utility classes \u2014 not just the isolated widgets the adapters\n * insert. Confirmed live (Sep 2026) that a reskin touching only specific\n * inserted components reads as a patchwork (native chrome right next to\n * redesigned islands) rather than \"the whole page redesigned,\" which is\n * the actual goal here. Every selector below targets a real, observed\n * LearningSuite class name (its own Tailwind-esque design-system classes:\n * bg-left-nav, bg-header, bg-top-nav, text-primary, .goBtn, etc.) \u2014 never a\n * bare `*`/tag-only rule that could hit something unintended (spec \xA739).\n * `!important` is used deliberately throughout: these utility classes are\n * how LearningSuite itself sets color, so anything less specific loses.\n *\n * Deliberately NOT touched: bare `<button>` (LearningSuite reuses it for\n * dropdown triggers with no background styling \u2014 turning every one of\n * those into a filled pill would break the account/term-switcher menus,\n * not just improve buttons that actually look like buttons) and bare\n * `.bg-base` (reused both for header/panel chrome AND for highlighted\n * table rows \u2014 see adapters/assignmentsAdapter.ts's own selector \u2014 so a\n * blanket override risks erasing a real visual signal elsewhere).\n */\n\n/* Ready-gate: hides real content for one frame rather than showing unstyled/un-hidden native\n   markup before an adapter has had a chance to run \u2014 `data-docket-ready` is set by\n   runAdapters() once theme/background are applied and any matching adapter has mounted (see\n   index.ts), with a ~400ms failsafe in earlyInject() so a page with no matching adapter is\n   never left permanently hidden. Deliberately narrow (`main` only, not the whole page) so the\n   masthead/nav are never hidden even during the gated window. */\nhtml[data-docket-reskin]:not([data-docket-ready]) main {\n  visibility: hidden;\n}\n\n/* Canvas: one consistent background across chrome that used to be several\n   slightly-different native grays. Body's background alone already reaches\n   the main content area (confirmed live: <main> itself has no background\n   of its own, it's transparent over body). `.bg-left-nav` is scoped with\n   `:not(.docket-nav-enhanced)` rather than excluded outright: the real\n   `<nav>` element (which gets `.docket-nav-enhanced` once mounted \u2014 see\n   restyleNav() in adapters/shell.ts) carries `.bg-left-nav` too and needs to\n   stay excluded so it keeps its own dedicated translucent sidebar-material\n   treatment in navigation.css instead of flattening to a plain canvas fill \u2014\n   but confirmed live (Sep 2026) that same class ALSO lands on a plain\n   sibling wrapper div (`<div class=\"bg-left-nav flex flex-col\">`) around\n   that nav, which a blanket exclusion let fall through to native fill: a\n   visible warm tan cast in light mode (rgb(230,219,206) vs. canvas\n   rgb(242,242,247)). The :not() lets that wrapper (and any other\n   `.bg-left-nav` element) take the flat canvas fill while the mounted nav\n   itself stays excluded. */\nhtml[data-docket-reskin],\n[data-docket-reskin] body,\n[data-docket-reskin] header,\n[data-docket-reskin] .bg-top-nav,\n[data-docket-reskin] .bg-header,\n[data-docket-reskin] .bg-left-nav:not(.docket-nav-enhanced) {\n  background-color: var(--docket-canvas) !important;\n}\n[data-docket-reskin] body {\n  font-family: var(--docket-font) !important;\n  color: var(--docket-label) !important;\n  line-height: 1.5;\n  -webkit-font-smoothing: antialiased;\n}\n[data-docket-reskin] ::selection {\n  background-color: var(--docket-accent);\n  color: var(--docket-on-accent);\n}\n\n/**\n * Confirmed live (Sep 2026, both themes): each sidebar row (Dashboard/\n * Announcements/Assignments/...) is wrapped in its own `<div class=\"navItem\n * ... bg-primary lg:bg-base ...\">`, one level inside the `<nav>`\n * restyleNav() enhances. That native fill (rgb(36,36,36) in dark mode,\n * rgb(255,255,255) in light \u2014 the SAME shade `.bg-base` gives the header,\n * distinct from the nav's own `.bg-left-nav` shade) painted every row as a\n * separate mismatched solid box floating inside the translucent sidebar\n * material below, instead of one continuous grouped list. Cleared so the\n * nav's own unified background (`.docket-nav-enhanced`) is the only fill\n * visible \u2014 matching Apple's own grouped lists, where individual rows carry\n * no background of their own, only hover/active state does (see\n * `.docket-nav-item:hover`/`.docket-nav-item-active` in navigation.css). */\n[data-docket-reskin] nav .navItem {\n  background-color: transparent !important;\n}\n\n/* The top-level section wrapper carries Tailwind's literal responsive class\n   `lg:bg-left-nav`, which is distinct from `.bg-left-nav` and otherwise keeps\n   the whole sidebar list inside one gray panel. */\n[data-docket-reskin] nav.docket-nav-enhanced > .bg-base.lg\\:bg-left-nav,\n[data-docket-reskin] nav.docket-nav-enhanced .navItem,\n[data-docket-reskin] nav.docket-nav-enhanced .sideNavList {\n  background-color: transparent !important;\n  border-color: transparent !important;\n}\n\n/* Typography: LearningSuite's own headings carry no color utility class (its base\n   stylesheet sets a default) \u2014 reset to the Apple type scale/color directly. Explicit\n   sizes/tracking added on top of font-family/weight (Sep 2026 pass): native heading sizes\n   varied 24-28px page-to-page with no consistent hierarchy \u2014 Apple's own type scale is a\n   controlled ladder, not \"whatever the page happened to set\". */\n[data-docket-reskin] h1,\n[data-docket-reskin] h2,\n[data-docket-reskin] h3 {\n  font-family: var(--docket-font) !important;\n  /* Weight capped at 600, matching .docket-title-1/-2's own scale \u2014 both real references\n     (apple.com, about.google) cap headline weight at 600; 800-weight, tightly-tracked\n     headlines belong to neither. Applies to pages that still render a plain native heading\n     (Announcements, Class Info, etc., with no dedicated adapter) so they match the\n     adapter-rendered pages' hierarchy instead of reading as an older design generation. */\n  font-weight: 600 !important;\n  color: var(--docket-label) !important;\n}\n[data-docket-reskin] h1 { font-size: 26px !important; letter-spacing: -0.015em; }\n[data-docket-reskin] h2 { font-size: 20px !important; letter-spacing: -0.01em; }\n[data-docket-reskin] h3 { font-size: 17px !important; letter-spacing: -0.005em; }\n\n/**\n * Instructor-authored rich text (a Content page's file list, syllabus body text, etc.)\n * confirmed live to render inside `class=\"default-list default-table instructorText\n * font-nunito\"`. Scoped to the confirmed compound class, not a bare `.font-nunito`, since\n * only that combination was ever actually observed.\n *\n * Instructor WYSIWYG content frequently carries inline black text intended for LearningSuite's\n * light native canvas. Override that text on the reskin canvas, including descendant inline\n * styles, without giving every note an opaque white box.\n */\n[data-docket-reskin] .instructorText.font-nunito {\n  font-family: var(--docket-font) !important;\n  background-color: transparent !important;\n  color: var(--docket-label) !important;\n  border: 0;\n  border-radius: 0;\n  padding: 0;\n}\n\n[data-docket-reskin] .instructorText.font-nunito :is(p, span, div, li, td, th) {\n  color: var(--docket-label) !important;\n}\n\n/**\n * The same compound class, confirmed live (Sep 2026 comparison pass) to ALSO render inside\n * a course Dashboard's per-day schedule cells \u2014 an instructor's own lesson-topic bullets for\n * that day, wrapped in `p.text-sm` (confirmed: `p.mb-2.text-sm.break-words > .instructorText\n * .font-nunito`; the whole-page version above is never nested in `.text-sm`). The full inset\n * A compact native-flow note keeps dashboard rows readable without a separate card treatment.\n */\n/**\n * Keep the note in normal flow so long text wraps naturally with its schedule entry.\n */\n[data-docket-reskin] .text-sm .instructorText.font-nunito {\n  display: block;\n}\n\n/**\n * LearningSuite's own branded font class, `Metropolis`. An earlier census (Grades page\n * only) found just 4 sitewide elements carrying it \u2014 all already covered \u2014 so this rule\n * was deliberately absent. The Sep 2026 pass re-ran the census on Combined Schedule and\n * found 76 elements rendering Metropolis despite the `body` remap above: a class rule\n * always beats an *inherited* font, so every element carrying `.font-metro` directly kept\n * the native font no matter what `body` says. 75 of the 76 were already covered (`body`\n * itself + 74 `.bg-action` buttons); the one real gap was LearningSuite's\n * `button.bg-primary-dark` action buttons (the schedule page's \"+ Item\", the Preferences\n * dialog's \"Save\"). Rather than whack-a-mole, the class itself is remapped \u2014 it is\n * LearningSuite's own semantic \"this is branded UI text\" signal, confirmed identical in\n * class-string on both themes, and a blanket font remap cannot change layout behavior the\n * way a color/background remap could.\n */\n[data-docket-reskin] .font-metro {\n  font-family: var(--docket-font) !important;\n}\n\n/**\n * LearningSuite's own text-color utility classes \u2014 split into a static-by-default tier\n * and a genuinely-interactive tier (Sep 2026 fix; previously one blanket blue rule).\n * Confirmed live these classes wrap entire static panels natively, not just links/actions:\n * Preferences' plain field labels, a Grade Scale `<table>`'s every cell, empty-state\n * strings (\"No Announcements\") \u2014 none of that is tappable, so tinting all of it violated\n * Apple's own rule that tint color means \"this is interactive.\" Meanwhile the assignment\n * name inside each `.bg-base.text-highlight` row (see the grouped-list-row rule further\n * down) is a plain `<div class=\"clicky ...\">` \u2014 genuinely clickable (it's the row's real\n * navigation target) but carries none of these classes itself, so it kept LearningSuite's\n * own separate, un-remapped native blue instead of either tier. Default first, so a plain\n * `<div>`/`<td>` carrying one of these classes gets the neutral label color unless a real\n * interactive tag/class overrides it below (tag-qualified selectors are more specific than\n * the bare-class default, so this doesn't depend on source order). */\n[data-docket-reskin] .text-primary,\n[data-docket-reskin] .text-primary-alt,\n[data-docket-reskin] .text-action,\n[data-docket-reskin] .text-highlight {\n  color: var(--docket-label) !important;\n}\n[data-docket-reskin] a.text-primary,\n[data-docket-reskin] a.text-primary-alt,\n[data-docket-reskin] a.text-action,\n[data-docket-reskin] a.text-highlight,\n[data-docket-reskin] button.text-primary,\n[data-docket-reskin] .clicky {\n  color: var(--docket-blue) !important;\n}\n[data-docket-reskin] .text-info {\n  color: var(--docket-label-secondary) !important;\n}\n\n/* Native \"today\" marker on the course-scoped Schedule mini-calendar \u2014 confirmed live as\n   `div.bg-primary.hover:border-primary-alt` with hardcoded near-black text, a third,\n   un-remapped native blue (rgb(115,175,211)) distinct from both the app's own accent and\n   the tokens above. Apple Calendar's own \"today\" treatment is a solid tinted marker with\n   white text \u2014 matched directly rather than folding into the text-color rules above, since\n   this is a background utility, not a text one. Confirmed only on this one calendar widget\n   this pass; re-audit before assuming `.bg-primary` is safe to remap elsewhere. */\n[data-docket-reskin] .bg-primary {\n  background-color: var(--docket-accent) !important;\n  /* NOT hardcoded white \u2014 dark mode's accent is a light blue (see tokens.css), so its\n     on-accent text must be dark or this fails contrast badly in that theme. */\n  color: var(--docket-on-accent) !important;\n}\n\n/* Section/category header bars (e.g. a grade category's \"20% of grade\" strip) \u2014\n   give them the same subtle grouped-list-header treatment as everything else,\n   instead of leaving LearningSuite's own solid accent-color bar. */\n[data-docket-reskin] .bg-accent,\n[data-docket-reskin] .bg-gray1 {\n  background-color: var(--docket-fill) !important;\n  color: var(--docket-label) !important;\n}\n\n/* Real action buttons (submit/upload/etc.), the course-list \"Go\" button, and\n   LearningSuite's own `bg-primary-dark` action buttons (confirmed live Sep 2026: the\n   schedule page's \"+ Item\" and the Preferences dialog's \"Save\", both bare <button>s\n   with `hover:bg-primary-alt`). Scoped to the bare-button form deliberately: the same\n   live census found `.bg-primary-dark` ALSO fills the active top tab\n   (`a.bg-primary-dark.bg-top-nav-highlight`, owned by .docket-top-tabs' underline\n   treatment in navigation.css) and the Preferences dialog's accordion headers (a <div>,\n   styled with the modal chrome below) \u2014 a blanket class rule would have fought both.\n   Never bare `button` for dropdown triggers \u2014 see the file comment.\n   Full pill radius: apple.com/about.google's own primary CTAs are consistently full pills,\n   and unlike a card or row, a single free-floating action button reads as more confidently\n   \"designed\" at a full pill than at the small-radius-rectangle scale meant for surfaces\n   containing other content. Flat single-color fill, never a gradient \u2014 neither real\n   reference uses one anywhere in its shipped CSS. */\n[data-docket-reskin] .goBtn,\n[data-docket-reskin] .bg-action,\n[data-docket-reskin] button.bg-primary-dark {\n  font-family: var(--docket-font) !important;\n  border-radius: var(--docket-radius-pill) !important;\n  background-color: var(--docket-accent) !important;\n  color: var(--docket-on-accent) !important;\n  border: none !important;\n  font-weight: 600 !important;\n}\n[data-docket-reskin] .goBtn:hover,\n[data-docket-reskin] .bg-action:hover,\n[data-docket-reskin] button.bg-primary-dark:hover {\n  filter: brightness(1.12);\n}\n/* No selector here previously defined a keyboard-focus ring at all (only :hover) \u2014 added\n   directly next to the rule that owns each selector, never a separate blanket `*` rule. */\n[data-docket-reskin] .goBtn:focus-visible,\n[data-docket-reskin] .bg-action:focus-visible,\n[data-docket-reskin] button.bg-primary-dark:focus-visible {\n  outline: 2px solid var(--docket-accent);\n  outline-offset: 2px;\n}\n\n/* Hairline dividers, softened to the Apple separator token instead of LearningSuite's\n   own higher-contrast gray borders. `.border-light` (confirmed live on each sidebar\n   `.navItem` row, rgb(109,108,109) natively \u2014 a much harder line than Apple's own\n   near-invisible hairlines) needs the same treatment as the `border-gray*` family.\n   `.border-info` (confirmed live: the course/term-switcher dropdown's own list border,\n   2 instances sitewide) and bare `.border` (confirmed live on e.g. the \"Course Homework\n   ID\" disclosure row \u2014 a plain gray in every sample checked, not a colored outline riding\n   on `currentColor`) join the same group; `.border` is the least-certain of the four here,\n   worth re-checking if a stray colored outline ever turns up gray after this ships. */\n[data-docket-reskin] [class*=\"border-gray\"],\n[data-docket-reskin] .border-light,\n[data-docket-reskin] .border-info,\n[data-docket-reskin] .border {\n  border-color: var(--docket-separator) !important;\n}\n\n/* Native instructor-view banner (confirmed live: `section.bg-attention`, a solid saturated\n   yellow rgb(255,243,130) sitting directly under the header on every page for an account\n   with instructor access). A later pass (shell.ts's mountStudentViewBadge()) relocates this\n   banner's one real action \u2014 the \"back to instructor view\" link \u2014 to a small icon on the\n   settings fabBar and hides the banner itself via navigation.css's `.docket-banner-relocated`\n   rule, since a rarely-used action doesn't need to permanently occupy a full-width strip of\n   chrome. This rule now only matters as the FALLBACK: if that relocation ever fails to find\n   the banner or its real link (fails soft, by design), the banner stays visible and still\n   needs to be legible rather than left in native's harsh yellow \u2014 reusing the status-badge\n   system's `soon` container/on-container pair (see tokens.css) for the same contrast-checked,\n   opaque, theme-correct treatment every due-soon badge gets, instead of a one-off color. */\n[data-docket-reskin] .bg-attention {\n  background-color: var(--docket-status-soon-bg) !important;\n  color: var(--docket-status-soon-fg) !important;\n  border-color: transparent !important;\n}\n[data-docket-reskin] .bg-attention a {\n  color: var(--docket-status-soon-fg) !important;\n  text-decoration: underline;\n}\n\n/* Native `<table>` (e.g. Grade Scale) gets zero elevation/structure by default \u2014 raw grid\n   borders, 0 radius, sitting one tab away from the Assignments view's proper card-row\n   treatment above. Confirmed live (Sep 2026) across Grade Scale, What-If Calculator,\n   Content, Syllabus, Announcements, Email, Schedule, and Groups that the only `<table>`\n   elements sitewide are genuine tabular data (Grade Scale's grade/percent pairs) \u2014 no\n   layout-purposed table turned up, so a bare tag selector is safe here the way it isn't for\n   `<button>`/`<select>` (see the file comment at the top). Re-audit before assuming this\n   holds if a new page type is ever added to the adapter set. */\n[data-docket-reskin] table {\n  border-collapse: separate;\n  border-spacing: 0;\n  border-radius: var(--docket-radius-md);\n  overflow: hidden;\n  border: 1px solid var(--docket-separator);\n  background-color: var(--docket-surface-1);\n}\n[data-docket-reskin] table td,\n[data-docket-reskin] table th {\n  border-color: var(--docket-separator) !important;\n}\n\n/**\n * The course Dashboard's per-day schedule (Sep 2026 comparison pass) \u2014 confirmed live this\n * is the single most-visited page never given a real adapter: each day is a plain\n * `div.mb-2 > div.bg-gray1.text-primary-alt.text-md.font-normal.px-4.py-2` (the date bar;\n * `.text-primary-alt` + no `.cursor-pointer` distinguishes it from the Combined Schedule\n * page's OWN `.bg-gray1.px-4.py-2` week header, which carries `.text-primary.cursor-pointer`\n * instead and stays scoped to `[data-docket-page=\"schedule\"]` in schedule.css \u2014 confirmed\n * live these two never collide, `.bg-gray1.text-primary-alt` returns 0 matches on every other\n * censused page) followed immediately by `div.pl-mobile` (the day's own item list; `.pl-mobile`\n * itself is a generic sitewide utility reused everywhere, so it's targeted only via the\n * adjacent-sibling combinator below, never bare). Already gets the sitewide tinted-fill color\n * from the `.bg-gray1` rule above; this adds the same day-header-plus-card shape Combined\n * Schedule's dedicated adapter already gives the identical data one level up.\n */\n[data-docket-reskin] .bg-gray1.text-primary-alt.px-4.py-2 {\n  border-radius: var(--docket-radius-sm) var(--docket-radius-sm) 0 0 !important;\n  border: 1px solid var(--docket-separator);\n  border-bottom: none;\n  font-family: var(--docket-font) !important;\n  font-weight: 600 !important;\n}\n[data-docket-reskin] .bg-gray1.text-primary-alt.px-4.py-2 + .pl-mobile {\n  background-color: var(--docket-surface-1);\n  border: 1px solid var(--docket-separator);\n  border-top: none;\n  border-radius: 0 0 var(--docket-radius-sm) var(--docket-radius-sm);\n  padding: 10px 16px 14px;\n  margin-bottom: 10px;\n}\n\n/**\n * Grade Summary (Sep 2026 comparison pass) \u2014 confirmed live the whole page is one CSS grid,\n * `div.grid.gridColsStyle` (zero `<table>` elements, so the sitewide `table` rule above never\n * reaches it; confirmed unique to this page, 0 matches on Dashboard/Course List/Schedule/\n * Announcements/course Schedule censused this pass), so it got zero elevation/structure \u2014\n * flat text sitting directly on canvas next to the Course List's own proper card treatment.\n * Wrapped as one elevated card, matching every other data surface in the redesign; each\n * course's percentage (native `div.text-lg.font-bold.clicky`, already tinted blue by the\n * text-tint tier above) becomes a pill badge instead of bare bold text, matching this\n * reskin's own `.docket-badge` idiom elsewhere.\n */\n[data-docket-reskin] .gridColsStyle {\n  background-color: var(--docket-surface-1);\n  border: 1px solid var(--docket-separator);\n  border-radius: var(--docket-radius-md) !important;\n  padding: 8px 16px;\n  overflow: hidden;\n}\n[data-docket-reskin] .gridColsStyle .clicky {\n  display: inline-flex;\n  padding: 3px 12px;\n  border-radius: var(--docket-radius-pill);\n  background-color: var(--docket-accent-container);\n  color: var(--docket-on-accent-container) !important;\n}\n\n/**\n * Grouped-list-row polish for LearningSuite's own real highlighted table rows \u2014 confirmed\n * live this exact compound class (never bare `.bg-base`, which stays untouched per the file\n * comment above) renders identically on the native Assignments-page fallback table AND the\n * Grades page's default sub-view (see pageDetector.ts's looksLikeAssignmentsPage() for why\n * those two pages needed to be told apart at all), so this benefits both native tables at\n * once with no new adapter. The row itself is a plain `<div>` (confirmed live it's neither\n * an `<a>` nor `.clicky`, so it renders in the neutral label color via the text-tint tier\n * above \u2014 only the row's inner `.clicky` assignment-name div is genuinely interactive and\n * gets tinted); this rule adds the rounded/hover-fill treatment the rest of the redesign\n * already uses everywhere else, so a raw native table reads as the same grouped list\n * instead of a flat one.\n */\n[data-docket-reskin] .bg-base.text-highlight {\n  border-radius: var(--docket-radius-sm) !important;\n  transition: background-color var(--docket-dur-fast) var(--docket-ease-standard);\n}\n[data-docket-reskin] .bg-base.text-highlight:hover {\n  background-color: var(--docket-fill) !important;\n}\n\n/**\n * LearningSuite's shared modal chrome \u2014 confirmed live (Sep 2026, dark theme, reskin\n * un-injected) hosting the Preferences dialog: a full-screen scrim `div.popupWrapper\n * .bg-blur` (native fill rgba(75,75,75,0.7) \u2014 note the class is NAMED \"bg-blur\" but its\n * computed backdrop-filter is `none`; the blur has to come from us) wrapping the sheet\n * `div.minMax.bg-base.height-Lg.overflow-hidden` (solid rgb(36,36,36), 0px radius, no\n * shadow). Scoped to the wrapper descendant so `.minMax` is never styled outside a modal\n * context (it has only ever been observed inside one, but the wrapper is the actual\n * shared component), and never via bare `.bg-base` \u2014 the file comment at the top explains\n * why that class stays untouched. The sheet itself gets the canvas token, not a\n * translucent material: a modal sheet floats over a dimmed, blurred page, and Apple's\n * own sheets are opaque surfaces whose depth cue is the shadow, not see-through glass\n * (translucent materials here would let the dimmed page bleed through the text).\n * `overflow-hidden` (part of the confirmed class string) clips children to the rounding.\n */\n[data-docket-reskin] .popupWrapper {\n  background-color: rgba(0, 0, 0, 0.35) !important;\n  backdrop-filter: saturate(180%) blur(20px);\n  -webkit-backdrop-filter: saturate(180%) blur(20px);\n}\n[data-docket-reskin] .popupWrapper .minMax {\n  border-radius: var(--docket-radius-lg) !important;\n  background-color: var(--docket-canvas) !important;\n  box-shadow: var(--docket-shadow-float);\n}\n/* The Preferences dialog's accordion section headers (\"General\", etc.) are confirmed\n   live to be `div.text-white.bg-primary-dark.px-4.py-2.cursor-pointer` \u2014 the same\n   native-accent-filled bar treatment `.bg-accent`/`.bg-gray1` already get above, and\n   deliberately the same: grouped-list section headers, not action buttons (which is why\n   the button rule above scopes itself to `button.bg-primary-dark`). Scoped to inside the\n   wrapper: if LearningSuite ever uses this pattern for page-level section headers\n   elsewhere, re-audit before extending the selector. */\n[data-docket-reskin] .popupWrapper div.bg-primary-dark {\n  background-color: var(--docket-fill) !important;\n  color: var(--docket-label) !important;\n}\n\n/* Preferences dialog's Cancel button \u2014 confirmed live class\n   `button.bg-base.border-info.text-info.font-metro` inside `.popupWrapper` (text/border\n   color and font already come free from the `.text-info`/`.border-info`/`.font-metro`\n   rules elsewhere in this file \u2014 only shape/fill were still fully native: 0 radius, solid\n   `.bg-base` gray, the same treatment the file comment at the top deliberately leaves\n   untouched sitewide). Sitting next to Save's full pill, that read as two different button\n   languages in one sheet \u2014 Apple's own sheets never vary corner radius/shape between\n   actions, only fill weight. Scoped to inside the dialog specifically (never bare\n   `.bg-base`), matching the accordion-header exception pattern just above. A \"Reset\"\n   control mentioned in an earlier review pass could not be reproduced live this session\n   (checked the General/Communication/Email accordion tabs) \u2014 not styled here; re-check if\n   one turns up on a tab not covered this pass. */\n[data-docket-reskin] .popupWrapper button.bg-base {\n  border-radius: var(--docket-radius-sm) !important;\n  background-color: var(--docket-fill) !important;\n}\n[data-docket-reskin] .popupWrapper button.bg-base:hover {\n  background-color: var(--docket-separator) !important;\n}\n\n/* `<iframe>` (e.g. Library Resources, confirmed live to embed `apps.lib.byu.edu` \u2014\n   cross-origin, no `@match`/`@grant` reaches inside it, and this pass isn't adding a second\n   match block for an unaudited third-party origin's markup). The interior stays fully\n   native; framing it from this side at least keeps the boundary consistent with every\n   other elevated surface instead of a stark unstyled rectangle. Confirmed live no other\n   `<iframe>` use needs different treatment this pass. */\n[data-docket-reskin] iframe {\n  border-radius: var(--docket-radius-md);\n  overflow: hidden;\n  border: 1px solid var(--docket-separator);\n}\n";
+  var global_default = "/**\n * Sitewide overrides applied directly to LearningSuite's OWN existing\n * markup and utility classes \u2014 not just the isolated widgets the adapters\n * insert. Confirmed live (Sep 2026) that a reskin touching only specific\n * inserted components reads as a patchwork (native chrome right next to\n * redesigned islands) rather than \"the whole page redesigned,\" which is\n * the actual goal here. Every selector below targets a real, observed\n * LearningSuite class name (its own Tailwind-esque design-system classes:\n * bg-left-nav, bg-header, bg-top-nav, text-primary, .goBtn, etc.) \u2014 never a\n * bare `*`/tag-only rule that could hit something unintended (spec \xA739).\n * `!important` is used deliberately throughout: these utility classes are\n * how LearningSuite itself sets color, so anything less specific loses.\n *\n * Deliberately NOT touched: bare `<button>` (LearningSuite reuses it for\n * dropdown triggers with no background styling \u2014 turning every one of\n * those into a filled pill would break the account/term-switcher menus,\n * not just improve buttons that actually look like buttons) and bare\n * `.bg-base` (reused both for header/panel chrome AND for highlighted\n * table rows \u2014 see adapters/assignmentsAdapter.ts's own selector \u2014 so a\n * blanket override risks erasing a real visual signal elsewhere).\n */\n\n/* Ready-gate: hides real content for one frame rather than showing unstyled/un-hidden native\n   markup before an adapter has had a chance to run \u2014 `data-docket-ready` is set by\n   runAdapters() once theme/background are applied and any matching adapter has mounted (see\n   index.ts), with a ~400ms failsafe in earlyInject() so a page with no matching adapter is\n   never left permanently hidden. Deliberately narrow (`main` only, not the whole page) so the\n   masthead/nav are never hidden even during the gated window. */\nhtml[data-docket-reskin]:not([data-docket-ready]) main {\n  visibility: hidden;\n}\n\n/* Canvas: one consistent background across chrome that used to be several\n   slightly-different native grays. Body's background alone already reaches\n   the main content area (confirmed live: <main> itself has no background\n   of its own, it's transparent over body). `.bg-left-nav` is scoped with\n   `:not(.docket-nav-enhanced)` rather than excluded outright: the real\n   `<nav>` element (which gets `.docket-nav-enhanced` once mounted \u2014 see\n   restyleNav() in adapters/shell.ts) carries `.bg-left-nav` too and needs to\n   stay excluded so it keeps its own dedicated translucent sidebar-material\n   treatment in navigation.css instead of flattening to a plain canvas fill \u2014\n   but confirmed live (Sep 2026) that same class ALSO lands on a plain\n   sibling wrapper div (`<div class=\"bg-left-nav flex flex-col\">`) around\n   that nav, which a blanket exclusion let fall through to native fill: a\n   visible warm tan cast in light mode (rgb(230,219,206) vs. canvas\n   rgb(242,242,247)). The :not() lets that wrapper (and any other\n   `.bg-left-nav` element) take the flat canvas fill while the mounted nav\n   itself stays excluded. */\nhtml[data-docket-reskin],\n[data-docket-reskin] body,\n[data-docket-reskin] header,\n[data-docket-reskin] .bg-top-nav,\n[data-docket-reskin] .bg-header,\n[data-docket-reskin] .bg-left-nav:not(.docket-nav-enhanced) {\n  background-color: var(--docket-canvas) !important;\n}\n[data-docket-reskin] body {\n  font-family: var(--docket-font) !important;\n  color: var(--docket-label) !important;\n  line-height: 1.5;\n  -webkit-font-smoothing: antialiased;\n}\n[data-docket-reskin] ::selection {\n  background-color: var(--docket-accent);\n  color: var(--docket-on-accent);\n}\n\n/**\n * Confirmed live (Sep 2026, both themes): each sidebar row (Dashboard/\n * Announcements/Assignments/...) is wrapped in its own `<div class=\"navItem\n * ... bg-primary lg:bg-base ...\">`, one level inside the `<nav>`\n * restyleNav() enhances. That native fill (rgb(36,36,36) in dark mode,\n * rgb(255,255,255) in light \u2014 the SAME shade `.bg-base` gives the header,\n * distinct from the nav's own `.bg-left-nav` shade) painted every row as a\n * separate mismatched solid box floating inside the translucent sidebar\n * material below, instead of one continuous grouped list. Cleared so the\n * nav's own unified background (`.docket-nav-enhanced`) is the only fill\n * visible \u2014 matching Apple's own grouped lists, where individual rows carry\n * no background of their own, only hover/active state does (see\n * `.docket-nav-item:hover`/`.docket-nav-item-active` in navigation.css). */\n[data-docket-reskin] nav .navItem {\n  background-color: transparent !important;\n}\n\n/* The top-level section wrapper carries Tailwind's literal responsive class\n   `lg:bg-left-nav`, which is distinct from `.bg-left-nav` and otherwise keeps\n   the whole sidebar list inside one gray panel. */\n[data-docket-reskin] nav.docket-nav-enhanced > .bg-base.lg\\:bg-left-nav,\n[data-docket-reskin] nav.docket-nav-enhanced .navItem,\n[data-docket-reskin] nav.docket-nav-enhanced .sideNavList {\n  background-color: transparent !important;\n  border-color: transparent !important;\n}\n\n/* Typography: LearningSuite's own headings carry no color utility class (its base\n   stylesheet sets a default) \u2014 reset to the Apple type scale/color directly. Explicit\n   sizes/tracking added on top of font-family/weight (Sep 2026 pass): native heading sizes\n   varied 24-28px page-to-page with no consistent hierarchy \u2014 Apple's own type scale is a\n   controlled ladder, not \"whatever the page happened to set\". */\n[data-docket-reskin] h1,\n[data-docket-reskin] h2,\n[data-docket-reskin] h3 {\n  font-family: var(--docket-font) !important;\n  /* Weight capped at 600, matching .docket-title-1/-2's own scale \u2014 both real references\n     (apple.com, about.google) cap headline weight at 600; 800-weight, tightly-tracked\n     headlines belong to neither. Applies to pages that still render a plain native heading\n     (Announcements, Class Info, etc., with no dedicated adapter) so they match the\n     adapter-rendered pages' hierarchy instead of reading as an older design generation. */\n  font-weight: 600 !important;\n  color: var(--docket-label) !important;\n}\n[data-docket-reskin] h1 { font-size: 26px !important; letter-spacing: -0.015em; }\n[data-docket-reskin] h2 { font-size: 20px !important; letter-spacing: -0.01em; }\n[data-docket-reskin] h3 { font-size: 17px !important; letter-spacing: -0.005em; }\n\n/**\n * Instructor-authored rich text (a Content page's file list, syllabus body text, etc.)\n * confirmed live to render inside `class=\"default-list default-table instructorText\n * font-nunito\"`. Scoped to the confirmed compound class, not a bare `.font-nunito`, since\n * only that combination was ever actually observed.\n *\n * Instructor WYSIWYG content frequently carries inline black text intended for LearningSuite's\n * light native canvas. Override that text on the reskin canvas, including descendant inline\n * styles, without giving every note an opaque white box.\n */\n[data-docket-reskin] .instructorText.font-nunito {\n  font-family: var(--docket-font) !important;\n  background-color: transparent !important;\n  color: var(--docket-label) !important;\n  border: 0;\n  border-radius: 0;\n  padding: 0;\n}\n\n[data-docket-reskin] .instructorText.font-nunito :is(p, span, div, li, td, th) {\n  color: var(--docket-label) !important;\n}\n\n/**\n * The same compound class, confirmed live (Sep 2026 comparison pass) to ALSO render inside\n * a course Dashboard's per-day schedule cells \u2014 an instructor's own lesson-topic bullets for\n * that day, wrapped in `p.text-sm` (confirmed: `p.mb-2.text-sm.break-words > .instructorText\n * .font-nunito`; the whole-page version above is never nested in `.text-sm`). The full inset\n * A compact native-flow note keeps dashboard rows readable without a separate card treatment.\n */\n/**\n * Keep the note in normal flow so long text wraps naturally with its schedule entry.\n */\n[data-docket-reskin] .text-sm .instructorText.font-nunito {\n  display: block;\n}\n\n/**\n * LearningSuite's own branded font class, `Metropolis`. An earlier census (Grades page\n * only) found just 4 sitewide elements carrying it \u2014 all already covered \u2014 so this rule\n * was deliberately absent. The Sep 2026 pass re-ran the census on Combined Schedule and\n * found 76 elements rendering Metropolis despite the `body` remap above: a class rule\n * always beats an *inherited* font, so every element carrying `.font-metro` directly kept\n * the native font no matter what `body` says. 75 of the 76 were already covered (`body`\n * itself + 74 `.bg-action` buttons); the one real gap was LearningSuite's\n * `button.bg-primary-dark` action buttons (the schedule page's \"+ Item\", the Preferences\n * dialog's \"Save\"). Rather than whack-a-mole, the class itself is remapped \u2014 it is\n * LearningSuite's own semantic \"this is branded UI text\" signal, confirmed identical in\n * class-string on both themes, and a blanket font remap cannot change layout behavior the\n * way a color/background remap could.\n */\n[data-docket-reskin] .font-metro {\n  font-family: var(--docket-font) !important;\n}\n\n/**\n * LearningSuite's own text-color utility classes \u2014 split into a static-by-default tier\n * and a genuinely-interactive tier (Sep 2026 fix; previously one blanket blue rule).\n * Confirmed live these classes wrap entire static panels natively, not just links/actions:\n * Preferences' plain field labels, a Grade Scale `<table>`'s every cell, empty-state\n * strings (\"No Announcements\") \u2014 none of that is tappable, so tinting all of it violated\n * Apple's own rule that tint color means \"this is interactive.\" Meanwhile the assignment\n * name inside each `.bg-base.text-highlight` row (see the grouped-list-row rule further\n * down) is a plain `<div class=\"clicky ...\">` \u2014 genuinely clickable (it's the row's real\n * navigation target) but carries none of these classes itself, so it kept LearningSuite's\n * own separate, un-remapped native blue instead of either tier. Default first, so a plain\n * `<div>`/`<td>` carrying one of these classes gets the neutral label color unless a real\n * interactive tag/class overrides it below (tag-qualified selectors are more specific than\n * the bare-class default, so this doesn't depend on source order). */\n[data-docket-reskin] .text-primary,\n[data-docket-reskin] .text-primary-alt,\n[data-docket-reskin] .text-action,\n[data-docket-reskin] .text-highlight {\n  color: var(--docket-label) !important;\n}\n[data-docket-reskin] a.text-primary,\n[data-docket-reskin] a.text-primary-alt,\n[data-docket-reskin] a.text-action,\n[data-docket-reskin] a.text-highlight,\n[data-docket-reskin] button.text-primary,\n[data-docket-reskin] .clicky {\n  color: var(--docket-blue) !important;\n}\n[data-docket-reskin] .text-info {\n  color: var(--docket-label-secondary) !important;\n}\n\n/* Native \"today\" marker on the course-scoped Schedule mini-calendar \u2014 confirmed live as\n   `div.bg-primary.hover:border-primary-alt` with hardcoded near-black text, a third,\n   un-remapped native blue (rgb(115,175,211)) distinct from both the app's own accent and\n   the tokens above. Apple Calendar's own \"today\" treatment is a solid tinted marker with\n   white text \u2014 matched directly rather than folding into the text-color rules above, since\n   this is a background utility, not a text one. Confirmed only on this one calendar widget\n   this pass; re-audit before assuming `.bg-primary` is safe to remap elsewhere. */\n[data-docket-reskin] .bg-primary {\n  background-color: var(--docket-accent) !important;\n  /* NOT hardcoded white \u2014 dark mode's accent is a light blue (see tokens.css), so its\n     on-accent text must be dark or this fails contrast badly in that theme. */\n  color: var(--docket-on-accent) !important;\n}\n\n/* Section/category header bars (e.g. a grade category's \"20% of grade\" strip) \u2014\n   give them the same subtle grouped-list-header treatment as everything else,\n   instead of leaving LearningSuite's own solid accent-color bar. */\n[data-docket-reskin] .bg-accent,\n[data-docket-reskin] .bg-gray1 {\n  background-color: var(--docket-fill) !important;\n  color: var(--docket-label) !important;\n}\n\n/* Real action buttons (submit/upload/etc.), the course-list \"Go\" button, and\n   LearningSuite's own `bg-primary-dark` action buttons (confirmed live Sep 2026: the\n   schedule page's \"+ Item\" and the Preferences dialog's \"Save\", both bare <button>s\n   with `hover:bg-primary-alt`). Scoped to the bare-button form deliberately: the same\n   live census found `.bg-primary-dark` ALSO fills the active top tab\n   (`a.bg-primary-dark.bg-top-nav-highlight`, owned by .docket-top-tabs' underline\n   treatment in navigation.css) and the Preferences dialog's accordion headers (a <div>,\n   styled with the modal chrome below) \u2014 a blanket class rule would have fought both.\n   Never bare `button` for dropdown triggers \u2014 see the file comment.\n   Full pill radius: apple.com/about.google's own primary CTAs are consistently full pills,\n   and unlike a card or row, a single free-floating action button reads as more confidently\n   \"designed\" at a full pill than at the small-radius-rectangle scale meant for surfaces\n   containing other content. Flat single-color fill, never a gradient \u2014 neither real\n   reference uses one anywhere in its shipped CSS. */\n[data-docket-reskin] .goBtn,\n[data-docket-reskin] .bg-action,\n[data-docket-reskin] button.bg-primary-dark {\n  font-family: var(--docket-font) !important;\n  border-radius: var(--docket-radius-pill) !important;\n  background-color: var(--docket-accent) !important;\n  color: var(--docket-on-accent) !important;\n  border: none !important;\n  font-weight: 600 !important;\n}\n[data-docket-reskin] .goBtn:hover,\n[data-docket-reskin] .bg-action:hover,\n[data-docket-reskin] button.bg-primary-dark:hover {\n  filter: brightness(1.12);\n}\n/* No selector here previously defined a keyboard-focus ring at all (only :hover) \u2014 added\n   directly next to the rule that owns each selector, never a separate blanket `*` rule. */\n[data-docket-reskin] .goBtn:focus-visible,\n[data-docket-reskin] .bg-action:focus-visible,\n[data-docket-reskin] button.bg-primary-dark:focus-visible {\n  outline: 2px solid var(--docket-accent);\n  outline-offset: 2px;\n}\n\n/* Hairline dividers, softened to the Apple separator token instead of LearningSuite's\n   own higher-contrast gray borders. `.border-light` (confirmed live on each sidebar\n   `.navItem` row, rgb(109,108,109) natively \u2014 a much harder line than Apple's own\n   near-invisible hairlines) needs the same treatment as the `border-gray*` family.\n   `.border-info` (confirmed live: the course/term-switcher dropdown's own list border,\n   2 instances sitewide) and bare `.border` (confirmed live on e.g. the \"Course Homework\n   ID\" disclosure row \u2014 a plain gray in every sample checked, not a colored outline riding\n   on `currentColor`) join the same group; `.border` is the least-certain of the four here,\n   worth re-checking if a stray colored outline ever turns up gray after this ships. */\n[data-docket-reskin] [class*=\"border-gray\"],\n[data-docket-reskin] .border-light,\n[data-docket-reskin] .border-info,\n[data-docket-reskin] .border {\n  border-color: var(--docket-separator) !important;\n}\n\n/* Native instructor-view banner (confirmed live: `section.bg-attention`, a solid saturated\n   yellow rgb(255,243,130) sitting directly under the header on every page for an account\n   with instructor access). A later pass (shell.ts's mountStudentViewBadge()) relocates this\n   banner's one real action \u2014 the \"back to instructor view\" link \u2014 to a small icon on the\n   settings fabBar and hides the banner itself via navigation.css's `.docket-banner-relocated`\n   rule, since a rarely-used action doesn't need to permanently occupy a full-width strip of\n   chrome. This rule now only matters as the FALLBACK: if that relocation ever fails to find\n   the banner or its real link (fails soft, by design), the banner stays visible and still\n   needs to be legible rather than left in native's harsh yellow \u2014 reusing the status-badge\n   system's `soon` container/on-container pair (see tokens.css) for the same contrast-checked,\n   opaque, theme-correct treatment every due-soon badge gets, instead of a one-off color. */\n[data-docket-reskin] .bg-attention {\n  background-color: var(--docket-status-soon-bg) !important;\n  color: var(--docket-status-soon-fg) !important;\n  border-color: transparent !important;\n}\n[data-docket-reskin] .bg-attention a {\n  color: var(--docket-status-soon-fg) !important;\n  text-decoration: underline;\n}\n\n/* Native `<table>` (e.g. Grade Scale) gets zero elevation/structure by default \u2014 raw grid\n   borders, 0 radius, sitting one tab away from the Assignments view's proper card-row\n   treatment above. Confirmed live (Sep 2026) across Grade Scale, What-If Calculator,\n   Content, Syllabus, Announcements, Email, Schedule, and Groups that the only `<table>`\n   elements sitewide are genuine tabular data (Grade Scale's grade/percent pairs) \u2014 no\n   layout-purposed table turned up, so a bare tag selector is safe here the way it isn't for\n   `<button>`/`<select>` (see the file comment at the top). Re-audit before assuming this\n   holds if a new page type is ever added to the adapter set. */\n/* Oct 2026: tables now share MAX's agenda-card language: one rounded card, hairline row\n   dividers only (no grid lines), a quiet uppercase header, and a hover fill. Confirmed live on\n   Prioritizer (`table.border-t`, rows `tr.h-10.bg-base` interleaved with empty\n   `tr.border-b > td[colspan]` detail slots that only fill when a row is expanded) and Exam List\n   (`table.md:border`, thead, every cell `td.border.p-2`). */\n[data-docket-reskin] table {\n  width: 100%;\n  border-collapse: separate !important;\n  border-spacing: 0;\n  border-radius: 12px;\n  overflow: hidden;\n  border: 1px solid var(--docket-shell-hairline, var(--docket-separator)) !important;\n  background-color: var(--docket-surface-1);\n  font-family: var(--docket-font);\n}\n[data-docket-reskin] table tr {\n  height: auto !important;\n  background-color: transparent !important;\n  border: 0 !important;\n}\n[data-docket-reskin] table :is(td, th) {\n  padding: 10px 14px !important;\n  border: 0 !important;\n  background-color: transparent !important;\n  color: var(--docket-label-secondary) !important;\n  font-size: 14px;\n  text-align: start;\n  vertical-align: middle;\n}\n[data-docket-reskin] table td:first-child { color: var(--docket-label) !important; font-weight: 550; }\n[data-docket-reskin] table tr + tr > td,\n[data-docket-reskin] table thead + tbody > tr:first-child > td {\n  border-top: 1px solid var(--docket-shell-hairline, var(--docket-separator)) !important;\n}\n[data-docket-reskin] table thead :is(th, td) {\n  padding-block: 9px !important;\n  background-color: var(--docket-surface-2) !important;\n  color: var(--docket-label-tertiary) !important;\n  font-size: 11.5px;\n  font-weight: 650;\n  letter-spacing: .05em;\n  text-transform: uppercase;\n  white-space: nowrap;\n}\n[data-docket-reskin] table thead :is(th, td) * { color: inherit !important; }\n[data-docket-reskin] table tbody tr:hover > td { background-color: var(--docket-fill) !important; }\n[data-docket-reskin] table :is(time, .text-xs) { color: var(--docket-label-tertiary); }\n/* Prioritizer's per-row detail slot stays out of the layout until LearningSuite fills it. */\n[data-docket-reskin] table tr:has(> td[colspan]:only-child):not(:has(> td > *)) { display: none; }\n/* Row actions (Exam List \"View\"): a compact tonal button, not a full-width pill. */\n[data-docket-reskin] table button.bg-primary-dark {\n  width: auto !important;\n  min-width: 0;\n  padding: 0 !important;\n  border-radius: var(--docket-radius-xs) !important;\n  background-color: var(--docket-accent-container) !important;\n  color: var(--docket-on-accent-container) !important;\n  font-size: 13px;\n}\n[data-docket-reskin] table button.bg-primary-dark > div { padding: 5px 14px !important; }\n[data-docket-reskin] table button.bg-primary-dark:hover { filter: brightness(1.15); }\n\n/**\n * The course Dashboard's per-day schedule (Sep 2026 comparison pass) \u2014 confirmed live this\n * is the single most-visited page never given a real adapter: each day is a plain\n * `div.mb-2 > div.bg-gray1.text-primary-alt.text-md.font-normal.px-4.py-2` (the date bar;\n * `.text-primary-alt` + no `.cursor-pointer` distinguishes it from the Combined Schedule\n * page's OWN `.bg-gray1.px-4.py-2` week header, which carries `.text-primary.cursor-pointer`\n * instead and stays scoped to `[data-docket-page=\"schedule\"]` in schedule.css \u2014 confirmed\n * live these two never collide, `.bg-gray1.text-primary-alt` returns 0 matches on every other\n * censused page) followed immediately by `div.pl-mobile` (the day's own item list; `.pl-mobile`\n * itself is a generic sitewide utility reused everywhere, so it's targeted only via the\n * adjacent-sibling combinator below, never bare). Already gets the sitewide tinted-fill color\n * from the `.bg-gray1` rule above; this adds the same day-header-plus-card shape Combined\n * Schedule's dedicated adapter already gives the identical data one level up.\n */\n[data-docket-reskin] .bg-gray1.text-primary-alt.px-4.py-2 {\n  border-radius: var(--docket-radius-sm) var(--docket-radius-sm) 0 0 !important;\n  border: 1px solid var(--docket-separator);\n  border-bottom: none;\n  font-family: var(--docket-font) !important;\n  font-weight: 600 !important;\n}\n[data-docket-reskin] .bg-gray1.text-primary-alt.px-4.py-2 + .pl-mobile {\n  background-color: var(--docket-surface-1);\n  border: 1px solid var(--docket-separator);\n  border-top: none;\n  border-radius: 0 0 var(--docket-radius-sm) var(--docket-radius-sm);\n  padding: 10px 16px 14px;\n  margin-bottom: 10px;\n}\n\n/**\n * Grade Summary (Sep 2026 comparison pass) \u2014 confirmed live the whole page is one CSS grid,\n * `div.grid.gridColsStyle` (zero `<table>` elements, so the sitewide `table` rule above never\n * reaches it; confirmed unique to this page, 0 matches on Dashboard/Course List/Schedule/\n * Announcements/course Schedule censused this pass), so it got zero elevation/structure \u2014\n * flat text sitting directly on canvas next to the Course List's own proper card treatment.\n * Wrapped as one elevated card, matching every other data surface in the redesign; each\n * course's percentage (native `div.text-lg.font-bold.clicky`, already tinted blue by the\n * text-tint tier above) becomes a pill badge instead of bare bold text, matching this\n * reskin's own `.docket-badge` idiom elsewhere.\n */\n[data-docket-reskin] .gridColsStyle {\n  background-color: var(--docket-surface-1);\n  border: 1px solid var(--docket-separator);\n  border-radius: var(--docket-radius-md) !important;\n  padding: 8px 16px;\n  overflow: hidden;\n}\n[data-docket-reskin] .gridColsStyle .clicky {\n  display: inline-flex;\n  padding: 3px 12px;\n  border-radius: var(--docket-radius-pill);\n  background-color: var(--docket-accent-container);\n  color: var(--docket-on-accent-container) !important;\n}\n\n/**\n * Grouped-list-row polish for LearningSuite's own real highlighted table rows \u2014 confirmed\n * live this exact compound class (never bare `.bg-base`, which stays untouched per the file\n * comment above) renders identically on the native Assignments-page fallback table AND the\n * Grades page's default sub-view (see pageDetector.ts's looksLikeAssignmentsPage() for why\n * those two pages needed to be told apart at all), so this benefits both native tables at\n * once with no new adapter. The row itself is a plain `<div>` (confirmed live it's neither\n * an `<a>` nor `.clicky`, so it renders in the neutral label color via the text-tint tier\n * above \u2014 only the row's inner `.clicky` assignment-name div is genuinely interactive and\n * gets tinted); this rule adds the rounded/hover-fill treatment the rest of the redesign\n * already uses everywhere else, so a raw native table reads as the same grouped list\n * instead of a flat one.\n */\n[data-docket-reskin] .bg-base.text-highlight {\n  border-radius: var(--docket-radius-sm) !important;\n  transition: background-color var(--docket-dur-fast) var(--docket-ease-standard);\n}\n[data-docket-reskin] .bg-base.text-highlight:hover {\n  background-color: var(--docket-fill) !important;\n}\n\n/**\n * LearningSuite's shared modal chrome \u2014 confirmed live (Sep 2026, dark theme, reskin\n * un-injected) hosting the Preferences dialog: a full-screen scrim `div.popupWrapper\n * .bg-blur` (native fill rgba(75,75,75,0.7) \u2014 note the class is NAMED \"bg-blur\" but its\n * computed backdrop-filter is `none`; the blur has to come from us) wrapping the sheet\n * `div.minMax.bg-base.height-Lg.overflow-hidden` (solid rgb(36,36,36), 0px radius, no\n * shadow). Scoped to the wrapper descendant so `.minMax` is never styled outside a modal\n * context (it has only ever been observed inside one, but the wrapper is the actual\n * shared component), and never via bare `.bg-base` \u2014 the file comment at the top explains\n * why that class stays untouched. The sheet itself gets the canvas token, not a\n * translucent material: a modal sheet floats over a dimmed, blurred page, and Apple's\n * own sheets are opaque surfaces whose depth cue is the shadow, not see-through glass\n * (translucent materials here would let the dimmed page bleed through the text).\n * `overflow-hidden` (part of the confirmed class string) clips children to the rounding.\n */\n[data-docket-reskin] .popupWrapper {\n  background-color: rgba(0, 0, 0, 0.35) !important;\n  backdrop-filter: saturate(180%) blur(20px);\n  -webkit-backdrop-filter: saturate(180%) blur(20px);\n}\n[data-docket-reskin] .popupWrapper .minMax {\n  border-radius: var(--docket-radius-lg) !important;\n  background-color: var(--docket-canvas) !important;\n  box-shadow: var(--docket-shadow-float);\n}\n/* The Preferences dialog's accordion section headers (\"General\", etc.) are confirmed\n   live to be `div.text-white.bg-primary-dark.px-4.py-2.cursor-pointer` \u2014 the same\n   native-accent-filled bar treatment `.bg-accent`/`.bg-gray1` already get above, and\n   deliberately the same: grouped-list section headers, not action buttons (which is why\n   the button rule above scopes itself to `button.bg-primary-dark`). Scoped to inside the\n   wrapper: if LearningSuite ever uses this pattern for page-level section headers\n   elsewhere, re-audit before extending the selector. */\n[data-docket-reskin] .popupWrapper div.bg-primary-dark {\n  background-color: var(--docket-fill) !important;\n  color: var(--docket-label) !important;\n}\n\n/* Preferences dialog's Cancel button \u2014 confirmed live class\n   `button.bg-base.border-info.text-info.font-metro` inside `.popupWrapper` (text/border\n   color and font already come free from the `.text-info`/`.border-info`/`.font-metro`\n   rules elsewhere in this file \u2014 only shape/fill were still fully native: 0 radius, solid\n   `.bg-base` gray, the same treatment the file comment at the top deliberately leaves\n   untouched sitewide). Sitting next to Save's full pill, that read as two different button\n   languages in one sheet \u2014 Apple's own sheets never vary corner radius/shape between\n   actions, only fill weight. Scoped to inside the dialog specifically (never bare\n   `.bg-base`), matching the accordion-header exception pattern just above. A \"Reset\"\n   control mentioned in an earlier review pass could not be reproduced live this session\n   (checked the General/Communication/Email accordion tabs) \u2014 not styled here; re-check if\n   one turns up on a tab not covered this pass. */\n[data-docket-reskin] .popupWrapper button.bg-base {\n  border-radius: var(--docket-radius-sm) !important;\n  background-color: var(--docket-fill) !important;\n}\n[data-docket-reskin] .popupWrapper button.bg-base:hover {\n  background-color: var(--docket-separator) !important;\n}\n\n/* `<iframe>` (e.g. Library Resources, confirmed live to embed `apps.lib.byu.edu` \u2014\n   cross-origin, no `@match`/`@grant` reaches inside it, and this pass isn't adding a second\n   match block for an unaudited third-party origin's markup). The interior stays fully\n   native; framing it from this side at least keeps the boundary consistent with every\n   other elevated surface instead of a stark unstyled rectangle. Confirmed live no other\n   `<iframe>` use needs different treatment this pass. */\n[data-docket-reskin] iframe {\n  border-radius: var(--docket-radius-md);\n  overflow: hidden;\n  border: 1px solid var(--docket-separator);\n}\n\n/* Instructor-authored rich text (Content pages' `.default-list`, notes in `.instructorText`)\n   often pastes in inline `background-color:#ffffff` and a mid-gray text color meant for\n   LearningSuite's light page. On the dark theme that renders as glaring white boxes with\n   unreadable text (confirmed live, Oct 2026, MATH 113 Review Materials). Drop only white\n   inline fills, and lift their paired text color to the label tone. */\n[data-docket-reskin][data-docket-theme=\"dark\"] :is(.default-list, .instructorText) :is([style*=\"background-color:#fff\" i], [style*=\"background-color: #fff\" i], [style*=\"background-color:rgb(255, 255, 255)\" i], [style*=\"background-color: rgb(255, 255, 255)\" i], [style*=\"background-color:white\" i], [style*=\"background-color: white\" i]) {\n  background-color: transparent !important;\n  color: var(--docket-label) !important;\n}\n";
 
   // src/styles/typography.css
   var typography_default = "/**\n * Eleventh-pass type scale \u2014 replaces the old Large Title/Title/Headline/Body/Subhead/\n * Footnote/Caption ladder (800-weight headlines, an 11px caption tier measured at ~1.7\u20133.3:1\n * contrast against canvas). Both real references (apple.com's shipped CSS, about.google's\n * shipped CSS) cap headline weight at 600 and hold a real content floor around 13\u201314px \u2014 this\n * scale does the same. See PASS11_PLAN.md Phase 4.5 for the sourced rationale.\n */\n.docket-scope {\n  font-family: var(--docket-font);\n  color: var(--docket-label);\n  -webkit-font-smoothing: antialiased;\n}\n/* 700 weight, one tier heavier than every smaller size below \u2014 confirmed live against fresh\n   apple.com/design.google captures (Sep 2026): both real references' own biggest headline\n   renders visibly heavier than a flat 600-weight cut at this size. Scoped to this one tier only\n   (`.docket-title-1` and smaller stay at their existing \u2264600 weights) \u2014 a single-tier bump, not\n   a rescale of the whole ladder. */\n.docket-display { font-size: clamp(34px, 4vw, 52px); line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 4px; }\n.docket-title-1 { font-size: 26px; line-height: 1.2; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 2px; }\n.docket-title-2 { font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: -0.01em; margin: 0; }\n.docket-lead { font-size: 19px; line-height: 1.4; font-weight: 400; margin: 0; color: var(--docket-label-secondary); }\n.docket-body { font-size: 16px; line-height: 1.5; font-weight: 400; margin: 0; }\n.docket-body-sm { font-size: 14px; line-height: 1.45; font-weight: 400; margin: 0; color: var(--docket-label-secondary); }\n.docket-label { font-size: 13px; line-height: 1.3; font-weight: 600; margin: 0; }\n.docket-eyebrow { font-size: 12px; line-height: 1.3; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; margin: 0; color: var(--docket-label-secondary); }\n";
@@ -231,7 +232,7 @@ html[data-docket-page="announcements"] main > div {
 `;
 
   // src/styles/navigation.css
-  var navigation_default = '/**\n * Applied to LearningSuite\'s OWN existing top-level nav element in place\n * (see adapters/shell.ts) \u2014 never a fabricated replacement nav with guessed\n * routes. An opaque "island" rail (macOS Sonoma\'s own sidebar treatment):\n * inset with a margin so canvas shows all the way around it, one step\n * darker/lighter than canvas via the surface-1 token, edge-defined with a\n * 1px separator border rather than a shadow.\n *\n * `background-color` (not the `background` shorthand) with `!important`:\n * confirmed live this element also carries LearningSuite\'s own\n * `.bg-left-nav` utility class, which global.css deliberately leaves alone\n * for every OTHER `.bg-left-nav` element (body) so the plain sitewide\n * canvas rule doesn\'t apply here \u2014 but without `!important` here too, any\n * equal-or-higher-specificity native rule on the same element could still\n * win by source order. Both column layout (`nav`\'s own native `flex-col`)\n * and this vertical sidebar\'s row treatment below (`padding`/`gap` reused\n * as vertical spacing, since `.docket-nav-enhanced` never overrides\n * `flex-direction`) were confirmed live to already compose correctly \u2014\n * only the fill color was ever actually broken.\n *\n * A pass tried stretching this card to fill nav\'s own native full-height flex-grow column\n * (`flex: 1 1 auto; align-self: stretch`), chasing a mockup reference whose sidebar panel ran\n * almost to the bottom of its (short, ~800px) reference canvas. Live-verified against a real\n * maximized Safari window (Sep 2026) and reverted: nav\'s real column is however tall the actual\n * browser window is, not the mockup\'s canvas \u2014 on a normal-to-large monitor that stretched this\n * bordered card across a huge dead gap below the 6 real rows, reading as a mostly-empty box\n * rather than a full panel, and orphaned the settings/eye FAB in the middle of that void. Back\n * to shrink-wrapping its own content; the FAB stays genuinely floating below it (see\n * `.docket-floating-bar` below), which is the honest description of that empty space rather\n * than something this card can safely pretend to own.\n */\n.docket-nav-enhanced {\n  display: flex !important;\n  gap: 4px;\n  padding: 10px;\n  margin: 12px 10px;\n  background-color: transparent !important;\n  border: 0;\n  border-radius: 0;\n  font-family: var(--docket-font);\n  overflow-x: auto;\n}\n.docket-nav-enhanced .docket-nav-item {\n  display: flex !important;\n  align-items: center !important;\n  gap: 10px;\n  font-family: var(--docket-font) !important;\n  font-size: 13px !important;\n  font-weight: 590 !important;\n  color: var(--docket-label) !important;\n  text-decoration: none !important;\n  padding: 10px 14px !important;\n  border-radius: var(--docket-radius-pill) !important;\n  white-space: nowrap;\n  background-color: transparent !important;\n  transition: background-color var(--docket-dur-fast) var(--docket-ease-standard);\n}\n.docket-nav-enhanced .docket-nav-item:hover { background-color: transparent !important; }\n/* Real `<a>` \u2014 reachable by keyboard already; this replaces the browser\'s own default ring\n   (which varies per browser and never matches the app\'s own accent) with the same focus\n   language every other control in this reskin uses. Negative offset keeps the ring inside\n   the pill instead of overlapping the next nav item in a tight sidebar. */\n.docket-nav-enhanced .docket-nav-item:focus-visible {\n  outline: 2px solid var(--docket-accent) !important;\n  outline-offset: -2px;\n}\n/* A prior pass tried a solid, fully-saturated accent fill here and reverted it \u2014 that read as a\n   literal button sitting under the label (real complaint: "the label looked like it had a button\n   behind it"). This is a different, much lower-contrast treatment (the mockup reference\'s own\n   active row: a faint accent-tinted wash, not a solid chip) \u2014 `color-mix` against the pill\'s own\n   surface rather than a flat opaque fill, so it reads as a soft selection state (the same idiom\n   macOS\'s own sidebar uses for the selected row) rather than a button. Text/icon color still\n   carries most of the signal, same as the no-fill version this replaces. */\n.docket-nav-enhanced .docket-nav-item-active {\n  background: transparent !important;\n  color: var(--docket-accent) !important;\n}\n.docket-nav-enhanced .docket-nav-item-active:hover {\n  background: transparent !important;\n}\n/* Matched by real label text in shell.ts\'s restyleNav() \u2014 see icons.ts\'s navIconByLabel.\n   Secondary/muted at rest so the label text stays the primary read, full label color when\n   the row is active (inherits currentColor, so both states come free from .docket-icon\'s\n   own `stroke: currentColor`). */\n.docket-nav-enhanced .docket-nav-icon {\n  width: 16px !important;\n  height: 16px !important;\n  flex-shrink: 0;\n  color: var(--docket-label-secondary);\n}\n.docket-nav-enhanced .docket-nav-item-active .docket-nav-icon {\n  color: var(--docket-accent);\n}\n\n/**\n * The course-level top tab strip (Home/Content/Exams/Grades/Schedule/\n * Syllabus, see adapters/shell.ts\'s restyleTopTabs()). LearningSuite fills\n * the active tab with a solid highlight color by default; this swaps that\n * for an Apple-tab-bar-style underline instead, on top of LearningSuite\'s\n * own real tabs/hrefs \u2014 never a replacement bar.\n */\n.docket-top-tabs .docket-top-tab {\n  font-family: var(--docket-font) !important;\n  font-size: 13px !important;\n  font-weight: 600 !important;\n  color: var(--docket-label-secondary) !important;\n  text-decoration: none !important;\n  background: transparent !important;\n  border-bottom: 3px solid transparent !important;\n  transition: color var(--docket-dur-fast) var(--docket-ease-standard), border-color var(--docket-dur-fast) var(--docket-ease-standard);\n}\n.docket-top-tabs .docket-top-tab:hover {\n  color: var(--docket-label) !important;\n}\n.docket-top-tabs .docket-top-tab:focus-visible {\n  outline: 2px solid var(--docket-accent) !important;\n  outline-offset: 2px;\n  border-radius: var(--docket-radius-xs);\n}\n/* A flat accent underline, not a gradient border-image. */\n.docket-top-tabs .docket-top-tab-active {\n  color: var(--docket-accent) !important;\n  border-bottom-color: var(--docket-accent) !important;\n}\n\n.docket-floating-bar {\n  position: fixed;\n  bottom: max(18px, env(safe-area-inset-bottom));\n  /* Left-anchored: the gear FAB reads as a global settings control, so it lives opposite the\n   * content, away from where scroll gestures land. */\n  left: 18px;\n  z-index: 2147483000;\n  display: flex;\n  gap: 8px;\n  transition: opacity var(--docket-dur-medium) var(--docket-ease-standard), transform var(--docket-dur-medium) var(--docket-ease-standard);\n}\n/**\n * On desktop this sits in the sidebar\'s own dead column and never touches real content. At\n * narrow widths the sidebar collapses and there is no dead column left \u2014 the bar was found\n * live (Sep 2026 UX audit, mobile Combined Schedule) sitting directly on top of scrolled list\n * text, blocking both reading and tapping it. Fading it out while actively scrolling down (see\n * `initFabAutoHide` in shell.ts) keeps it out of the way of the content it would otherwise\n * cover, while scrolling up or coming to rest brings it straight back.\n */\n.docket-floating-bar-hidden {\n  opacity: 0;\n  transform: translateY(8px);\n  pointer-events: none;\n}\n.docket-fab {\n  width: 44px; height: 44px;\n  border-radius: 50%;\n  /* Genuinely floating chrome \u2014 sits over arbitrary scrolled content, like the dropdown\n     menus below, so it keeps the one surviving shadow token. */\n  background: var(--docket-surface-2);\n  box-shadow: var(--docket-shadow-float);\n  border: none;\n  display: flex; align-items: center; justify-content: center;\n  cursor: pointer;\n  color: var(--docket-label);\n  transition: background-color var(--docket-dur-fast) var(--docket-ease-standard), transform var(--docket-dur-fast) var(--docket-ease-standard);\n}\n.docket-fab:hover { background: var(--docket-fill); }\n.docket-fab:active { transform: scale(0.94); }\n.docket-fab:focus-visible {\n  outline: 2px solid var(--docket-accent);\n  outline-offset: 2px;\n}\n.docket-icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }\n\n/**\n * Real native artifact, not this reskin\'s own markup: LearningSuite ships a mobile-only\n * duplicate of the Student View "Back to Instructor View" link as `nav`\'s own first child\n * (`div.bg-left-nav.border-b`, containing an `a.lg\\:hidden` \u2014 confirmed live, Sep 2026). Its\n * content collapses to zero height above the `lg` breakpoint as intended, but the wrapper\n * div\'s own native `border-b` (a plain `1px solid rgb(109,108,109)`) doesn\'t collapse with it,\n * so a stray 1px gray line sat right at the top of the nav card, above "Course List" \u2014 invisible\n * against the old unstyled/near-black nav, but an obvious loose thread now that this card has\n * its own real background/border. Neutralized only above `lg` (matches the link\'s own\n * `lg:hidden`), so the real mobile divider between this link and the rest of the mobile menu is\n * untouched. `:first-child` keys off real DOM position, not a guessed class name that could\n * silently stop matching on a future LearningSuite markup change.\n */\n@media (min-width: 1024px) {\n  .docket-nav-enhanced > *:first-child {\n    border-bottom: none !important;\n  }\n}\n\n/**\n * Real native form controls, not this reskin\'s own inserted markup \u2014 confirmed live the\n * only `appearance: auto` native controls anywhere on the site are `<input type="radio">`\n * in LearningSuite\'s own Preferences dialog (Display: Light/Dark/Attempt-to-detect/Classic\n * Mode) and, by the same tag, any native checkbox. This is a safe, bounded, unambiguous tag\n * selector \u2014 unlike bare `<button>`/`<select>` (deliberately never touched, see global.css\'s\n * own file comment), a radio/checkbox input only ever means "choose an option," never\n * "open a menu," so there\'s no risk of silently breaking an unrelated control.\n *\n * `appearance: none` also strips the browser\'s native focus ring, so a `:focus-visible`\n * replacement below is not optional \u2014 without one this would ship a real keyboard-\n * accessibility regression on the one native form control on the whole site.\n */\n[data-docket-reskin] input[type="radio"],\n[data-docket-reskin] input[type="checkbox"] {\n  appearance: none;\n  -webkit-appearance: none;\n  width: 20px;\n  height: 20px;\n  margin: 0;\n  flex-shrink: 0;\n  position: relative;\n  border: 1.5px solid var(--docket-label-tertiary);\n  background-color: var(--docket-surface-1);\n  cursor: pointer;\n  transition: background-color var(--docket-dur-fast) var(--docket-ease-standard), border-color var(--docket-dur-fast) var(--docket-ease-standard);\n}\n[data-docket-reskin] input[type="radio"] { border-radius: 50%; }\n[data-docket-reskin] input[type="checkbox"] { border-radius: 5px; }\n[data-docket-reskin] input[type="radio"]:checked,\n[data-docket-reskin] input[type="checkbox"]:checked {\n  border-color: var(--docket-accent);\n  background-color: var(--docket-accent);\n}\n[data-docket-reskin] input[type="radio"]:checked::after {\n  content: "";\n  position: absolute;\n  top: 50%; left: 50%;\n  width: 8px; height: 8px;\n  border-radius: 50%;\n  background: var(--docket-on-accent);\n  transform: translate(-50%, -50%);\n}\n[data-docket-reskin] input[type="checkbox"]:checked::after {\n  content: "";\n  position: absolute;\n  top: 2px; left: 6px;\n  width: 5px; height: 10px;\n  border-right: 2px solid var(--docket-on-accent);\n  border-bottom: 2px solid var(--docket-on-accent);\n  transform: rotate(45deg);\n}\n[data-docket-reskin] input[type="radio"]:focus-visible,\n[data-docket-reskin] input[type="checkbox"]:focus-visible {\n  outline: 2px solid var(--docket-accent);\n  outline-offset: 2px;\n}\n\n/**\n * Bare text-entry inputs \u2014 confirmed live (Sep 2026) the only `input` types anywhere on\n * the site are `text` (Email\'s "Select from Contacts"/"Add additional email addresses"\n * fields) and `number` (What-If Calculator\'s score fields; also checked Groups, Schedule,\n * Announcements, Syllabus, Content \u2014 no other input type turned up, so only these two are\n * targeted, not a guessed broader list). Both were fully native: sharp corners, native\n * fill, and \u2014 worse \u2014 the raw browser default focus outline, a THIRD focus-ring language\n * next to the correct one radios/checkboxes get above. Given the matching treatment here.\n */\n[data-docket-reskin] input[type="text"],\n[data-docket-reskin] input[type="number"] {\n  font-family: var(--docket-font) !important;\n  background-color: var(--docket-surface-1) !important;\n  border: 1px solid var(--docket-separator) !important;\n  border-radius: var(--docket-radius-sm) !important;\n  color: var(--docket-label) !important;\n  padding: 6px 10px;\n}\n[data-docket-reskin] input[type="text"]:focus-visible,\n[data-docket-reskin] input[type="number"]:focus-visible {\n  outline: 2px solid var(--docket-accent);\n  outline-offset: 2px;\n  border-color: transparent !important;\n}\n\n/**\n * The masthead\'s own two dropdown triggers \u2014 confirmed live real elements:\n * `button.header-coursedropdown-trigger` ("All courses" / the course name, top-left) and\n * `button.header-userdropdown-trigger` (the account name, top-right). Both present on\n * literally every page, and \u2014 unlike the sidebar and the dropdown panels they open \u2014 never\n * given a hover/pill treatment: bare text next to a caret with no affordance at all that\n * they\'re interactive. A soft pill-shaped hover fill (the same idiom already used for menu\n * rows and nav items) is enough to make the one piece of chrome that\'s on every screen stop\n * reading as unstyled Bootstrap.\n */\n/**\n * Confirmed live (Sep 2026, real 5-course account): the padding+negative-margin version of\n * this pill ("padding: 4px 12px; margin: -4px -12px" \u2014 visually neutral for POSITION only)\n * shrank the button\'s own content box by the padding amount on every affected page. This\n * button\'s course-name child is a `min-w-0` flex-shrink item with no fixed width of its own,\n * so that shrunk content box came entirely out of its available room \u2014 "MATH 113 \u2013 Calculus 2"\n * (164.9px needed, confirmed against the real unstyled page) truncated to "MATH 113 \u2013 Calc\u2026" in\n * a masthead element present on every single course-scoped page. A `::before` pseudo-element\n * gives the same hover-pill footprint without touching the real button\'s own box model at all.\n */\n/* `z-index: 0` (not just `position: relative`) is required so this button establishes its\n   OWN local stacking context \u2014 without it, a `z-index: -1` on the `::before` below escapes to\n   the nearest ANCESTOR stacking context instead, painting the hover pill behind unrelated\n   ancestor content (confirmed live: it rendered fully invisible, behind the header bar\'s own\n   background) rather than merely behind this button\'s own text. */\n[data-docket-reskin] .header-coursedropdown-trigger,\n[data-docket-reskin] .header-userdropdown-trigger {\n  position: relative;\n  z-index: 0;\n}\n/* Live-measured (Sep 2026): `.header-userdropdown-trigger`\'s own native padding is\n   `6.4px 0 0` \u2014 top-only, no bottom (`.header-coursedropdown-trigger`\'s is a plain `0`, unaffected\n   \u2014 confirmed live, this asymmetry is unique to the user-dropdown button, likely a leftover\n   sizing hack from LearningSuite\'s own original small icon-only avatar). The pill `::before`\n   below is built from this button\'s own box via a symmetric `-4px`/`-12px` inset, so it centers\n   correctly on the box \u2014 but the avatar/name/chevron content inside was pushed 6.4px toward the\n   bottom by that lopsided padding, reading as "the pill and its content don\'t line up" even\n   though the pill itself was never off-center. */\n[data-docket-reskin] .header-userdropdown-trigger {\n  padding: 0 !important;\n}\n[data-docket-reskin] .header-coursedropdown-trigger::before,\n[data-docket-reskin] .header-userdropdown-trigger::before {\n  content: "";\n  position: absolute;\n  inset: -4px -12px;\n  z-index: -1;\n  border-radius: var(--docket-radius-pill);\n  transition: background-color var(--docket-dur-fast) var(--docket-ease-standard);\n  pointer-events: none;\n}\n[data-docket-reskin] .header-coursedropdown-trigger:hover::before,\n[data-docket-reskin] .header-userdropdown-trigger:hover::before {\n  background-color: var(--docket-fill) !important;\n}\n[data-docket-reskin] .header-coursedropdown-trigger:focus-visible,\n[data-docket-reskin] .header-userdropdown-trigger:focus-visible {\n  outline: 2px solid var(--docket-accent);\n  outline-offset: 2px;\n}\n\n/**\n * Masthead brand lockup (`#_topLink`, confirmed live real element, a genuine link to the\n * LearningSuite home page): the native BYU logo image, small LearningSuite icon mark, and\n * stacked "Learning"/"Suite" text are hidden here \u2014 never removed from the DOM, `#_topLink`\n * itself stays the real click target \u2014 and replaced by a single real text wordmark inserted by\n * shell.ts\'s restyleMasthead(). Hidden by their own stable component classnames\n * (`header-byu-logo`/`header-ls-logo`) or the stacked-text div\'s own component classes, never\n * the long incidental Tailwind utility chain on their wrapper divs, which is far more likely to\n * drift on a native LearningSuite update.\n */\n[data-docket-reskin] #_topLink img.header-byu-logo,\n[data-docket-reskin] #_topLink img.header-ls-logo,\n[data-docket-reskin] #_topLink div.hidden.md\\:inline-flex.flex-col {\n  display: none !important;\n}\n/* Hiding the native children can collapse #_topLink\'s own box toward zero size \u2014 this keeps a\n   real hit area for the real home link, matching this codebase\'s own established 44px touch\n   target (cards.css\'s .docket-row, responsive.css\'s own HIG comment). */\n[data-docket-reskin] #_topLink {\n  display: flex;\n  align-items: center;\n  min-width: 44px;\n  min-height: 100%;\n}\n/* Live-measured (Sep 2026): this row\'s own native height is a bare 36px with zero vertical\n   padding \u2014 every child (the course dropdown, the wordmark, the avatar chip) has to fit and\n   self-center inside that, which reads as visibly cramped once a real text wordmark and an\n   avatar circle are added on top of what used to be a small icon. Padding only (native\'s own\n   `border-b` and flex children stay exactly as they are; each child already centers itself\n   within whatever height this row ends up with, so this alone gives every child more room\n   without needing to touch their own sizing individually. */\n[data-docket-reskin] .bg-header {\n  position: relative;\n  padding: 8px 0;\n}\n[data-docket-reskin] .docket-wordmark {\n  font-family: var(--docket-font);\n  font-size: 16px;\n  letter-spacing: -0.01em;\n  color: var(--docket-label);\n  white-space: nowrap;\n}\n/* A flat single-weight string read as a generic placeholder label, not a brand mark \u2014 split\n   into a two-part lockup (bold accent "BYU" + a lighter, secondary-toned product name) the way\n   a real product wordmark pairs an org mark with a suite name, reusing only tokens already used\n   elsewhere (no new colors introduced for this). */\n[data-docket-reskin] .docket-wordmark-brand {\n  font-weight: 800;\n  color: var(--docket-accent);\n}\n[data-docket-reskin] .docket-wordmark-suite {\n  font-weight: 500;\n  color: var(--docket-label-secondary);\n  margin-left: 5px;\n}\n/* Below the native site\'s own `md` breakpoint (confirmed live: this is exactly where\n   LearningSuite already hides the BYU logo and the stacked text, leaving only the small icon \u2014\n   now itself hidden above) there\'s no room left for a third piece of text next to the\n   hamburger and the course dropdown. */\n@media (max-width: 767px) {\n  [data-docket-reskin] .docket-wordmark { display: none; }\n}\n/* Between `md` and `lg` (matches the hamburger\'s own `lg:hidden`): left-aligned in normal flow\n   where the old logo/text used to sit \u2014 true centering below is only safe once the course\n   dropdown (a flex-grow sibling whose width varies a lot with a real course name\'s length) has\n   enough room that it can\'t collide with a centered wordmark. */\n@media (min-width: 768px) and (max-width: 1023px) {\n  [data-docket-reskin] .docket-wordmark { display: inline-block; }\n}\n@media (min-width: 1024px) {\n  [data-docket-reskin] .docket-wordmark {\n    display: inline-block;\n    position: absolute;\n    left: 50%;\n    top: 50%;\n    transform: translate(-50%, -50%);\n    max-width: 38vw;\n    overflow: hidden;\n    text-overflow: ellipsis;\n    pointer-events: none; /* decorative \u2014 #_topLink remains the real click target underneath */\n  }\n}\n\n/**\n * User-dropdown trigger: a resting fill (the hover-pill ::before above only painted on hover,\n * so at rest this read as bare icon+text+arrow with zero affordance) plus an initials avatar\n * chip replacing the generic fa-user-circle glyph, computed from the trigger\'s own real\n * rendered name text by shell.ts\'s restyleMasthead()/computeInitials() \u2014 reuses the exact\n * container/on-container token pair the active nav item and the Grade Summary percentage badge\n * already use (see docket-nav-item-active above / global.css), not a new color.\n */\n[data-docket-reskin] .header-userdropdown-trigger::before {\n  background-color: var(--docket-surface-2);\n}\n[data-docket-reskin] .header-userdropdown-trigger:hover::before {\n  background-color: var(--docket-fill) !important;\n}\n[data-docket-reskin] .header-userdropdown-trigger .fa-user-circle {\n  display: none;\n}\n[data-docket-reskin] .docket-user-avatar {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  width: 26px;\n  height: 26px;\n  border-radius: 50%;\n  margin-right: 8px;\n  background: var(--docket-accent-container);\n  color: var(--docket-on-accent-container);\n  font-family: var(--docket-font);\n  font-size: 11px;\n  font-weight: 700;\n  flex-shrink: 0;\n}\n[data-docket-reskin] .header-userdropdown-trigger .fa-caret-down {\n  font-size: 11px;\n  color: var(--docket-label-tertiary);\n  margin-left: 4px;\n}\n\n/* Student View banner (see global.css\'s .bg-attention rule, kept as the fallback treatment for\n   when shell.ts\'s mountStudentViewBadge() can\'t find the real back-link and fails soft):\n   relocated to a small icon on the settings fabBar, so the full-width native bar is hidden here\n   \u2014 a plain stylesheet rule rather than overlayContent()\'s per-node `.hidden` convention, since\n   this is a single top-level element with the same "exists once or not at all" shape as\n   navEl/topTabsEl/fabBar above, which shell.ts already manages with a marker class rather than\n   the heavier per-adapter overlay machinery. */\n[data-docket-reskin] .docket-banner-relocated {\n  display: none !important;\n}\n\n/**\n * Floating menu chrome \u2014 the top bar\'s own dropdown panels, confirmed live on the Combined\n * Schedule page:\n *\n * - Account menu (Messages/Preferences/Help/Logout): container\n *   `div.header-userdropdown-dropdown` wrapping `ul ... bg-base border-info lg:rounded`\n *   (right-anchored at `lg:right-0 lg:mr-6`).\n * - Course/term switcher ("All courses" at top level; the identical component also serves\n *   the course-scoped term switcher \u2014 same container class, one fix covers both):\n *   container `div.header-coursedropdown-dropdown` wrapping `ul ... bg-base border-info\n *   sm:rounded`.\n *\n * Both panels rendered natively as a solid off-palette box with no shadow and no backdrop\n * blur sitting on top of an otherwise-redesigned page. The containers themselves stay\n * untouched (zero-height position-only wrappers; the `ul` does all the visual work).\n * LearningSuite\'s own `transition-all duration-100 origin-top` open/close animation on the\n * `ul` is confirmed live and deliberately NOT overridden \u2014 only fill/radius/shadow change\n * here. These genuinely float over arbitrary page content, so \u2014 unlike the now-opaque nav\n * rail \u2014 they keep a translucent, blurred material and the one surviving shadow token.\n */\n[data-docket-reskin] .header-userdropdown-dropdown > ul,\n[data-docket-reskin] .header-coursedropdown-dropdown > ul {\n  background-color: var(--docket-canvas) !important;\n  background-color: color-mix(in srgb, var(--docket-canvas) 92%, transparent) !important;\n  border-radius: var(--docket-radius-md) !important;\n  box-shadow: var(--docket-shadow-float);\n  backdrop-filter: saturate(180%) blur(20px);\n  -webkit-backdrop-filter: saturate(180%) blur(20px);\n}\n\n/**\n * Menu-row hover, scoped to the two confirmed surfaces (never sitewide): the header\n * dropdown rows are `li.pt-1.pb-1.hover:bg-accent` / `li.py-1.px-3.hover:bg-accent`, and\n * inside the Preferences sheet the timezone-picker options are\n * `div.cursor-pointer.text-primary.hover\\:bg-accent`. Natively the hover fill is\n * LearningSuite\'s accent color (var(--ac)); here it becomes the same neutral fill every\n * other hoverable row in the redesign uses.\n */\n[data-docket-reskin] .header-userdropdown-dropdown li.hover\\:bg-accent:hover,\n[data-docket-reskin] .header-coursedropdown-dropdown li.hover\\:bg-accent:hover,\n[data-docket-reskin] .popupWrapper .hover\\:bg-accent:hover {\n  background-color: var(--docket-fill) !important;\n}\n';
+  var navigation_default = '/**\n * App shell: the same two-band top bar and quiet context rail as the MAX reskin\n * (styles/max.css), so both BYU sites read as one product.\n *\n * Every rule here targets LearningSuite\'s own stable classes (`header`,\n * `.bg-header`, `.bg-top-nav` / `.bg-top-nav-highlight`, `nav.bg-left-nav`) rather\n * than classes shell.ts adds later, so the shell is already in its final shape at\n * first paint. Script-inserted pieces (nav icons, the avatar) land in space that is\n * reserved here, so nothing shifts when they arrive.\n */\n[data-docket-reskin] {\n  --docket-shell-hairline: color-mix(in srgb, var(--docket-separator) 65%, transparent);\n}\n\n/* Top bar. */\n[data-docket-reskin] body > header {\n  background-color: var(--docket-surface-1) !important;\n  border-bottom: 1px solid var(--docket-shell-hairline) !important;\n}\n[data-docket-reskin] header .bg-header {\n  position: relative;\n  align-items: center;\n  height: 48px;\n  padding: 0 20px 0 0;\n  background-color: transparent !important;\n  border-bottom: 0 !important;\n}\n[data-docket-reskin] header .bg-top-nav {\n  align-items: stretch;\n  height: 40px;\n  padding: 0 8px;\n  line-height: 1;\n  background-color: transparent !important;\n  border-bottom: 0 !important;\n}\n[data-docket-reskin] header .bg-top-nav > a {\n  display: flex;\n  align-items: center;\n  padding: 0 12px !important;\n  background-color: transparent !important;\n  border-bottom: 2px solid transparent;\n  color: var(--docket-label-secondary) !important;\n  font-family: var(--docket-font) !important;\n  font-size: 13.5px !important;\n  font-weight: 600 !important;\n  text-decoration: none !important;\n  transition: color var(--docket-dur-fast) var(--docket-ease-standard), background-color var(--docket-dur-fast) var(--docket-ease-standard);\n}\n[data-docket-reskin] header .bg-top-nav > a:hover {\n  background-color: var(--docket-fill) !important;\n  color: var(--docket-label) !important;\n}\n[data-docket-reskin] header .bg-top-nav > a.bg-top-nav-highlight {\n  border-bottom-color: var(--docket-accent);\n  color: var(--docket-accent) !important;\n}\n[data-docket-reskin] header .bg-top-nav > a.bg-top-nav-highlight:hover { background-color: transparent !important; }\n[data-docket-reskin] header .bg-top-nav > a:focus-visible {\n  outline: 2px solid var(--docket-accent) !important;\n  outline-offset: -2px;\n}\n/* The strip\'s trailing text block ("Back to Instructor View", term notes). */\n[data-docket-reskin] header .bg-top-nav > div {\n  display: flex;\n  align-items: center;\n  color: var(--docket-label-tertiary) !important;\n  font-size: 12.5px !important;\n}\n\n/* Context rail. */\n[data-docket-reskin] div.bg-left-nav:has(> nav) {\n  /* Same rail width as MAX\'s native #sidebar, so both sites line up. */\n  flex: 0 0 225px;\n  width: 225px !important;\n  max-width: 225px;\n  background-color: var(--docket-canvas) !important;\n  border-right: 1px solid var(--docket-shell-hairline);\n}\n/* No vertical margin: nav is a flex-grow, h-0 column child, so any margin\n   overflows body and makes the whole page scroll by that amount. */\n[data-docket-reskin] nav.bg-left-nav {\n  display: flex !important;\n  width: 100% !important;\n  max-width: none !important;\n  min-width: 0 !important;\n  box-sizing: border-box !important;\n  gap: 0;\n  margin: 0 !important;\n  padding: 18px 8px !important;\n  background-color: transparent !important;\n  border: 0;\n  font-family: var(--docket-font);\n  overflow-x: hidden;\n}\n[data-docket-reskin] nav.bg-left-nav a {\n  position: relative;\n  display: flex !important;\n  align-items: center !important;\n  min-height: 36px;\n  margin: 1px 0;\n  /* Left padding reserves the icon slot so inserted icons never shift labels. */\n  padding: 7px 12px 7px 38px !important;\n  background-color: transparent !important;\n  border-radius: 8px !important;\n  color: var(--docket-label-secondary) !important;\n  font-family: var(--docket-font) !important;\n  font-size: 14px !important;\n  font-weight: 500 !important;\n  text-decoration: none !important;\n  white-space: nowrap;\n  transition: background-color var(--docket-dur-fast) var(--docket-ease-standard), color var(--docket-dur-fast) var(--docket-ease-standard);\n}\n[data-docket-reskin] nav.bg-left-nav a * { color: inherit !important; }\n[data-docket-reskin] nav.bg-left-nav a:hover {\n  background-color: var(--docket-fill) !important;\n  color: var(--docket-label) !important;\n}\n[data-docket-reskin] nav.bg-left-nav a:focus-visible {\n  outline: 2px solid var(--docket-accent) !important;\n  outline-offset: -2px;\n}\n[data-docket-reskin] nav.bg-left-nav a.docket-nav-item-active {\n  background-color: var(--docket-accent-container) !important;\n  color: var(--docket-on-accent-container) !important;\n  font-weight: 600 !important;\n}\n[data-docket-reskin] nav.bg-left-nav .docket-nav-icon {\n  position: absolute;\n  left: 12px;\n  top: 50%;\n  width: 16px !important;\n  height: 16px !important;\n  transform: translateY(-50%);\n  color: var(--docket-label-tertiary) !important;\n}\n[data-docket-reskin] nav.bg-left-nav .docket-nav-item-active .docket-nav-icon { color: inherit !important; }\n/* Section label, read from LearningSuite\'s own current-section title (shell.ts). */\n[data-docket-reskin] .docket-nav-label {\n  margin: 0 0 6px;\n  line-height: 16px;\n  padding: 0 12px;\n  color: var(--docket-label-tertiary);\n  font-family: var(--docket-font);\n  font-size: 11.5px;\n  font-weight: 650;\n  letter-spacing: .06em;\n  text-transform: uppercase;\n}\n@media (min-width: 1024px) {\n  /* LearningSuite ships a mobile-only "Back to Instructor View" row as nav\'s first\n     child; its wrapper\'s border-b doesn\'t collapse with it on desktop. */\n  [data-docket-reskin] nav.bg-left-nav > :is(:first-child, .docket-nav-label + *) { border-bottom: none !important; }\n}\n\n/* The content well shares the rail\'s canvas, as on MAX. */\n[data-docket-reskin] #fullLSPage {\n  background-color: var(--docket-canvas) !important;\n}\n\n.docket-floating-bar {\n  position: fixed;\n  bottom: max(18px, env(safe-area-inset-bottom));\n  /* Left-anchored: the gear FAB reads as a global settings control, so it lives opposite the\n   * content, away from where scroll gestures land. */\n  left: 18px;\n  z-index: 2147483000;\n  display: flex;\n  gap: 8px;\n  transition: opacity var(--docket-dur-medium) var(--docket-ease-standard), transform var(--docket-dur-medium) var(--docket-ease-standard);\n}\n/**\n * On desktop this sits in the sidebar\'s own dead column and never touches real content. At\n * narrow widths the sidebar collapses and there is no dead column left \u2014 the bar was found\n * live (Sep 2026 UX audit, mobile Combined Schedule) sitting directly on top of scrolled list\n * text, blocking both reading and tapping it. Fading it out while actively scrolling down (see\n * `initFabAutoHide` in shell.ts) keeps it out of the way of the content it would otherwise\n * cover, while scrolling up or coming to rest brings it straight back.\n */\n.docket-floating-bar-hidden {\n  opacity: 0;\n  transform: translateY(8px);\n  pointer-events: none;\n}\n.docket-fab {\n  width: 44px; height: 44px;\n  border-radius: 50%;\n  /* Genuinely floating chrome \u2014 sits over arbitrary scrolled content, like the dropdown\n     menus below, so it keeps the one surviving shadow token. */\n  background: var(--docket-surface-2);\n  box-shadow: var(--docket-shadow-float);\n  border: none;\n  display: flex; align-items: center; justify-content: center;\n  cursor: pointer;\n  color: var(--docket-label);\n  transition: background-color var(--docket-dur-fast) var(--docket-ease-standard), transform var(--docket-dur-fast) var(--docket-ease-standard);\n}\n.docket-fab:hover { background: var(--docket-fill); }\n.docket-fab:active { transform: scale(0.94); }\n.docket-fab:focus-visible {\n  outline: 2px solid var(--docket-accent);\n  outline-offset: 2px;\n}\n.docket-icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }\n\n/**\n * Real native artifact, not this reskin\'s own markup: LearningSuite ships a mobile-only\n * duplicate of the Student View "Back to Instructor View" link as `nav`\'s own first child\n * (`div.bg-left-nav.border-b`, containing an `a.lg\\:hidden` \u2014 confirmed live, Sep 2026). Its\n * content collapses to zero height above the `lg` breakpoint as intended, but the wrapper\n * div\'s own native `border-b` (a plain `1px solid rgb(109,108,109)`) doesn\'t collapse with it,\n * so a stray 1px gray line sat right at the top of the nav card, above "Course List" \u2014 invisible\n * against the old unstyled/near-black nav, but an obvious loose thread now that this card has\n * its own real background/border. Neutralized only above `lg` (matches the link\'s own\n * `lg:hidden`), so the real mobile divider between this link and the rest of the mobile menu is\n * untouched. `:first-child` keys off real DOM position, not a guessed class name that could\n * silently stop matching on a future LearningSuite markup change.\n */\n@media (min-width: 1024px) {\n  .docket-nav-enhanced > *:first-child {\n    border-bottom: none !important;\n  }\n}\n\n/**\n * Real native form controls, not this reskin\'s own inserted markup \u2014 confirmed live the\n * only `appearance: auto` native controls anywhere on the site are `<input type="radio">`\n * in LearningSuite\'s own Preferences dialog (Display: Light/Dark/Attempt-to-detect/Classic\n * Mode) and, by the same tag, any native checkbox. This is a safe, bounded, unambiguous tag\n * selector \u2014 unlike bare `<button>`/`<select>` (deliberately never touched, see global.css\'s\n * own file comment), a radio/checkbox input only ever means "choose an option," never\n * "open a menu," so there\'s no risk of silently breaking an unrelated control.\n *\n * `appearance: none` also strips the browser\'s native focus ring, so a `:focus-visible`\n * replacement below is not optional \u2014 without one this would ship a real keyboard-\n * accessibility regression on the one native form control on the whole site.\n */\n[data-docket-reskin] input[type="radio"],\n[data-docket-reskin] input[type="checkbox"] {\n  appearance: none;\n  -webkit-appearance: none;\n  width: 20px;\n  height: 20px;\n  margin: 0;\n  flex-shrink: 0;\n  position: relative;\n  border: 1.5px solid var(--docket-label-tertiary);\n  background-color: var(--docket-surface-1);\n  cursor: pointer;\n  transition: background-color var(--docket-dur-fast) var(--docket-ease-standard), border-color var(--docket-dur-fast) var(--docket-ease-standard);\n}\n[data-docket-reskin] input[type="radio"] { border-radius: 50%; }\n[data-docket-reskin] input[type="checkbox"] { border-radius: 5px; }\n[data-docket-reskin] input[type="radio"]:checked,\n[data-docket-reskin] input[type="checkbox"]:checked {\n  border-color: var(--docket-accent);\n  background-color: var(--docket-accent);\n}\n[data-docket-reskin] input[type="radio"]:checked::after {\n  content: "";\n  position: absolute;\n  top: 50%; left: 50%;\n  width: 8px; height: 8px;\n  border-radius: 50%;\n  background: var(--docket-on-accent);\n  transform: translate(-50%, -50%);\n}\n[data-docket-reskin] input[type="checkbox"]:checked::after {\n  content: "";\n  position: absolute;\n  top: 2px; left: 6px;\n  width: 5px; height: 10px;\n  border-right: 2px solid var(--docket-on-accent);\n  border-bottom: 2px solid var(--docket-on-accent);\n  transform: rotate(45deg);\n}\n[data-docket-reskin] input[type="radio"]:focus-visible,\n[data-docket-reskin] input[type="checkbox"]:focus-visible {\n  outline: 2px solid var(--docket-accent);\n  outline-offset: 2px;\n}\n\n/**\n * Bare text-entry inputs \u2014 confirmed live (Sep 2026) the only `input` types anywhere on\n * the site are `text` (Email\'s "Select from Contacts"/"Add additional email addresses"\n * fields) and `number` (What-If Calculator\'s score fields; also checked Groups, Schedule,\n * Announcements, Syllabus, Content \u2014 no other input type turned up, so only these two are\n * targeted, not a guessed broader list). Both were fully native: sharp corners, native\n * fill, and \u2014 worse \u2014 the raw browser default focus outline, a THIRD focus-ring language\n * next to the correct one radios/checkboxes get above. Given the matching treatment here.\n */\n[data-docket-reskin] input[type="text"],\n[data-docket-reskin] input[type="number"] {\n  font-family: var(--docket-font) !important;\n  background-color: var(--docket-surface-1) !important;\n  border: 1px solid var(--docket-separator) !important;\n  border-radius: var(--docket-radius-sm) !important;\n  color: var(--docket-label) !important;\n  padding: 6px 10px;\n}\n[data-docket-reskin] input[type="text"]:focus-visible,\n[data-docket-reskin] input[type="number"]:focus-visible {\n  outline: 2px solid var(--docket-accent);\n  outline-offset: 2px;\n  border-color: transparent !important;\n}\n\n/**\n * Masthead: wordmark, course switcher, account. Natively a 36px row with the\n * BYU logo, a small icon mark between border-l/border-r dividers, and stacked\n * "Learning / Suite" text. All of it stays in the DOM (#_topLink remains the\n * real home link); only the visual parts are hidden, and the wordmark is drawn\n * with pseudo-elements so it exists at first paint instead of popping in.\n */\n[data-docket-reskin] #_topLink > div { display: none !important; }\n[data-docket-reskin] #_topLink {\n  display: flex !important;\n  align-items: center;\n  gap: 5px;\n  min-width: 44px;\n  height: 48px;\n  padding: 0 20px;\n  font-family: var(--docket-font);\n  font-size: 15px;\n  letter-spacing: -0.01em;\n  text-decoration: none !important;\n  white-space: nowrap;\n}\n[data-docket-reskin] #_topLink::before {\n  content: "BYU";\n  color: var(--docket-accent);\n  font-weight: 800;\n}\n[data-docket-reskin] #_topLink::after {\n  content: "Learning Suite";\n  color: var(--docket-label-secondary);\n  font-weight: 500;\n}\n/* Course switcher: course name as the bar\'s title, term as quiet metadata. */\n[data-docket-reskin] header .header-coursedropdown {\n  display: flex;\n  align-items: center;\n  height: auto;\n  margin: 0 !important;\n  padding: 0 0 0 16px !important;\n  border-left: 1px solid var(--docket-shell-hairline);\n}\n[data-docket-reskin] .header-coursedropdown-trigger,\n[data-docket-reskin] .header-userdropdown-trigger {\n  position: relative;\n  z-index: 0;\n  align-items: center;\n  height: 32px !important;\n  padding: 0 !important;\n  font-family: var(--docket-font) !important;\n}\n/* The top level shows a lone "All courses" label that LearningSuite uppercases. */\n[data-docket-reskin] .header-coursedropdown-trigger {\n  color: var(--docket-label) !important;\n  font-size: 15px;\n  font-weight: 650;\n  letter-spacing: -0.01em;\n  text-transform: none !important;\n}\n[data-docket-reskin] .header-coursedropdown-trigger > div { text-transform: none !important; }\n[data-docket-reskin] .header-coursedropdown-trigger > div:first-child:not(:only-of-type) {\n  order: 2;\n  margin: 0 0 0 10px !important;\n  color: var(--docket-label-tertiary) !important;\n  font-size: 12.5px;\n  font-weight: 500;\n  letter-spacing: 0;\n  text-transform: none;\n}\n[data-docket-reskin] .header-coursedropdown-trigger > div:nth-child(2) {\n  order: 1;\n  margin: 0 !important;\n  color: var(--docket-label) !important;\n}\n[data-docket-reskin] .header-coursedropdown-trigger .fa-caret-down,\n[data-docket-reskin] .header-userdropdown-trigger .fa-caret-down {\n  order: 3;\n  margin-left: 8px;\n  color: var(--docket-label-tertiary) !important;\n  font-size: 11px;\n}\n[data-docket-reskin] header .header-userdropdown {\n  display: flex;\n  align-items: center;\n  height: auto;\n  margin: 0 0 0 auto !important;\n  padding: 0 !important;\n}\n[data-docket-reskin] .header-userdropdown-trigger span {\n  margin-right: 0 !important;\n  color: var(--docket-label-secondary) !important;\n  font-size: 13.5px;\n  font-weight: 600;\n}\n/* A hover pill drawn outside the button\'s own box, so long course names never\n   lose width to padding. z-index: 0 above keeps it inside this stacking context. */\n[data-docket-reskin] .header-coursedropdown-trigger::before,\n[data-docket-reskin] .header-userdropdown-trigger::before {\n  content: "";\n  position: absolute;\n  inset: 0 -10px;\n  z-index: -1;\n  border-radius: var(--docket-radius-xs);\n  transition: background-color var(--docket-dur-fast) var(--docket-ease-standard);\n  pointer-events: none;\n}\n[data-docket-reskin] .header-coursedropdown-trigger:hover::before,\n[data-docket-reskin] .header-userdropdown-trigger:hover::before {\n  background-color: var(--docket-fill);\n}\n[data-docket-reskin] .header-coursedropdown-trigger:focus-visible,\n[data-docket-reskin] .header-userdropdown-trigger:focus-visible {\n  outline: 2px solid var(--docket-accent) !important;\n  outline-offset: 2px;\n}\n/* The avatar slot is sized at first paint; shell.ts swaps the generic person\n   glyph for an initials chip inside it without moving the name. */\n[data-docket-reskin] .header-userdropdown-trigger > div.relative {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  width: 26px;\n  height: 26px;\n  margin: 0 8px 0 0 !important;\n}\n[data-docket-reskin] .header-userdropdown-trigger > div.relative:has(.docket-user-avatar) .fa-user-circle { display: none; }\n[data-docket-reskin] .docket-user-avatar {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  width: 26px;\n  height: 26px;\n  border-radius: 50%;\n  background: var(--docket-accent-container);\n  color: var(--docket-on-accent-container);\n  font-family: var(--docket-font);\n  font-size: 11px;\n  font-weight: 700;\n}\n@media (max-width: 767px) {\n  [data-docket-reskin] #_topLink::after { content: none; }\n  [data-docket-reskin] header .header-coursedropdown { padding-left: 12px !important; }\n}\n\n/* Student View banner (see global.css\'s .bg-attention rule, kept as the fallback treatment for\n   when shell.ts\'s mountStudentViewBadge() can\'t find the real back-link and fails soft):\n   relocated to a small icon on the settings fabBar, so the full-width native bar is hidden here\n   \u2014 a plain stylesheet rule rather than overlayContent()\'s per-node `.hidden` convention, since\n   this is a single top-level element with the same "exists once or not at all" shape as\n   navEl/topTabsEl/fabBar above, which shell.ts already manages with a marker class rather than\n   the heavier per-adapter overlay machinery. */\n[data-docket-reskin] .docket-banner-relocated {\n  display: none !important;\n}\n\n/**\n * Floating menu chrome \u2014 the top bar\'s own dropdown panels, confirmed live on the Combined\n * Schedule page:\n *\n * - Account menu (Messages/Preferences/Help/Logout): container\n *   `div.header-userdropdown-dropdown` wrapping `ul ... bg-base border-info lg:rounded`\n *   (right-anchored at `lg:right-0 lg:mr-6`).\n * - Course/term switcher ("All courses" at top level; the identical component also serves\n *   the course-scoped term switcher \u2014 same container class, one fix covers both):\n *   container `div.header-coursedropdown-dropdown` wrapping `ul ... bg-base border-info\n *   sm:rounded`.\n *\n * Both panels rendered natively as a solid off-palette box with no shadow and no backdrop\n * blur sitting on top of an otherwise-redesigned page. The containers themselves stay\n * untouched (zero-height position-only wrappers; the `ul` does all the visual work).\n * LearningSuite\'s own `transition-all duration-100 origin-top` open/close animation on the\n * `ul` is confirmed live and deliberately NOT overridden \u2014 only fill/radius/shadow change\n * here. These genuinely float over arbitrary page content, so \u2014 unlike the now-opaque nav\n * rail \u2014 they keep a translucent, blurred material and the one surviving shadow token.\n */\n[data-docket-reskin] .header-userdropdown-dropdown > ul,\n[data-docket-reskin] .header-coursedropdown-dropdown > ul {\n  background-color: var(--docket-canvas) !important;\n  background-color: color-mix(in srgb, var(--docket-canvas) 92%, transparent) !important;\n  border-radius: var(--docket-radius-md) !important;\n  box-shadow: var(--docket-shadow-float);\n  backdrop-filter: saturate(180%) blur(20px);\n  -webkit-backdrop-filter: saturate(180%) blur(20px);\n}\n\n/**\n * Menu-row hover, scoped to the two confirmed surfaces (never sitewide): the header\n * dropdown rows are `li.pt-1.pb-1.hover:bg-accent` / `li.py-1.px-3.hover:bg-accent`, and\n * inside the Preferences sheet the timezone-picker options are\n * `div.cursor-pointer.text-primary.hover\\:bg-accent`. Natively the hover fill is\n * LearningSuite\'s accent color (var(--ac)); here it becomes the same neutral fill every\n * other hoverable row in the redesign uses.\n */\n[data-docket-reskin] .header-userdropdown-dropdown li.hover\\:bg-accent:hover,\n[data-docket-reskin] .header-coursedropdown-dropdown li.hover\\:bg-accent:hover,\n[data-docket-reskin] .popupWrapper .hover\\:bg-accent:hover {\n  background-color: var(--docket-fill) !important;\n}\n\n/* Page footer ("\xA9 BYU", Dark Mode toggle, LS Help): part of the shell, so it takes the\n   shell\'s canvas and hairline instead of its own native .bg-base fill. */\n[data-docket-reskin] main ~ footer,\n[data-docket-reskin] #fullLSPage footer.bg-base {\n  background-color: var(--docket-canvas) !important;\n  border-top: 1px solid var(--docket-shell-hairline) !important;\n}\n/* LearningSuite rules every page title (h1.pb-px, border-b) \u2014 MAX titles carry no rule,\n   and the shell\'s own hairlines already separate the chrome from the page. */\n[data-docket-reskin] main h1 { border-bottom: 0 !important; }\n\n/* Content\'s rail is a collapsible tree: .navItem > .dynamicNavLink > div > a, with its\n   own pl-7 / px-2 pl-4 indents and a fixed h-5 row. Collapse those so tree rows share\n   the flat rail\'s geometry; tree links carry no icon, so they skip the icon slot. */\n[data-docket-reskin] nav.bg-left-nav .navItem {\n  min-height: 0 !important;\n  padding-left: 0 !important;\n  border: 0 !important;\n}\n[data-docket-reskin] nav.bg-left-nav .navItem .navItem { padding-left: 14px !important; }\n[data-docket-reskin] nav.bg-left-nav .dynamicNavLink {\n  align-items: center;\n  height: auto !important;\n  margin: 0 !important;\n  padding: 0 !important;\n}\n[data-docket-reskin] nav.bg-left-nav .dynamicNavLink > div.flex { flex: 1 1 auto; min-width: 0; }\n[data-docket-reskin] nav.bg-left-nav .dynamicNavLink a {\n  flex: 1 1 auto;\n  display: block !important;\n  min-width: 0;\n  padding-left: 12px !important;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n[data-docket-reskin] nav.bg-left-nav .dynamicNavLink > :not(div.flex) {\n  flex: 0 0 auto;\n  width: 20px;\n  margin: 0 !important;\n  padding: 0 !important;\n  color: var(--docket-label-tertiary) !important;\n  text-align: center;\n}\n[data-docket-reskin] nav.bg-left-nav .navItem .h-3 { display: none; }\n[data-docket-reskin] nav.bg-left-nav .sideNavList { padding-top: 0 !important; border: 0 !important; }\n/* Leaf rows have no disclosure caret; indent them to the caret rows\' text column. */\n[data-docket-reskin] nav.bg-left-nav .dynamicNavLink > div.flex:only-child a { padding-left: 32px !important; }\n';
 
   // src/styles/cards.css
   var cards_default = `/* Apple "grouped list" idiom (Reminders/Settings/Mail): a rounded card containing
@@ -448,22 +449,26 @@ html[data-docket-page="announcements"] main > div {
   var schedule_default = '/**\n * Course-scoped Schedule page (issue #6, Sep 2026 pass). All selectors are\n * traced to live DOM (tools/audit/37\u201340, real DANCE 280 Schedule page, Table\n * view), and the whole file is gated behind `[data-docket-page="schedule"]`,\n * which src/index.ts derives each pass from a live-confirmed page-unique\n * signal (`main .innerBox` \u2014 the view switcher; 1 hit on Schedule, 0 on the\n * seven other page types censused). The earlier "no stable class names" note\n * about this page was outdated: it renders LearningSuite\'s own Tailwind-ish\n * utilities, and the compounds below were verified unique to this page.\n *\n * What was actually wrong (measured live): colors already remapped fine via\n * global.css\'s sitewide .bg-accent/.bg-gray1/.bg-primary rules, but shape did\n * not \u2014 the Table/List view switcher trigger and its dropdown menu compute\n * radius 0px (dropdown bg solid rgb(36,36,36), off-palette in both themes),\n * the blue "today" day chip is a sharp-cornered square, and the view switcher\n * being bg-accent = bg-gray1 made the active view indistinguishable. The\n * `border-collapse: separate` bare-table suspicion from the brief was checked\n * and ruled out live: this page contains zero <table> elements in either of\n * its views (the grid is CSS-grid divs), so the bare-table rule never fires\n * here.\n *\n * Live numbers below were measured on the injected page (audit 37/38/39).\n */\n\n/* \u2500\u2500 The Table/List view switcher \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n * Confirmed structure: div.relative.outerBox > div.relative.inline-block...bg-base\n * > div.flex.justify-between.items-center.border.px-2.innerBox (trigger,\n * h-8) + div.bg-base...border.border-gray3.rounded (menu, -z-10 invisible\n * until opened). `.innerBox`/`.outerBox` are Schedule-unique (census 40), so\n * `main .innerBox` can only mean this control. The trigger keeps the\n * sitewide .bg-base treatment from global.css (neutral fill, like macOS\'s\n * segmented-control well); the OPEN choice inside the menu carries\n * `bg-accent`, which the sitewide rule turns into the same neutral fill as\n * the inactive rows \u2014 killing the only active-state signal the control has.\n * Restore an Apple-style selected state there specifically. */\n[data-docket-page="schedule"] main .innerBox {\n  border-radius: var(--docket-radius-sm) !important;\n  border-color: var(--docket-separator) !important;\n  background-color: var(--docket-fill) !important;\n  font-family: var(--docket-font) !important;\n  overflow: hidden;\n}\n/* The dropdown menu: off-palette solid rgb(36,36,36) in both themes, 0px\n * radius natively (`border-gray3 rounded` \u2014 its own `rounded` class is 4px,\n * off-scale). Elevated surface: canvas + hairline + shadow, like every other\n * menu/dropdown the redesign owns (navigation.css\'s dropdown treatment). */\n[data-docket-page="schedule"] main .outerBox > .bg-base.border-gray3 {\n  border-radius: var(--docket-radius-md) !important;\n  background-color: var(--docket-bg-elevated) !important;\n  box-shadow: var(--docket-shadow);\n  border-color: var(--docket-separator) !important;\n  overflow: hidden;\n}\n/* Selected view inside the open menu \u2014 confirmed live as\n * `div.bg-accent.cursor-pointer.text-primary.hover:bg-accent.flex.flex-col.px-3`.\n * Apple segmented-control semantics: the selected segment gets the accent\n * fill, not the same fill as the rest. */\n[data-docket-page="schedule"] main .outerBox > .bg-base.border-gray3 > .bg-accent {\n  background-color: var(--docket-accent) !important;\n  color: var(--docket-on-accent) !important;\n}\n\n/* \u2500\u2500 Week header rows (Table view) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n * Confirmed live: `div.text-primary.bg-gray1.px-4.py-2.cursor-pointer`,\n * one per week (16 on the audited page), sitting directly above each week\'s\n * content wrapper. Gated to the schedule scope because the plain\n * `.bg-gray1.px-4.py-2` compound also appears on the course Dashboard (6\xD7,\n * census 40). Grouped-list section header treatment: tinted fill, rounded\n * group corners, no border. */\n[data-docket-page="schedule"] main .bg-gray1.px-4.py-2 {\n  border-radius: var(--docket-radius-sm) var(--docket-radius-sm) 0 0 !important;\n  font-family: var(--docket-font) !important;\n  font-weight: 600 !important;\n  color: var(--docket-label) !important;\n  background-color: var(--docket-fill) !important;\n}\n/* Week content wrapper (the `.bg-base.p-1.pt-4` grid panel under each week\n * header \u2014 Schedule-unique per census 40; 15 of them = 15 weeks + 1 header).\n * Rounds the BOTTOM of each week group so header+content read as one card\n * (the header rule above rounds the top). p-1/pt-4 margins pull the inner\n * grid up over the wrapper\'s own edges (-mx-1 -mt-4), so clip the wrapper\'s\n * corners: without overflow hidden the grid\'s cell borders poke past the\n * rounded corners as sharp pixels. */\n[data-docket-page="schedule"] main .bg-base.p-1.pt-4 {\n  border-radius: 0 0 var(--docket-radius-sm) var(--docket-radius-sm) !important;\n  overflow: hidden;\n  box-shadow: var(--docket-shadow);\n  margin-bottom: 10px;\n}\n/* \u2500\u2500 Grid cells (day rows inside each week) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n * Confirmed live: rows are `div.grid.-mx-1.-mt-4` of cells\n * `div.pb-2.border-gray2.border-b[.border-r]` \u2014 hairline shared edges. The\n * gray-cell borders get the token treatment; the underlying panel (rule\n * above) is what reads as the card. */\n[data-docket-page="schedule"] main .bg-base.p-1.pt-4 .border-b {\n  border-color: var(--docket-separator) !important;\n}\n/* Day/date label cells (first cell of each row) \u2014 secondary label weight so\n * the entry text reads as the primary content. */\n[data-docket-page="schedule"] main .bg-base.p-1.pt-4 .border-b:first-child {\n  color: var(--docket-label-secondary) !important;\n}\n\n/* \u2500\u2500 "Today" markers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n * Two confirmed live shapes, both native accent-blue with sharp corners:\n * 1. The Table view\'s blue day chip `div.bg-primary.hover:border-primary-alt`\n *    (global.css already remaps .bg-primary to --docket-blue + white text \u2014\n *    this adds the missing shape/typography).\n * 2. The mini-calendar\'s today cell (same `.bg-primary` utility).\n * Apple Calendar\'s today treatment: accent pill, white text, no visible\n * border. */\n[data-docket-page="schedule"] main .bg-primary.hover\\:border-primary-alt {\n  border-radius: var(--docket-radius-sm) !important;\n  border: none !important;\n  font-family: var(--docket-font) !important;\n  font-weight: 600 !important;\n  box-shadow: none !important;\n}\n\n/* \u2500\u2500 "Go to Combined Schedule" button \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n * Confirmed live: `button.bg-action...` (the only one on the page), already\n * filled/remapped by global.css\'s .bg-action rule \u2014 but its computed radius\n * was 0px natively on this page (census 37) because that rule doesn\'t reach\n * it (see note there); this guarantees the token radius and font. */\n[data-docket-page="schedule"] main button.bg-action {\n  border-radius: var(--docket-radius-sm) !important;\n  font-family: var(--docket-font) !important;\n  font-weight: 600 !important;\n}\n\n/* \u2500\u2500 Phone Table view: retain cells, reflow their real order \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n * On a live 390px view the native inline `128px 1fr 1fr` grid reduced each\n * content column to ~120px: every title wrapped into a tall, hard-to-scan\n * vertical strip. `markScheduleTableGrids()` identifies the real header and\n * each repeating Date / Column 1 / Column 2 trio; at this breakpoint only,\n * retain those native elements and simply stack them. No data, link, menu,\n * or click handler is recreated or removed. */\n@media (max-width: 560px) {\n  [data-docket-page="schedule"] main .grid[data-docket-schedule-header="true"] {\n    display: none !important;\n  }\n  [data-docket-page="schedule"] main .grid[data-docket-schedule-reflow="true"] {\n    grid-template-columns: minmax(0, 1fr) !important;\n    grid-template-rows: none !important;\n    margin: 0 !important;\n  }\n  [data-docket-page="schedule"] main .grid[data-docket-schedule-reflow="true"] > [data-docket-schedule-cell] {\n    grid-column: 1 !important;\n    min-width: 0;\n    border-right: 0 !important;\n    padding: 10px 12px !important;\n  }\n  [data-docket-page="schedule"] main .grid[data-docket-schedule-reflow="true"] > [data-docket-schedule-empty="true"] {\n    display: none;\n  }\n  [data-docket-page="schedule"] main .grid[data-docket-schedule-reflow="true"] > [data-docket-schedule-cell="date"] {\n    background-color: var(--docket-surface-2);\n    color: var(--docket-label-secondary) !important;\n    font-weight: 600;\n    padding-top: 8px !important;\n    padding-bottom: 8px !important;\n  }\n  [data-docket-page="schedule"] main .grid[data-docket-schedule-reflow="true"] > [data-docket-schedule-cell="primary"],\n  [data-docket-page="schedule"] main .grid[data-docket-schedule-reflow="true"] > [data-docket-schedule-cell="secondary"] {\n    background-color: var(--docket-surface-1);\n  }\n}\n';
 
   // src/styles/max.css
-  var max_default = `/* MAX keeps its own server-rendered structure. Target stable roles, not every
- * nested div, so surface hierarchy and authored content stay intact. */
+  var max_default = `/* MAX is a Bootstrap 3 app with a fixed shell: .navbar-fixed-top, a fixed
+ * #sidebar rail, and a fixed #main-content pane holding #form-toolbar above the
+ * scrolling #form-content. Every selector below was confirmed against that live
+ * DOM; the shell keeps its native geometry so no rule has to fight its layout. */
 html[data-docket-max-reskin] {
   color-scheme: light;
   --docket-max-font: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
   --docket-max-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --docket-max-canvas: #fff; --docket-max-surface-1: #f8f9fa; --docket-max-surface-2: #f1f3f4; --docket-max-surface-3: #e9eaee;
-  --docket-max-label: #1f1f1f; --docket-max-secondary: #444746; --docket-max-muted: #6c6f70; --docket-max-border: #dadce0; --docket-max-fill: #eceef0;
-  --docket-max-accent: #0b57d0; --docket-max-on-accent: #fff; --docket-max-accent-container: #d2e3fc; --docket-max-on-accent-container: #174ea6;
-  --docket-max-radius-sm: 10px; --docket-max-radius: 14px; --docket-max-rail: var(--docket-max-accent); --docket-max-focus: var(--docket-max-accent); --docket-max-dur: 120ms;
+  --docket-max-label: #1f1f1f; --docket-max-secondary: #444746; --docket-max-muted: #6c6f70; --docket-max-border: #e3e5e8; --docket-max-fill: #eceef0;
+  --docket-max-accent: #0b57d0; --docket-max-on-accent: #fff; --docket-max-accent-container: #d3e3fd; --docket-max-on-accent-container: #0842a0;
+  --docket-max-green: #1e8e3e; --docket-max-blue: #1a73e8; --docket-max-orange: #e8710a;
+  --docket-max-radius-sm: 8px; --docket-max-radius: 12px; --docket-max-focus: var(--docket-max-accent); --docket-max-dur: 120ms;
 }
 html[data-docket-max-reskin][data-docket-theme="dark"] {
   color-scheme: dark;
-  --docket-max-canvas: #131314; --docket-max-surface-1: #1b1b1c; --docket-max-surface-2: #1f1f20; --docket-max-surface-3: #2a2a2c;
-  --docket-max-label: #e3e3e3; --docket-max-secondary: #c4c7c5; --docket-max-muted: #9a9d9c; --docket-max-border: #444746; --docket-max-fill: #2a2a2c;
-  --docket-max-accent: #a8c7fa; --docket-max-on-accent: #062e6f; --docket-max-accent-container: #0e2a4d; --docket-max-on-accent-container: #aecbfa;
+  --docket-max-canvas: #131314; --docket-max-surface-1: #1b1b1d; --docket-max-surface-2: #222224; --docket-max-surface-3: #2c2c2f;
+  --docket-max-label: #e3e3e3; --docket-max-secondary: #c4c7c5; --docket-max-muted: #8e918f; --docket-max-border: #2e2f31; --docket-max-fill: #28292b;
+  --docket-max-accent: #a8c7fa; --docket-max-on-accent: #062e6f; --docket-max-accent-container: #1c3355; --docket-max-on-accent-container: #d3e3fd;
+  --docket-max-green: #81c995; --docket-max-blue: #8ab4f8; --docket-max-orange: #fcad70;
 }
 html[data-docket-max-reskin][data-docket-background="graphite"] { --docket-max-canvas: #e8e8ed; }
 html[data-docket-max-reskin][data-docket-theme="dark"][data-docket-background="graphite"] { --docket-max-canvas: #000; }
@@ -476,440 +481,266 @@ html[data-docket-max-reskin][data-docket-theme="dark"][data-docket-background="r
 html[data-docket-max-reskin][data-docket-background="sand"] { --docket-max-canvas: #f7f1e5; }
 html[data-docket-max-reskin][data-docket-theme="dark"][data-docket-background="sand"] { --docket-max-canvas: #16120a; }
 
+/* Base. Spans are deliberately excluded from the font reset: MAX's
+ * .glyphicons/.halflings icons and MathJax glyphs are spans with their own
+ * fonts, and overriding them renders blank boxes. */
 html[data-docket-max-reskin], html[data-docket-max-reskin] body {
-  min-height: 100%; margin: 0; background: var(--docket-max-canvas) !important; color: var(--docket-max-label) !important;
-  font-family: var(--docket-max-font) !important; font-size: 16px; line-height: 1.5;
+  background: var(--docket-max-canvas) !important; color: var(--docket-max-label) !important;
+  font-family: var(--docket-max-font) !important; font-size: 15px; line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
-/* MAX applies a legacy serif face directly to content descendants. Reset prose
- * deliberately, while the monospace/math exception below keeps equations intact. */
-html[data-docket-max-reskin] body :is(p, div, span, li, dt, dd, td, th, label, legend, small) {
-  color: var(--docket-max-label) !important; font-family: var(--docket-max-font) !important;
+html[data-docket-max-reskin] :is(p, div, li, dt, dd, td, th, label, legend, small, a, b, strong, i, em, h1, h2, h3, h4, h5, h6, input, select, textarea, button):not(.MathJax *, .MathJax_Display *, mjx-container *) {
+  font-family: var(--docket-max-font) !important;
 }
-html[data-docket-max-reskin] :is(#app, #root, main, #main, #content, #main-content, #page-content, .content, .content-wrapper, .container, .container-fluid) {
-  width: auto; max-width: min(1440px, calc(100% - 3rem)); margin-inline: auto; background: transparent !important; color: var(--docket-max-label) !important;
-}
-html[data-docket-max-reskin] .docket-max-course-header {
-  display: flex !important; align-items: center !important; height: 56px !important; min-height: 56px !important; max-height: 56px !important; padding: 0 1.25rem !important;
-  background: var(--docket-max-surface-1) !important; border-bottom: 1px solid var(--docket-max-border) !important;
-  box-sizing: border-box !important; overflow: hidden !important;
-}
-html[data-docket-max-reskin] .docket-max-menu-toggle {
-  position: static !important; display: none !important; align-items: center !important; justify-content: center !important;
-  width: 40px !important; min-width: 40px !important; min-height: 40px !important; margin: 0 .6rem 0 0 !important; padding: 0 !important;
-  background: transparent !important; border: 1px solid transparent !important; border-radius: var(--docket-max-radius-sm) !important; color: var(--docket-max-secondary) !important; font-size: 0 !important;
-}
-html[data-docket-max-reskin] .docket-max-menu-toggle::before { content: "\u2630"; font-size: 1.1rem; line-height: 1; }
-html[data-docket-max-reskin] .docket-max-menu-toggle:hover { background: var(--docket-max-fill) !important; color: var(--docket-max-label) !important; }
-html[data-docket-max-reskin] .docket-max-course-context {
-  display: inline-flex !important; align-items: center !important; min-height: 42px !important; margin-right: auto !important; color: var(--docket-max-label) !important;
-  font-size: .9375rem !important; font-weight: 650 !important; text-decoration: none !important; white-space: nowrap !important; border: 0 !important; box-shadow: none !important;
-}
-html[data-docket-max-reskin] .docket-max-user-menu { color: var(--docket-max-secondary) !important; font-size: .875rem !important; font-weight: 600 !important; border: 0 !important; box-shadow: none !important; text-decoration: none !important; }
-html[data-docket-max-reskin] .docket-max-empty-search,
-html[data-docket-max-reskin] .docket-max-empty-search-shell,
-html[data-docket-max-reskin] .docket-max-shortcuts,
-html[data-docket-max-reskin] .docket-max-shortcut { display: none !important; }
-/* The Dashboard's legacy "Navigate" search is a decorative header control;
- * target its stable native value as a fallback while its generated wrapper is
- * still streaming into the page. */
-html[data-docket-max-reskin] :is(input, textarea)[value="Navigate" i],
-html[data-docket-max-reskin] :is(input, textarea)[aria-label*="Navigate" i],
-html[data-docket-max-reskin] :is(input, textarea)[placeholder*="Navigate" i] { display: none !important; }
-html[data-docket-max-reskin] .docket-max-primary-nav {
-  display: flex !important; align-items: stretch !important; min-height: 42px !important; padding: 0 .75rem !important;
-  background: var(--docket-max-surface-1) !important; border-bottom: 1px solid var(--docket-max-border) !important;
-}
-html[data-docket-max-reskin] .docket-max-primary-nav a {
-  display: flex !important; align-items: center !important; min-height: 42px !important; padding: 0 .8rem !important;
-  background: transparent !important; border: 0 !important; border-bottom: 2px solid transparent !important; color: var(--docket-max-secondary) !important;
-  font-size: .875rem !important; font-weight: 600 !important; text-decoration: none !important;
-}
-html[data-docket-max-reskin] .docket-max-primary-nav a:hover { background: var(--docket-max-fill) !important; color: var(--docket-max-label) !important; }
-html[data-docket-max-reskin] .docket-max-primary-nav .docket-max-active-nav { background: transparent !important; border-bottom-color: var(--docket-max-accent) !important; color: var(--docket-max-accent) !important; }
-html[data-docket-max-reskin] .docket-max-sidebar {
-  padding: .4rem !important; background: var(--docket-max-surface-1) !important; border: 1px solid var(--docket-max-border) !important;
-  border-radius: var(--docket-max-radius) !important;
-}
-html[data-docket-max-reskin] .docket-max-sidebar :is(div, ul, li) { background: transparent !important; border-color: transparent !important; }
-html[data-docket-max-reskin] .docket-max-sidebar :is(a, [role="link"]) { display: flex !important; align-items: center !important; min-height: 44px !important; padding: .5rem .75rem !important; border: 0 !important; border-radius: var(--docket-max-radius-sm) !important; color: var(--docket-max-secondary) !important; }
-html[data-docket-max-reskin] .docket-max-main-pane { width: calc(100% - 2rem) !important; max-width: none !important; margin: 1rem !important; }
-html[data-docket-max-reskin] .docket-max-content-row {
-  position: relative !important; display: block !important; min-height: 52px !important; line-height: 1.4 !important; list-style-position: inside !important;
-  margin: .35rem 0 !important; padding: .45rem .75rem .45rem 1rem !important; background: var(--docket-max-surface-1) !important;
-  border: 1px solid var(--docket-max-border) !important; border-radius: var(--docket-max-radius-sm) !important;
-}
-html[data-docket-max-reskin] .docket-max-content-row::before { position: absolute; inset: 0 auto 0 0; width: 3px; border-radius: var(--docket-max-radius-sm) 0 0 var(--docket-max-radius-sm); background: var(--docket-max-accent); content: ""; }
-html[data-docket-max-reskin] .docket-max-content-row:hover { background: var(--docket-max-surface-2) !important; }
-html[data-docket-max-reskin] .docket-max-content-row a { color: var(--docket-max-label) !important; font-weight: 600 !important; text-decoration: none !important; }
-html[data-docket-max-reskin] .docket-max-redundant-outline { display: none !important; }
-/* The Reading view's production content pane uses a generated content/main
- * class rather than MAX's older Bootstrap container names. Scope this only to
- * role-named page regions; it replaces the former unsafe all-div reset. */
-html[data-docket-max-reskin][data-docket-theme="dark"] :is([class*="content"], [class*="Content"], [class*="main"], [class*="Main"]) {
-  background-color: var(--docket-max-canvas) !important;
-}
-html[data-docket-max-reskin] :is(pre, code, kbd, samp, .MathJax, .MathJax_Display, .MathJax_SVG, mjx-container) { font-family: var(--docket-max-mono) !important; }
-
-/* Compact course shell and section strip. */
-html[data-docket-max-reskin] :is(header, #header, .navbar, .navbar-default, .navbar-inverse) {
-  min-height: 56px; background: var(--docket-max-surface-1) !important; border: 0 !important; border-bottom: 1px solid var(--docket-max-border) !important; box-shadow: none !important;
-}
-html[data-docket-max-reskin] :is(.navbar-header, .navbar-brand) { min-height: 56px; display: flex; align-items: center; }
-html[data-docket-max-reskin] .navbar-brand { padding: 0 1rem; color: var(--docket-max-label) !important; font-size: .95rem; font-weight: 650; letter-spacing: -.01em; }
-html[data-docket-max-reskin] :is(.navbar-nav > li > a, .navbar-text, .navbar-toggle) { min-height: 56px; display: flex; align-items: center; color: var(--docket-max-secondary) !important; }
-html[data-docket-max-reskin] :is(.courseMenu, .course-menu, .subnav, .nav-tabs) {
-  display: flex; gap: .15rem; min-height: 42px; margin: 0 !important; padding: 0 .75rem; overflow-x: auto;
-  background: var(--docket-max-surface-1) !important; border: 0 !important; border-bottom: 1px solid var(--docket-max-border) !important;
-}
-html[data-docket-max-reskin] :is(.courseMenu a, .course-menu a, .subnav a, .nav-tabs > li > a) {
-  display: flex; align-items: center; min-height: 42px; padding: 0 .8rem !important; color: var(--docket-max-secondary) !important;
-  border: 0 !important; border-bottom: 2px solid transparent !important; border-radius: 0 !important; font-size: .875rem; font-weight: 600; text-decoration: none !important;
-}
-html[data-docket-max-reskin] :is(.courseMenu a:hover, .course-menu a:hover, .subnav a:hover, .nav-tabs > li > a:hover) { background: var(--docket-max-fill) !important; color: var(--docket-max-label) !important; }
-html[data-docket-max-reskin] :is(.courseMenu .active > a, .course-menu .active > a, .subnav .active > a, .nav-tabs > li.active > a, [aria-current="page"]) {
-  background: transparent !important; color: var(--docket-max-accent) !important; border-bottom-color: var(--docket-max-accent) !important;
-}
-
-/* Quiet 44px rail with a strong selected state instead of ruled-list chrome. */
-html[data-docket-max-reskin] :is(#sidebar, .sidebar, .left-nav, .sidenav) { background: var(--docket-max-surface-1) !important; border: 1px solid var(--docket-max-border) !important; border-radius: var(--docket-max-radius) !important; padding: .4rem !important; }
-html[data-docket-max-reskin] :is(.list-group, #sidebar ul, .sidebar ul, .left-nav ul, .sidenav ul) { margin: 0 !important; padding: 0 !important; list-style: none; }
-html[data-docket-max-reskin] :is(.list-group-item, .sidebar a, .left-nav a, .sidenav a, #sidebar a) {
-  display: flex; align-items: center; min-height: 44px; margin: 0; padding: .5rem .75rem !important; background: transparent !important;
-  border: 0 !important; border-radius: var(--docket-max-radius-sm) !important; color: var(--docket-max-secondary) !important; font-size: .9rem; text-decoration: none !important;
-}
-html[data-docket-max-reskin] :is(.list-group-item:hover, .sidebar a:hover, .left-nav a:hover, .sidenav a:hover, #sidebar a:hover) { background: var(--docket-max-fill) !important; color: var(--docket-max-label) !important; }
-html[data-docket-max-reskin] :is(.list-group-item.active, .sidebar .active > a, .left-nav .active > a, .sidenav .active > a, #sidebar .active > a) { background: var(--docket-max-accent-container) !important; color: var(--docket-max-on-accent-container) !important; font-weight: 650; }
-
-/* Cards, activities, schedule groups, and announcements. */
-html[data-docket-max-reskin] :is(.panel, .well, .card, .box, .innerBox, .alert, .activity, .announcement, .schedule-item, .event, .content-item) {
-  position: relative; margin-block: .75rem; padding: 1rem; background: var(--docket-max-surface-1) !important; border: 1px solid var(--docket-max-border) !important;
-  border-radius: var(--docket-max-radius) !important; color: var(--docket-max-label) !important; box-shadow: none !important;
-}
-html[data-docket-max-reskin] :is(.activity, .announcement, .schedule-item, .event, .content-item)::before { position: absolute; inset: 0 auto 0 0; width: 3px; border-radius: var(--docket-max-radius) 0 0 var(--docket-max-radius); background: var(--docket-max-rail); content: ""; }
-html[data-docket-max-reskin] :is(.panel-heading, .panel-footer, .card-header, .box-header) { margin: -1rem -1rem 1rem; padding: .75rem 1rem; background: var(--docket-max-surface-2) !important; border: 0 !important; border-bottom: 1px solid var(--docket-max-border) !important; color: var(--docket-max-label) !important; }
-html[data-docket-max-reskin] :is(.activity a, .announcement a, .schedule-item a, .event a, .content-item a) { display: block; color: inherit !important; text-decoration: none !important; }
-html[data-docket-max-reskin] :is(.activity:hover, .announcement:hover, .schedule-item:hover, .event:hover, .content-item:hover) { background: var(--docket-max-surface-2) !important; }
-html[data-docket-max-reskin] :is(.meta, .metadata, .date, .due-date, time, .text-muted, .help-block, .subtitle) { color: var(--docket-max-muted) !important; font-size: .8125rem; }
-
-html[data-docket-max-reskin] :is(h1, h2, h3, h4, h5, h6) { color: var(--docket-max-label) !important; font-family: var(--docket-max-font) !important; font-weight: 650 !important; letter-spacing: -.015em; text-decoration: none !important; border-bottom: 0 !important; }
-html[data-docket-max-reskin] h1 { margin: 1.25rem 0 1rem; font-size: clamp(1.5rem, 1.2rem + 1vw, 2rem); }
-html[data-docket-max-reskin] h2 { margin: 1.25rem 0 .75rem; font-size: clamp(1.2rem, 1.05rem + .5vw, 1.45rem); }
-html[data-docket-max-reskin] :is(p, li, dt, dd, td, th, label, legend, small) { color: var(--docket-max-label) !important; font-family: var(--docket-max-font) !important; }
-html[data-docket-max-reskin] :is(ul, ol) { padding-inline-start: 1.35rem; }
-html[data-docket-max-reskin] li + li { margin-top: .3rem; }
+html[data-docket-max-reskin] :is(p, div, li, dt, dd, td, th, label, legend, small, b, strong, i, em):not(.MathJax *, .MathJax_Display *, mjx-container *) { color: inherit; }
+html[data-docket-max-reskin] :is(pre, code, kbd, samp) { font-family: var(--docket-max-mono) !important; }
+/* MathJax 2 falls back to black PNG glyphs when its web fonts are unavailable
+ * (Safari), and text color cannot reach those images. Invert them to the label tone. */
+html[data-docket-max-reskin][data-docket-theme="dark"] :is(.MathJax, .MathJax_Display) img { filter: invert(.86) !important; }
 html[data-docket-max-reskin] a { color: var(--docket-max-accent) !important; }
+html[data-docket-max-reskin] ::selection { background: var(--docket-max-accent); color: var(--docket-max-on-accent); }
 
-/* High-contrast data and timetable events communicate through text as well as color. */
-html[data-docket-max-reskin] :is(table, .table) { width: 100%; background: var(--docket-max-surface-1) !important; border: 1px solid var(--docket-max-border) !important; border-collapse: separate; border-radius: var(--docket-max-radius) !important; border-spacing: 0; overflow: hidden; }
-html[data-docket-max-reskin] :is(th, td) { padding: .7rem .85rem !important; background: var(--docket-max-surface-1) !important; border-color: var(--docket-max-border) !important; color: var(--docket-max-label) !important; text-align: start; vertical-align: top; }
-html[data-docket-max-reskin] :is(th, thead > tr > th, thead > tr > td) { background: var(--docket-max-surface-2) !important; font-weight: 650; }
-html[data-docket-max-reskin] tr + tr :is(th, td) { border-top: 1px solid var(--docket-max-border) !important; }
-html[data-docket-max-reskin] .table-striped > tbody > tr:nth-of-type(odd) > * { background: var(--docket-max-surface-2) !important; }
-html[data-docket-max-reskin] .table-hover > tbody > tr:hover > * { background: var(--docket-max-fill) !important; }
-html[data-docket-max-reskin] :is(.fc-event, .calendar-event, .timetable-event, .schedule-event, .docket-max-schedule-event) { background: var(--docket-max-accent-container) !important; border: 1px solid var(--docket-max-accent) !important; color: var(--docket-max-on-accent-container) !important; }
-html[data-docket-max-reskin] :is(.fc-event *, .calendar-event *, .timetable-event *, .schedule-event *, .docket-max-schedule-event *) { color: inherit !important; }
+/* Top bar: course context row, then the section tabs. */
+html[data-docket-max-reskin] .navbar-fixed-top {
+  min-height: 0 !important; margin: 0 !important; background: var(--docket-max-surface-1) !important;
+  border: 0 !important; border-bottom: 1px solid var(--docket-max-border) !important; box-shadow: none !important;
+}
+html[data-docket-max-reskin] .navbar-fixed-top > .container-fluid { padding: 0 !important; }
+html[data-docket-max-reskin] .navbar-fixed-top .navbar-header {
+  float: none !important; background: transparent !important; border: 0 !important; display: flex !important; align-items: center !important; gap: 8px;
+  height: 48px; margin: 0 !important; padding: 0 20px !important;
+}
+html[data-docket-max-reskin] .navbar-brand {
+  float: none !important; display: flex !important; align-items: baseline !important; gap: 10px;
+  height: auto !important; margin: 0 !important; padding: 0 !important;
+  color: var(--docket-max-label) !important; font-size: 15px !important; font-weight: 650 !important; letter-spacing: -.01em; text-decoration: none !important;
+}
+html[data-docket-max-reskin] .navbar-brand .brand-sub {
+  position: static !important; color: var(--docket-max-muted) !important; font-size: 12.5px !important; font-weight: 500 !important; letter-spacing: 0;
+}
+/* The header's "Navigate" text search duplicates the tabs and rail. */
+html[data-docket-max-reskin] .searchdiv { display: none !important; }
+html[data-docket-max-reskin] .navbar-toggle {
+  margin: 0 !important; padding: 8px !important; background: transparent !important; border: 0 !important; border-radius: var(--docket-max-radius-sm) !important;
+}
+html[data-docket-max-reskin] .navbar-toggle .icon-bar { background: var(--docket-max-secondary) !important; }
+html[data-docket-max-reskin] .navbar-toggle:hover { background: var(--docket-max-fill) !important; }
+html[data-docket-max-reskin] .navbar-collapse { padding: 0 8px !important; border: 0 !important; box-shadow: none !important; }
+html[data-docket-max-reskin] .navbar-nav > li > a {
+  background: transparent !important; color: var(--docket-max-secondary) !important;
+  font-size: 13.5px !important; font-weight: 600 !important; text-decoration: none !important;
+}
+html[data-docket-max-reskin] .navbar-nav > li > a:hover { color: var(--docket-max-label) !important; background: var(--docket-max-fill) !important; }
+html[data-docket-max-reskin] .navbar-nav > :is(.active, .open) > a,
+html[data-docket-max-reskin] .navbar-nav [aria-current="page"] { color: var(--docket-max-accent) !important; background: transparent !important; }
+html[data-docket-max-reskin] .caret {
+  margin-left: 6px !important; border-top: 4px solid currentColor !important; border-right: 4px solid transparent !important;
+  border-left: 4px solid transparent !important; border-bottom: 0 !important; opacity: .6;
+}
+@media (min-width: 768px) {
+  html[data-docket-max-reskin] .navbar-collapse.collapse { display: flex !important; align-items: stretch; height: 40px !important; }
+  html[data-docket-max-reskin] .navbar-nav { float: none !important; display: flex !important; margin: 0 !important; }
+  html[data-docket-max-reskin] .navbar-nav > li { float: none !important; }
+  html[data-docket-max-reskin] .navbar-nav.navbar-right { margin-left: auto !important; }
+  html[data-docket-max-reskin] .navbar-nav > li > a {
+    display: flex !important; align-items: center; height: 40px; padding: 0 12px !important; box-sizing: border-box;
+    border-bottom: 2px solid transparent !important;
+  }
+  html[data-docket-max-reskin] .navbar-nav > .active > a { border-bottom-color: var(--docket-max-accent) !important; }
+}
+html[data-docket-max-reskin] .dropdown-menu {
+  min-width: 200px; margin-top: 4px !important; padding: 6px !important; background: var(--docket-max-surface-2) !important;
+  border: 1px solid var(--docket-max-border) !important; border-radius: var(--docket-max-radius) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .28) !important;
+}
+html[data-docket-max-reskin] .dropdown-menu > li > a {
+  padding: 7px 12px !important; border-radius: 6px; color: var(--docket-max-label) !important; font-size: 14px; text-decoration: none !important;
+}
+html[data-docket-max-reskin] .dropdown-menu > li > a:is(:hover, :focus) { background: var(--docket-max-fill) !important; }
+html[data-docket-max-reskin] .dropdown-menu .divider { margin: 6px 0 !important; background: var(--docket-max-border) !important; }
 
-html[data-docket-max-reskin] :is(input, textarea, select) { min-height: 40px; padding: .45rem .65rem; background: var(--docket-max-surface-1) !important; border: 1px solid var(--docket-max-border) !important; border-radius: var(--docket-max-radius-sm) !important; color: var(--docket-max-label) !important; font-family: var(--docket-max-font) !important; }
-html[data-docket-max-reskin] :is(input, textarea, select):hover { border-color: var(--docket-max-secondary) !important; }
-html[data-docket-max-reskin] :is(input, textarea, select)::placeholder { color: var(--docket-max-muted) !important; }
-html[data-docket-max-reskin] :is(button, .btn, input[type="submit"], input[type="button"]) { min-height: 40px; padding: .45rem .8rem; border-radius: var(--docket-max-radius-sm) !important; font-family: var(--docket-max-font) !important; font-weight: 600; }
-html[data-docket-max-reskin] :is(.btn-primary, .btn-success, input[type="submit"], button[type="submit"]) { background: var(--docket-max-accent) !important; border-color: var(--docket-max-accent) !important; color: var(--docket-max-on-accent) !important; }
-html[data-docket-max-reskin] :is(.btn-default, .btn-secondary, button:not(.btn-primary):not(.btn-success)) { background: var(--docket-max-surface-2) !important; border-color: var(--docket-max-border) !important; color: var(--docket-max-label) !important; }
-html[data-docket-max-reskin] :is(.badge, .label, .status, .status-chip) { display: inline-flex; align-items: center; min-height: 24px; padding: .15rem .5rem; background: var(--docket-max-surface-3) !important; border: 0 !important; border-radius: 999px !important; color: var(--docket-max-secondary) !important; font-size: .75rem; font-weight: 650; }
+/* MAX pins these panes below its native 77px navbar with hard-coded offsets;
+ * follow the reskinned bar's measured height instead (see syncMaxHeaderOffset). */
+html[data-docket-max-reskin] .docket-max-fixed-pane { top: var(--docket-max-header-offset, 77px) !important; }
 
-html[data-docket-max-reskin] :is(a, button, input, textarea, select, [tabindex]):focus-visible { outline: 3px solid var(--docket-max-focus) !important; outline-offset: 2px; }
-html[data-docket-max-reskin] :is(button, input, select, textarea):disabled, [aria-disabled="true"] { cursor: not-allowed; opacity: .55; }
+/* Context rail. */
+html[data-docket-max-reskin] #sidebar {
+  padding: 18px 8px !important; background: var(--docket-max-canvas) !important;
+  border: 0 !important; border-right: 1px solid var(--docket-max-border) !important; box-shadow: none !important; overflow-y: auto;
+}
+html[data-docket-max-reskin] #sidebar .sidebar-splitter { padding: 0 !important; background: transparent !important; border: 0 !important; }
+html[data-docket-max-reskin] #sidebar .sidebar-title {
+  margin: 0 0 6px !important; line-height: 16px !important; padding: 0 12px !important; color: var(--docket-max-muted) !important;
+  font-size: 11.5px !important; font-weight: 650 !important; letter-spacing: .06em !important; text-transform: uppercase;
+}
+html[data-docket-max-reskin] #sidebar .title-icon { display: none !important; }
+html[data-docket-max-reskin] #sidebar .nav-sidebar { margin: 0 !important; padding: 0 !important; }
+html[data-docket-max-reskin] #sidebar .nav-sidebar > li { margin: 0 !important; }
+html[data-docket-max-reskin] #sidebar .nav-sidebar > li > a {
+  display: block; margin: 1px 0 !important; padding: 7px 12px !important; background: transparent !important; border: 0 !important;
+  border-radius: var(--docket-max-radius-sm) !important; color: var(--docket-max-secondary) !important;
+  font-size: 14px !important; font-weight: 500 !important; text-decoration: none !important;
+}
+html[data-docket-max-reskin] #sidebar .nav-sidebar > li > a:hover { background: var(--docket-max-fill) !important; color: var(--docket-max-label) !important; }
+html[data-docket-max-reskin] #sidebar .nav-sidebar > .active > a { background: var(--docket-max-accent-container) !important; color: var(--docket-max-on-accent-container) !important; font-weight: 600 !important; }
+/* Empty .dropdown-header items are MAX's group separators. */
+html[data-docket-max-reskin] #sidebar .nav-sidebar > .dropdown-header:empty {
+  height: 1px; border: 0 !important; margin: 10px 12px !important; padding: 0 !important; background: var(--docket-max-border) !important;
+}
+html[data-docket-max-reskin] #sidebar .nav-sidebar > .dropdown-header:not(:empty) {
+  margin: 14px 0 4px !important; padding: 0 12px !important; color: var(--docket-max-muted) !important; font-size: 11.5px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase;
+}
+
+/* Content views turn the rail into a collapsible outline tree. */
+html[data-docket-max-reskin] #sidebar .nav-tree-head { color: var(--docket-max-label) !important; font-weight: 600 !important; }
+html[data-docket-max-reskin] #sidebar .nav-tree-items { margin: 2px 0 8px !important; padding: 0 0 0 10px !important; list-style: none !important; }
+html[data-docket-max-reskin] #sidebar .nav-tree-items > li { margin: 0 !important; }
+html[data-docket-max-reskin] #sidebar .nav-tree-items .nav-tree-link {
+  display: block; padding: 5px 10px !important; overflow: hidden; background: transparent !important; border-radius: 6px;
+  color: var(--docket-max-secondary) !important; font-size: 13px !important; text-decoration: none !important; text-overflow: ellipsis; white-space: nowrap;
+}
+html[data-docket-max-reskin] #sidebar .nav-tree-items .nav-tree-link:hover { background: var(--docket-max-fill) !important; color: var(--docket-max-label) !important; }
+html[data-docket-max-reskin] #sidebar .nav-tree-items > .active > .nav-tree-link { background: var(--docket-max-accent-container) !important; color: var(--docket-max-on-accent-container) !important; font-weight: 600; }
+
+/* Work pane: slim toolbar over the scrolling content. */
+html[data-docket-max-reskin] #main-content { background: var(--docket-max-canvas) !important; }
+html[data-docket-max-reskin] #form-toolbar {
+  display: flex !important; align-items: center; gap: 2px; padding: 0 56px 0 16px !important; box-sizing: border-box;
+  background: var(--docket-max-canvas) !important; border: 0 !important; border-bottom: 1px solid var(--docket-max-border) !important; box-shadow: none !important;
+}
+html[data-docket-max-reskin] #form-toolbar .slot { float: none !important; width: auto !important; height: auto !important; display: flex !important; align-items: center; margin: 0 !important; padding: 0 !important; border: 0 !important; background: transparent !important; }
+html[data-docket-max-reskin] #form-toolbar .button-link {
+  position: static !important; width: auto !important;
+  display: inline-flex !important; align-items: center; gap: 6px; height: 28px; padding: 0 10px !important; border-radius: 7px;
+  color: var(--docket-max-secondary) !important; font-size: 12.5px !important; font-weight: 600; text-decoration: none !important; white-space: nowrap;
+}
+html[data-docket-max-reskin] #form-toolbar .button-link br { display: none; }
+html[data-docket-max-reskin] #form-toolbar .button-link .halflings { top: 0 !important; font-size: 12px; color: var(--docket-max-muted); }
+html[data-docket-max-reskin] #form-toolbar .button-link:hover { background: var(--docket-max-fill) !important; color: var(--docket-max-label) !important; }
+html[data-docket-max-reskin] #form-toolbar select { min-height: 30px; padding: 2px 10px; }
+/* Content views repeat the rail's outline in a toolbar select; see markMaxStructure. */
+html[data-docket-max-reskin] #form-toolbar .docket-max-redundant-outline { display: none !important; }
+
+/* Hide/show navigation: a quiet square icon button instead of a grey pill. */
+html[data-docket-max-reskin] .maximize-minimize { left: auto !important; right: 12px !important; width: auto !important; height: auto !important; }
+html[data-docket-max-reskin] .maximize-minimize.docket-max-fixed-pane { top: calc(var(--docket-max-header-offset, 77px) + 6px) !important; }
+html[data-docket-max-reskin] .maximize-minimize > button {
+  width: 30px !important; height: 30px !important; min-height: 0 !important; padding: 0 !important; line-height: 30px !important; text-align: center;
+  background: transparent !important; border: 1px solid var(--docket-max-border) !important; border-radius: var(--docket-max-radius-sm) !important;
+  color: var(--docket-max-muted) !important; box-shadow: none !important; opacity: 1 !important;
+}
+html[data-docket-max-reskin] .maximize-minimize > button:hover { background: var(--docket-max-fill) !important; color: var(--docket-max-label) !important; }
+html[data-docket-max-reskin] .maximize-minimize > button > div { display: none !important; }
+html[data-docket-max-reskin] .maximize-minimize .halflings { top: 0 !important; font-size: 12px; line-height: 28px; }
+
+html[data-docket-max-reskin] .form-content-display {
+  padding: 28px max(32px, calc((100% - 760px) / 2)) 80px !important; box-sizing: border-box;
+  background: var(--docket-max-canvas) !important; color: var(--docket-max-label) !important;
+}
+
+/* MAX caps its dashboard wrappers at fixed fractions of the old layout; the
+ * content column above already sets the measure. */
+html[data-docket-max-reskin] :is(.form-content-display > div, .form-content-display > div > div, .listingTable, .announcement) { max-width: none !important; }
+html[data-docket-max-reskin] .listingTable { margin: 0 !important; }
+
+/* Type. */
+html[data-docket-max-reskin] :is(h1, h2, h3, h4, h5, h6) { color: var(--docket-max-label) !important; font-weight: 650 !important; letter-spacing: -.015em; border: 0 !important; text-decoration: none !important; }
+html[data-docket-max-reskin] #form-content h1 { margin: 0 0 18px !important; font-size: 26px !important; line-height: 1.2 !important; }
+html[data-docket-max-reskin] #form-content h2 { margin: 32px 0 12px !important; padding: 0 !important; font-size: 18px !important; line-height: 1.3 !important; }
+html[data-docket-max-reskin] #form-content h3 { margin: 22px 0 6px !important; font-size: 15.5px !important; line-height: 1.35 !important; }
+html[data-docket-max-reskin] #form-content > :first-child { margin-top: 0 !important; }
+/* MAX's red disclosure triangle on section headings is decorative. */
+html[data-docket-max-reskin] #form-content h2::before { display: none !important; }
+html[data-docket-max-reskin] #form-content :is(ul, ol) { padding-inline-start: 1.35rem; }
+html[data-docket-max-reskin] #form-content li + li { margin-top: .25rem; }
+html[data-docket-max-reskin] #form-content p { margin: 0 0 .75rem; }
+html[data-docket-max-reskin] :is(.text-muted, .help-block, .rowHeader) { color: var(--docket-max-muted) !important; }
+
+/* Dashboard schedule: a compact agenda list. */
+html[data-docket-max-reskin] :is(table, .listingTable) {
+  width: 100%; background: var(--docket-max-surface-1) !important; border: 1px solid var(--docket-max-border) !important;
+  border-collapse: separate !important; border-spacing: 0 !important; border-radius: var(--docket-max-radius) !important; overflow: hidden;
+}
+html[data-docket-max-reskin] :is(th, td) {
+  padding: 10px 14px !important; background: transparent !important; border: 0 !important;
+  color: var(--docket-max-label) !important; text-align: start; vertical-align: top; font-size: 14px;
+}
+html[data-docket-max-reskin] tr { background: transparent !important; }
+html[data-docket-max-reskin] tr + tr > :is(th, td) { border-top: 1px solid var(--docket-max-border) !important; }
+html[data-docket-max-reskin] thead :is(th, td) { padding-block: 9px !important; background: var(--docket-max-surface-2) !important; color: var(--docket-max-muted) !important; font-size: 11.5px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
+html[data-docket-max-reskin] tbody tr:hover > td { background: var(--docket-max-fill) !important; }
+html[data-docket-max-reskin] .listingTable td { padding: 8px 12px !important; font-size: 13.5px; }
+html[data-docket-max-reskin] .listingTable tbody tr:hover > td { background: transparent !important; }
+html[data-docket-max-reskin] .listingTable td:first-child {
+  width: 92px; padding-top: 10px !important; color: var(--docket-max-secondary) !important; font-size: 12.5px; font-weight: 600; white-space: nowrap;
+}
+html[data-docket-max-reskin] .listingTable td:first-child strong { color: var(--docket-max-label) !important; }
+/* MAX paints the current day yellow; mark it with an accent ring instead. */
+html[data-docket-max-reskin] #today-highlight {
+  background: color-mix(in srgb, var(--docket-max-accent) 8%, transparent) !important;
+  outline: 2px solid var(--docket-max-accent); outline-offset: -2px;
+}
+html[data-docket-max-reskin] #today-highlight > td:first-child,
+html[data-docket-max-reskin] #today-highlight > td:first-child strong { color: var(--docket-max-accent) !important; }
+html[data-docket-max-reskin] #today-highlight + tr > td { border-top-color: transparent !important; }
+html[data-docket-max-reskin] .calendar-itemlist { margin: 0 !important; min-height: 0 !important; max-width: none !important; padding: 0 !important; list-style: none !important; }
+html[data-docket-max-reskin] .list-view-item {
+  --docket-max-rail: var(--docket-max-muted);
+  margin: 0 0 4px !important; padding: 4px 10px !important; background: color-mix(in srgb, var(--docket-max-rail) 13%, transparent) !important;
+  border: 0 !important; border-left: 3px solid var(--docket-max-rail) !important; border-radius: 0 6px 6px 0 !important;
+  color: var(--docket-max-label) !important; font-size: 13.5px; font-weight: 550; line-height: 1.4;
+}
+html[data-docket-max-reskin] .list-view-item:last-child { margin-bottom: 0 !important; }
+html[data-docket-max-reskin] .list-view-item.green-item { --docket-max-rail: var(--docket-max-green); }
+html[data-docket-max-reskin] .list-view-item.blue-item { --docket-max-rail: var(--docket-max-blue); }
+html[data-docket-max-reskin] .list-view-item.orange-item { --docket-max-rail: var(--docket-max-orange); }
+html[data-docket-max-reskin] .list-view-item.transparent-item { background: transparent !important; border-left-color: var(--docket-max-border) !important; color: var(--docket-max-secondary) !important; }
+html[data-docket-max-reskin] .list-view-item > :is(a, span) { color: inherit !important; text-decoration: none !important; }
+html[data-docket-max-reskin] .list-view-item > a:hover { text-decoration: underline !important; }
+
+/* Announcements and other cards. */
+html[data-docket-max-reskin] :is(.announcement, .panel, .well) {
+  margin: 0 0 12px !important; padding: 16px 20px !important; background: var(--docket-max-surface-1) !important;
+  border: 1px solid var(--docket-max-border) !important; border-radius: var(--docket-max-radius) !important; box-shadow: none !important; color: var(--docket-max-label) !important;
+}
+html[data-docket-max-reskin] #form-content .announcement h3 { margin: 0 0 2px !important; }
+html[data-docket-max-reskin] .announcement > p:first-of-type > i:only-child { color: var(--docket-max-muted) !important; font-size: 12.5px; font-style: normal; }
+html[data-docket-max-reskin] .announcement > :last-child { margin-bottom: 0 !important; }
+html[data-docket-max-reskin] .panel-heading { margin: -16px -20px 14px !important; padding: 10px 20px !important; background: var(--docket-max-surface-2) !important; border: 0 !important; border-bottom: 1px solid var(--docket-max-border) !important; color: var(--docket-max-label) !important; }
+
+/* Content outlines (Reading, Homework, ...). */
+html[data-docket-max-reskin] .assignment > ul > li { margin: 0 !important; padding: 2px 0; }
+html[data-docket-max-reskin] .assignment > ul > li > a { font-weight: 550; text-decoration: none !important; }
+html[data-docket-max-reskin] .assignment > ul > li > a:hover { text-decoration: underline !important; }
+
+/* Controls. */
+html[data-docket-max-reskin] :is(input:not([type="checkbox"], [type="radio"]), textarea, select) {
+  min-height: 34px; padding: 5px 10px; background: var(--docket-max-surface-1) !important; border: 1px solid var(--docket-max-border) !important;
+  border-radius: var(--docket-max-radius-sm) !important; color: var(--docket-max-label) !important; box-shadow: none !important;
+}
+html[data-docket-max-reskin] :is(input, textarea, select):hover { border-color: var(--docket-max-muted) !important; }
+html[data-docket-max-reskin] :is(input, textarea)::placeholder { color: var(--docket-max-muted) !important; }
+html[data-docket-max-reskin] .btn { padding: 6px 14px; border-radius: var(--docket-max-radius-sm) !important; font-weight: 600; box-shadow: none !important; }
+html[data-docket-max-reskin] :is(.btn-primary, .btn-success, input[type="submit"]) { background: var(--docket-max-accent) !important; border-color: var(--docket-max-accent) !important; color: var(--docket-max-on-accent) !important; }
+html[data-docket-max-reskin] :is(.btn-default, .btn-secondary) { background: var(--docket-max-surface-2) !important; border: 1px solid var(--docket-max-border) !important; color: var(--docket-max-label) !important; }
+html[data-docket-max-reskin] :is(.btn-default, .btn-secondary):hover { background: var(--docket-max-fill) !important; }
+html[data-docket-max-reskin] :is(.badge, .label) { padding: 2px 8px; background: var(--docket-max-surface-3) !important; border-radius: 999px !important; color: var(--docket-max-secondary) !important; font-size: 12px; font-weight: 650; }
+html[data-docket-max-reskin] .alert { padding: 12px 16px !important; background: var(--docket-max-surface-2) !important; border: 1px solid var(--docket-max-border) !important; border-radius: var(--docket-max-radius) !important; color: var(--docket-max-label) !important; }
+
+html[data-docket-max-reskin] :is(a, button, input, textarea, select, [tabindex]):focus-visible { outline: 2px solid var(--docket-max-focus) !important; outline-offset: 2px; }
+html[data-docket-max-reskin] :is(button, input, select, textarea):disabled { cursor: not-allowed; opacity: .55; }
 html[data-docket-max-reskin] .skip-link { position: fixed; z-index: 2147483647; top: .5rem; left: .5rem; transform: translateY(-160%); padding: .65rem .85rem; background: var(--docket-max-accent) !important; border-radius: var(--docket-max-radius-sm); color: var(--docket-max-on-accent) !important; }
 html[data-docket-max-reskin] .skip-link:focus { transform: translateY(0); }
-html[data-docket-max-reskin] [aria-expanded="true"] > :is(.caret, .chevron, .glyphicon-chevron-right) { transform: rotate(90deg); }
-html[data-docket-max-reskin] :is(.caret, .chevron, .glyphicon-chevron-right) { color: currentColor !important; transition: transform var(--docket-max-dur) ease; }
-html[data-docket-max-reskin] :is(a, button, input, textarea, select, .panel, .card, .activity, .announcement, .schedule-item, .event, .content-item) { transition: background-color var(--docket-max-dur) ease, border-color var(--docket-max-dur) ease, color var(--docket-max-dur) ease; }
+html[data-docket-max-reskin] [aria-expanded="true"] > .caret { opacity: 1; }
+html[data-docket-max-reskin] :is(a, button, input, textarea, select) { transition: background-color var(--docket-max-dur) ease, border-color var(--docket-max-dur) ease, color var(--docket-max-dur) ease; }
 @media (prefers-reduced-motion: reduce) { html[data-docket-max-reskin] * { animation-duration: .001ms !important; transition-duration: .001ms !important; } }
 html[data-docket-max-reskin][data-docket-reduced-motion="true"] * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+
 @media (max-width: 640px) {
-  html[data-docket-max-reskin] .docket-max-menu-toggle { display: inline-flex !important; }
-  html[data-docket-max-reskin] :is(#app, #root, main, #main, #content, #main-content, #page-content, .content, .content-wrapper, .container, .container-fluid) { max-width: calc(100% - 1.5rem); }
-  html[data-docket-max-reskin] :is(#sidebar, .sidebar, .left-nav, .sidenav) { margin: .75rem; }
-  html[data-docket-max-reskin] :is(table, .table) { display: block; max-width: 100%; overflow-x: auto; white-space: nowrap; }
-}
-
-/* LearningSuite visual parity pass: these role-specific rules deliberately come
- * last, so they win over MAX's old server styles while leaving its behavior intact. */
-html[data-docket-max-reskin] {
-  --docket-max-radius-sm: 10px;
-  --docket-max-radius: 14px;
-  --docket-max-dur: 120ms;
-}
-html[data-docket-max-reskin] .docket-max-course-header {
-  display: flex !important;
-  align-items: center !important;
-  min-height: 56px !important;
-  /* Break MAX's centered application shell so the course chrome reaches both viewport edges. */
-  width: 100vw !important;
-  max-width: none !important;
-  margin-left: calc(50% - 50vw) !important;
-  margin-right: 0 !important;
-  padding: 0 28px !important;
-  background: var(--docket-max-canvas) !important;
-  border: 0 !important;
-  border-bottom: 1px solid var(--docket-max-border) !important;
-  box-sizing: border-box !important;
-}
-html[data-docket-max-reskin] .docket-max-course-context {
-  min-height: 44px !important;
-  color: var(--docket-max-label) !important;
-  font-size: .9375rem !important;
-  font-weight: 650 !important;
-  letter-spacing: -.01em;
-}
-html[data-docket-max-reskin] .docket-max-course-header {
-  height: auto !important;
-  max-height: none !important;
-  overflow: visible !important;
-}
-html[data-docket-max-reskin] .docket-max-top-shell {
-  position: relative !important;
-  left: calc(50% - 50vw) !important;
-  width: 100vw !important;
-  max-width: none !important;
-  margin-inline: 0 !important;
-  background: var(--docket-max-canvas) !important;
-  border-bottom: 1px solid var(--docket-max-border) !important;
-  box-sizing: border-box !important;
-}
-html[data-docket-max-reskin] .docket-max-course-header .docket-max-course-context {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: flex-start !important;
-  justify-content: center !important;
-  line-height: 1.15 !important;
-}
-html[data-docket-max-reskin] .docket-max-course-header .docket-max-course-context :is(span, div) {
-  position: static !important;
-  display: block !important;
-  margin: 0 !important;
-  line-height: 1.15 !important;
-}
-html[data-docket-max-reskin] .docket-max-user-menu {
-  margin-left: auto !important;
-  padding-inline: 16px !important;
-  position: relative !important;
-  z-index: 2 !important;
-  white-space: nowrap !important;
-  color: var(--docket-max-secondary) !important;
-  font-size: .875rem !important;
-  font-weight: 600 !important;
-}
-html[data-docket-max-reskin] .docket-max-primary-nav {
-  gap: 4px;
-  width: 100vw !important;
-  max-width: none !important;
-  margin-left: calc(50% - 50vw) !important;
-  margin-right: 0 !important;
-  min-height: 40px !important;
-  padding: 0 16px !important;
-  background: var(--docket-max-canvas) !important;
-  border: 0 !important;
-  border-bottom: 1px solid var(--docket-max-border) !important;
-}
-html[data-docket-max-reskin] .docket-max-primary-nav a {
-  min-height: 40px !important;
-  padding: 0 14px !important;
-  background: transparent !important;
-  border-bottom: 2px solid transparent !important;
-  color: var(--docket-max-secondary) !important;
-  font-size: .8125rem !important;
-  font-weight: 650 !important;
-}
-html[data-docket-max-reskin] .docket-max-primary-nav a:hover { background: var(--docket-max-fill) !important; color: var(--docket-max-label) !important; }
-html[data-docket-max-reskin] .docket-max-primary-nav :is(.docket-max-active-nav, [aria-current="page"]) { color: var(--docket-max-accent) !important; border-bottom-color: var(--docket-max-accent) !important; }
-html[data-docket-max-reskin] .docket-max-utility-link {
-  position: relative !important;
-  top: 10px !important;
-  z-index: 1 !important;
-  display: inline-flex !important;
-  margin-right: 18px !important;
-}
-
-html[data-docket-max-reskin] .docket-max-sidebar,
-html[data-docket-max-reskin] :is(#sidebar, .sidebar, .left-nav, .sidenav) {
-  width: 280px !important;
-  min-width: 280px !important;
-  min-height: calc(100vh - 96px) !important;
-  margin: 0 !important;
-  padding: 28px 20px !important;
-  box-sizing: border-box !important;
-  background: var(--docket-max-canvas) !important;
-  border: 0 !important;
-  border-right: 1px solid var(--docket-max-border) !important;
-  border-radius: 0 !important;
-}
-html[data-docket-max-reskin] :is(.docket-max-sidebar, #sidebar, .sidebar, .left-nav, .sidenav) :is(a, [role="link"], .list-group-item) {
-  min-height: 42px !important;
-  margin: 0 0 4px !important;
-  padding: 0 14px !important;
-  border: 0 !important;
-  border-radius: var(--docket-max-radius-sm) !important;
-  background: transparent !important;
-  color: var(--docket-max-secondary) !important;
-  font-size: .875rem !important;
-  font-weight: 600 !important;
-}
-html[data-docket-max-reskin] :is(.docket-max-sidebar, #sidebar, .sidebar, .left-nav, .sidenav) :is(a, [role="link"], .list-group-item):hover { background: var(--docket-max-fill) !important; color: var(--docket-max-label) !important; }
-html[data-docket-max-reskin] :is(.docket-max-sidebar, #sidebar, .sidebar, .left-nav, .sidenav) :is(.docket-max-sidebar-active, .active > a, .list-group-item.active) { background: var(--docket-max-accent-container) !important; color: var(--docket-max-on-accent-container) !important; font-weight: 650 !important; }
-
-html[data-docket-max-reskin] .docket-max-main-pane {
-  width: auto !important;
-  max-width: 1164px !important;
-  min-width: 0 !important;
-  margin: 0 auto !important;
-  padding: 36px 28px 72px !important;
-  background: transparent !important;
-  box-sizing: border-box !important;
-}
-html[data-docket-max-reskin] :is(main, #main, #content, #main-content, #page-content, .content, .content-wrapper) { max-width: 1164px !important; min-width: 0 !important; margin-inline: auto !important; padding-inline: 28px !important; box-sizing: border-box !important; }
-html[data-docket-max-reskin] :is(h1, h2, h3, h4, h5, h6) { font-weight: 650 !important; letter-spacing: -.025em !important; }
-html[data-docket-max-reskin] h1 { margin: 0 0 24px !important; font-size: clamp(1.7rem, 1.4rem + .8vw, 2.1rem) !important; line-height: 1.18 !important; }
-html[data-docket-max-reskin] h2 { margin: 34px 0 14px !important; font-size: 1.35rem !important; line-height: 1.25 !important; }
-html[data-docket-max-reskin] h3 { margin: 26px 0 10px !important; font-size: 1rem !important; line-height: 1.35 !important; }
-html[data-docket-max-reskin] :is(.meta, .metadata, .date, .due-date, time, .text-muted, .help-block, .subtitle) { color: var(--docket-max-muted) !important; font-size: .8125rem !important; font-weight: 500 !important; }
-
-html[data-docket-max-reskin] :is(.panel, .well, .card, .box, .innerBox, .alert, .activity, .announcement, .schedule-item, .event, .content-item) {
-  margin-block: 12px !important;
-  padding: 20px !important;
-  background: var(--docket-max-surface-1) !important;
-  border: 1px solid var(--docket-max-border) !important;
-  border-radius: var(--docket-max-radius) !important;
-}
-html[data-docket-max-reskin] :is(.activity, .announcement, .schedule-item, .event, .content-item)::before { width: 4px !important; }
-html[data-docket-max-reskin] :is(.panel-heading, .panel-footer, .card-header, .box-header) { margin: -20px -20px 16px !important; padding: 13px 20px !important; background: var(--docket-max-surface-2) !important; }
-
-html[data-docket-max-reskin] .docket-max-schedule-table {
-  width: 100% !important;
-  max-width: 1164px !important;
-  margin: 0 auto 34px !important;
-  background: var(--docket-max-surface-1) !important;
-  border: 1px solid var(--docket-max-border) !important;
-  border-collapse: separate !important;
-  border-spacing: 0 !important;
-  border-radius: var(--docket-max-radius) !important;
-  overflow: hidden !important;
-}
-html[data-docket-max-reskin] .docket-max-schedule-table :is(td, th) { padding: 16px 20px !important; background: transparent !important; border: 0 !important; }
-html[data-docket-max-reskin] .docket-max-schedule-table :is(td, th) { padding: 12px 16px !important; }
-html[data-docket-max-reskin] .docket-max-schedule-table tr,
-html[data-docket-max-reskin] .docket-max-schedule-table :is(td, th) {
-  height: auto !important;
-  min-height: 0 !important;
-}
-/* MAX marks the current day by painting the table row itself. Keep the state
- * readable through its event rails without letting that legacy fill dominate
- * the full-width dashboard card. */
-html[data-docket-max-reskin] .docket-max-schedule-table tr { background: var(--docket-max-surface-1) !important; }
-html[data-docket-max-reskin] table tr { background: var(--docket-max-surface-1) !important; }
-html[data-docket-max-reskin] .docket-max-schedule-table tr + tr :is(td, th) { border-top: 1px solid var(--docket-max-border) !important; }
-html[data-docket-max-reskin] .docket-max-schedule-table :is(td, th):first-child { width: 142px !important; color: var(--docket-max-secondary) !important; font-size: .875rem !important; font-weight: 650 !important; white-space: nowrap; }
-html[data-docket-max-reskin] .docket-max-schedule-event,
-html[data-docket-max-reskin] :is(.fc-event, .calendar-event, .timetable-event, .schedule-event) {
-  display: block !important;
-  width: auto !important;
-  min-height: 0 !important;
-  margin: 3px 0 !important;
-  padding: 7px 10px 7px 14px !important;
-  box-sizing: border-box !important;
-  background: transparent !important;
-  border: 0 !important;
-  border-left: 4px solid var(--docket-max-rail) !important;
-  border-radius: 0 !important;
-  color: var(--docket-max-label) !important;
-  font-size: .9375rem !important;
-  font-weight: 600 !important;
-}
-html[data-docket-max-reskin] .docket-max-schedule-event:hover,
-html[data-docket-max-reskin] :is(.fc-event, .calendar-event, .timetable-event, .schedule-event):hover { background: var(--docket-max-fill) !important; border-radius: 0 var(--docket-max-radius-xs) var(--docket-max-radius-xs) 0 !important; }
-html[data-docket-max-reskin] :is(.table-striped > tbody > tr:nth-of-type(odd) > *, .table-hover > tbody > tr:hover > *) { background: transparent !important; }
-html[data-docket-max-reskin] :is(.badge, .label, .status, .status-chip) { background: var(--docket-max-surface-3) !important; color: var(--docket-max-secondary) !important; }
-
-@media (max-width: 760px) {
-  html[data-docket-max-reskin] .docket-max-course-header { min-height: 52px !important; padding-inline: 16px !important; }
-  html[data-docket-max-reskin] .docket-max-primary-nav { padding-inline: 8px !important; }
-  html[data-docket-max-reskin] :is(.docket-max-sidebar, #sidebar, .sidebar, .left-nav, .sidenav) { width: 100% !important; min-width: 0 !important; min-height: 0 !important; padding: 10px 12px !important; border-right: 0 !important; border-bottom: 1px solid var(--docket-max-border) !important; }
-  html[data-docket-max-reskin] .docket-max-main-pane,
-  html[data-docket-max-reskin] :is(main, #main, #content, #main-content, #page-content, .content, .content-wrapper) { padding: 24px 16px 48px !important; }
-}
-
-/* MAX course chrome follows the same two-band pattern as LearningSuite: a
- * compact course context row, then the primary tabs. These selectors override
- * the earlier experimental viewport-offset rules without moving native nodes. */
-html[data-docket-max-reskin] .docket-max-course-header {
-  position: static !important;
-  display: flex !important;
-  align-items: center !important;
-  /* These roles live inside MAX's centered app shell. Deliberately break only
-   * the two chrome rows out of it, matching LearningSuite's full-width header. */
-  width: 100vw !important;
-  min-height: 56px !important;
-  height: 56px !important;
-  max-width: none !important;
-  max-height: none !important;
-  margin: 0 0 0 calc(50% - 50vw) !important;
-  padding: 0 28px !important;
-  overflow: hidden !important;
-  background: var(--docket-max-surface-1) !important;
-  border: 0 !important;
-  border-bottom: 1px solid var(--docket-max-border) !important;
-  box-sizing: border-box !important;
-}
-html[data-docket-max-reskin] .docket-max-course-context {
-  display: flex !important;
-  align-items: center !important;
-  min-height: 44px !important;
-  color: var(--docket-max-label) !important;
-  font-size: .9375rem !important;
-  font-weight: 650 !important;
-  line-height: 1.2 !important;
-  text-decoration: none !important;
-  white-space: nowrap !important;
-}
-html[data-docket-max-reskin] .docket-max-primary-nav {
-  position: static !important;
-  display: flex !important;
-  align-items: stretch !important;
-  gap: 0 !important;
-  width: 100vw !important;
-  min-height: 48px !important;
-  max-width: none !important;
-  margin: 0 0 0 calc(50% - 50vw) !important;
-  padding: 0 28px !important;
-  overflow: visible !important;
-  background: var(--docket-max-surface-1) !important;
-  border: 0 !important;
-  border-bottom: 1px solid var(--docket-max-border) !important;
-  box-sizing: border-box !important;
-}
-html[data-docket-max-reskin] .docket-max-primary-nav a {
-  display: flex !important;
-  align-items: center !important;
-  min-height: 48px !important;
-  margin: 0 !important;
-  padding: 0 14px !important;
-  color: var(--docket-max-secondary) !important;
-  font-size: .875rem !important;
-  font-weight: 600 !important;
-  text-decoration: none !important;
-  border: 0 !important;
-  border-bottom: 2px solid transparent !important;
-}
-html[data-docket-max-reskin] .docket-max-primary-nav .docket-max-active-nav {
-  color: var(--docket-max-accent) !important;
-  border-bottom-color: var(--docket-max-accent) !important;
-}
-html[data-docket-max-reskin] .docket-max-user-menu {
-  margin-left: auto !important;
-  padding-inline: 14px !important;
-  transform: none !important;
-  color: var(--docket-max-secondary) !important;
-  text-decoration: none !important;
+  html[data-docket-max-reskin] .form-content-display { padding: 20px 16px 56px !important; }
+  html[data-docket-max-reskin] #form-toolbar { padding-left: 8px !important; overflow-x: auto; }
+  html[data-docket-max-reskin] table:not(.listingTable) { display: block; max-width: 100%; overflow-x: auto; white-space: nowrap; }
+  html[data-docket-max-reskin] .listingTable td:first-child { width: 72px; }
 }
 `;
 
@@ -1175,7 +1006,8 @@ html[data-docket-max-reskin] .docket-max-user-menu {
     reducedMotion: false,
     background: "default",
     courseColors: {},
-    externalFeeds: []
+    externalFeeds: [],
+    sessionRelay: { url: "", secret: "" }
   };
   var KEY = "settings";
   function loadSettings() {
@@ -1761,6 +1593,31 @@ html[data-docket-max-reskin] .docket-max-user-menu {
           method: "GET",
           url,
           headers: { Accept: "text/calendar" },
+          timeout: 15e3,
+          onload: (response) => {
+            if (response.status >= 200 && response.status < 300) resolve(response.responseText);
+            else reject(new Error(`HTTP ${response.status}`));
+          },
+          onerror: () => reject(new Error("network error")),
+          ontimeout: () => reject(new Error("timed out"))
+        });
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
+    });
+  }
+  function gmPostJson(url, body, headers = {}) {
+    return new Promise((resolve, reject) => {
+      if (typeof GM_xmlhttpRequest !== "function") {
+        reject(new Error("GM_xmlhttpRequest not granted by this userscript manager"));
+        return;
+      }
+      try {
+        GM_xmlhttpRequest({
+          method: "POST",
+          url,
+          headers: { "Content-Type": "application/json", ...headers },
+          data: JSON.stringify(body),
           timeout: 15e3,
           onload: (response) => {
             if (response.status >= 200 && response.status < 300) resolve(response.responseText);
@@ -2637,6 +2494,32 @@ html[data-docket-max-reskin] .docket-max-user-menu {
     note.textContent = "Only used to fetch the exact URL you enter here \u2014 nothing else is sent. See PRIVACY.md.";
     return [title, group([...rows, addRow]), note];
   }
+  function sessionRelaySection(relay, onChange) {
+    const title = document.createElement("div");
+    title.className = "group-title";
+    title.textContent = "Session Relay";
+    const row2 = document.createElement("div");
+    row2.className = "row row-col";
+    const urlInput = document.createElement("input");
+    urlInput.className = "text-input";
+    urlInput.type = "url";
+    urlInput.placeholder = "Relay URL (e.g. http://desktop.tailnet.ts.net:8787)";
+    urlInput.value = relay.url;
+    const secretInput = document.createElement("input");
+    secretInput.className = "text-input";
+    secretInput.type = "password";
+    secretInput.placeholder = "Relay secret";
+    secretInput.value = relay.secret;
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "seg";
+    saveBtn.textContent = relay.url ? "Update" : "Save";
+    saveBtn.addEventListener("click", () => onChange({ url: urlInput.value.trim().replace(/\/+$/, ""), secret: secretInput.value.trim() }));
+    row2.append(urlInput, secretInput, saveBtn);
+    const note = document.createElement("div");
+    note.className = "footer-note";
+    note.textContent = "Sends your LearningSuite session cookie to this relay so it can keep you signed in while this computer sleeps. Use only a machine you own, over a private network. Clear the URL to turn off. See PRIVACY.md.";
+    return [title, group([row2]), note];
+  }
   function diagnosticsRow() {
     const row2 = document.createElement("div");
     row2.className = "row";
@@ -2726,6 +2609,7 @@ html[data-docket-max-reskin] .docket-max-user-menu {
       group([appearanceRow(settings.appearance, (v) => persist({ appearance: v })), backgroundRow(settings.background, (v) => persist({ background: v }))]),
       ...courseColorSection,
       ...externalFeedsSection(settings.externalFeeds, (next) => persist({ externalFeeds: next })),
+      ...sessionRelaySection(settings.sessionRelay, (next) => persist({ sessionRelay: next })),
       group([
         switchRow(shadow, "Use Companion navigation", settings.useCompanionNav, (v) => persist({ useCompanionNav: v })),
         switchRow(shadow, "Reduce Motion", settings.reducedMotion, (v) => persist({ reducedMotion: v }))
@@ -2792,9 +2676,13 @@ html[data-docket-max-reskin] .docket-max-user-menu {
     const links = Array.from(nav.querySelectorAll("a"));
     if (links.length < 2) return null;
     nav.classList.add("docket-nav-enhanced", "docket-scope");
+    const visible = links.filter((a) => a.getClientRects().length > 0);
     let bestLink = null;
     let bestScore = -1;
-    for (const a of links) {
+    const nativeCurrent = visible.filter((a) => a.classList.contains("lg:font-bold"));
+    if (nativeCurrent.length === 1) bestScore = Number.POSITIVE_INFINITY;
+    bestLink = nativeCurrent.length === 1 ? nativeCurrent[0] : null;
+    for (const a of visible.length ? visible : links) {
       const href = a.getAttribute("href");
       if (!href) continue;
       const score = pathMatchScore(location.pathname, new URL(href, document.baseURI).pathname);
@@ -2812,11 +2700,23 @@ html[data-docket-max-reskin] .docket-max-user-menu {
         icon.classList.add("docket-nav-icon");
         a.insertBefore(icon, a.firstChild);
       }
-      if (a === bestLink) {
-        a.classList.add("docket-nav-item-active");
-      }
+      a.classList.toggle("docket-nav-item-active", a === bestLink);
     }
+    mountNavLabel(nav);
     return nav;
+  }
+  function mountNavLabel(nav) {
+    const title = nav.querySelector("[currentsectiontitle]")?.getAttribute("currentsectiontitle")?.trim();
+    let label = nav.querySelector(":scope > .docket-nav-label");
+    if (!title) {
+      label?.remove();
+      return;
+    }
+    if (!label) {
+      label = h("div", { class: "docket-nav-label docket-scope", "aria-hidden": "true" });
+      nav.insertBefore(label, nav.firstChild);
+    }
+    if (label.textContent !== title) label.textContent = title;
   }
   function restyleTopTabs() {
     const bar = document.querySelector(".bg-top-nav");
@@ -2836,24 +2736,13 @@ html[data-docket-max-reskin] .docket-max-user-menu {
     return (parts.length > 1 ? first + last : first).toUpperCase();
   }
   function restyleMasthead() {
-    const topLink = document.querySelector("#_topLink");
-    if (topLink && !topLink.querySelector(".docket-wordmark")) {
-      topLink.appendChild(
-        h("span", { class: "docket-wordmark docket-scope", "aria-hidden": "true" }, [
-          h("span", { class: "docket-wordmark-brand" }, ["BYU"]),
-          h("span", { class: "docket-wordmark-suite" }, ["Learning Suite"])
-        ])
-      );
-    }
     const trigger = document.querySelector(".header-userdropdown-trigger");
     if (trigger && !trigger.querySelector(".docket-user-avatar")) {
       const nameEl = trigger.querySelector(".hidden.md\\:inline");
       const initials = computeInitials(nameEl?.textContent ?? "");
+      const slot = trigger.querySelector(":scope > div.relative") ?? trigger;
       if (initials) {
-        trigger.insertBefore(
-          h("span", { class: "docket-user-avatar docket-scope", "aria-hidden": "true" }, [initials]),
-          trigger.firstChild
-        );
+        slot.insertBefore(h("span", { class: "docket-user-avatar docket-scope", "aria-hidden": "true" }, [initials]), slot.firstChild);
       }
     }
   }
@@ -2957,6 +2846,121 @@ html[data-docket-max-reskin] .docket-max-user-menu {
     return hostname === "max.byu.edu";
   }
 
+  // src/lib/keepAlive.ts
+  var PAGE_SCRIPT = `(() => {
+  if (window.__docketKeepAlive) return;
+  window.__docketKeepAlive = true;
+  const PING_MS = 10 * 60 * 1000;
+  const TICK_MS = 30 * 1000;
+  const RELOAD_GUARD_KEY = "docket-keepalive-reloaded-at";
+  let lastPing = Date.now();
+  let lastTick = Date.now();
+
+  const ready = () => typeof window.require === "function" && typeof window.global_appID !== "undefined";
+
+  const ping = (onDone) => {
+    if (!ready()) return;
+    lastPing = Date.now();
+    window.require(["core/ajax"], (ajax) => {
+      ajax.ajaxCallback(window.global_appID, "ajax/general/general.php", "", null, false, "keepAlive", null,
+        (body) => {
+          let ok = false;
+          try {
+            const res = JSON.parse(body);
+            ok = res.result === "success" && (!window.global_subsessionID || res.subsessionid === window.global_subsessionID);
+          } catch (e) {}
+          if (onDone) onDone(ok);
+        },
+        () => { if (onDone) onDone(false); });
+    });
+  };
+
+  const hasUnsavedEdits = () => {
+    const editors = window.CKEDITOR && window.CKEDITOR.instances;
+    if (editors && Object.values(editors).some((ed) => ed.checkDirty && ed.checkDirty())) return true;
+    return [...document.querySelectorAll("textarea, input:not([type=hidden]):not([type=checkbox]):not([type=radio])")]
+      .some((el) => el.value !== el.defaultValue);
+  };
+
+  // Session expired: reload through CAS, unless that would lose typed work or we just tried.
+  const recover = (fallback) => {
+    let lastReload = 0;
+    try { lastReload = Number(sessionStorage.getItem(RELOAD_GUARD_KEY)) || 0; } catch (e) {}
+    if (hasUnsavedEdits() || Date.now() - lastReload < 60 * 1000) {
+      if (fallback) fallback();
+      return;
+    }
+    try { sessionStorage.setItem(RELOAD_GUARD_KEY, String(Date.now())); } catch (e) {}
+    location.reload();
+  };
+
+  const check = (fallback) => ping((ok) => { if (!ok) recover(fallback); });
+
+  setInterval(() => {
+    const now = Date.now();
+    // A tick that arrives minutes late means the machine was asleep.
+    const woke = now - lastTick > 5 * 60 * 1000;
+    lastTick = now;
+    if (woke || now - lastPing >= PING_MS) check();
+  }, TICK_MS);
+
+  const catchUp = () => { if (Date.now() - lastPing > 60 * 1000) check(); };
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") catchUp(); });
+  window.addEventListener("focus", catchUp);
+  window.addEventListener("online", catchUp);
+
+  // Intercept LearningSuite's own warning dialog: renew (or recover) instead of showing it,
+  // and only fall through to the real dialog when recovering would discard unsaved edits.
+  const patch = () => {
+    if (!ready()) return;
+    window.require(["core/loadScript"], (loader) => {
+      const original = loader.loadDriverBuild;
+      if (typeof original !== "function" || original.__docket) return;
+      const patched = function (path, cb) {
+        if (typeof path === "string" && path.includes("timeoutWarning")) {
+          const args = arguments;
+          check(() => original.apply(this, args));
+          return;
+        }
+        return original.apply(this, arguments);
+      };
+      patched.__docket = true;
+      loader.loadDriverBuild = patched;
+    });
+  };
+  patch();
+})();`;
+  function startSessionKeepAlive() {
+    const script = document.createElement("script");
+    script.textContent = PAGE_SCRIPT;
+    (document.head || document.documentElement).appendChild(script);
+    script.remove();
+  }
+
+  // src/lib/sessionRelay.ts
+  var SEND_MS = 10 * 60 * 1e3;
+  function currentSession() {
+    const phpsessid = document.cookie.split("; ").find((c) => c.startsWith("PHPSESSID="))?.slice("PHPSESSID=".length);
+    const match = location.pathname.match(/^\/\.([^/]+)\/([^/]+)\//);
+    if (!phpsessid || !match) return null;
+    return { phpsessid, subsessionID: match[1], appId: match[2] };
+  }
+  function startSessionRelay() {
+    const send = () => {
+      const { url, secret } = loadSettings().sessionRelay;
+      const session = currentSession();
+      if (!url || !secret || !session) return;
+      gmPostJson(`${url}/session`, session, { Authorization: `Bearer ${secret}` }).catch(
+        (error) => console.warn("[docket] session relay unreachable", error)
+      );
+    };
+    send();
+    setInterval(send, SEND_MS);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") send();
+    });
+  }
+
   // src/index.ts
   function injectStyles() {
     if (document.getElementById("docket-reskin-styles")) return;
@@ -2986,231 +2990,64 @@ html[data-docket-max-reskin] .docket-max-user-menu {
       document.documentElement.removeAttribute("data-docket-background");
     }
     document.documentElement.setAttribute("data-docket-reduced-motion", String(settings.reducedMotion));
+    claimMaxColorScheme(dark);
+  }
+  function setMeta(name, content) {
+    let meta = document.querySelector(`meta[name="${name}"]`);
+    if (!meta) {
+      meta = document.createElement("meta");
+      meta.name = name;
+      (document.head ?? document.documentElement).appendChild(meta);
+    }
+    meta.content = content;
+  }
+  function claimMaxColorScheme(dark) {
+    setMeta("darkreader-lock", "");
+    setMeta("color-scheme", dark ? "dark" : "light");
   }
   function maxAncestors(element) {
     const ancestors = [];
     for (let current = element.parentElement; current; current = current.parentElement) ancestors.push(current);
     return ancestors;
   }
-  function maxPathMatchScore(current, href) {
-    const path = new URL(href, document.baseURI).pathname.replace(/\/+$/, "");
-    const here = current.replace(/\/+$/, "");
-    if (path === here) return path.length + 1e3;
-    return here.startsWith(path + "/") || path.startsWith(here + "/") ? path.length : -1;
-  }
-  function markMaxAncestor(element, className, predicate) {
-    const match = maxAncestors(element).find((candidate) => predicate(candidate, candidate.getBoundingClientRect()));
-    match?.classList.add(className);
-    return match;
-  }
-  function setMaxStyle(element, properties) {
-    for (const [property, value] of Object.entries(properties)) {
-      element.style.setProperty(property, value, "important");
-    }
+  var maxHeaderObserver;
+  var observedMaxHeader;
+  function syncMaxHeaderOffset() {
+    const header = document.querySelector(".navbar-fixed-top");
+    if (!header) return;
+    const apply = () => {
+      const visible = getComputedStyle(header).display !== "none";
+      const offset = visible ? Math.ceil(header.getBoundingClientRect().bottom) : 0;
+      document.documentElement.style.setProperty("--docket-max-header-offset", `${Math.max(offset, 0)}px`);
+    };
+    document.querySelectorAll("#sidebar, #main-content, .maximize-minimize").forEach((pane) => {
+      pane.classList.toggle("docket-max-fixed-pane", getComputedStyle(pane).position === "fixed");
+    });
+    apply();
+    if (observedMaxHeader === header) return;
+    maxHeaderObserver?.disconnect();
+    maxHeaderObserver = new ResizeObserver(apply);
+    maxHeaderObserver.observe(header);
+    observedMaxHeader = header;
   }
   function markMaxStructure() {
-    const anchors = Array.from(document.querySelectorAll("a"));
-    const courseSegment = location.pathname.split("/").filter(Boolean)[0];
-    const courseLink = anchors.find((anchor) => courseSegment && new URL(anchor.href).pathname === `/${courseSegment}/`);
-    const navLinks = anchors.filter((anchor) => ["Home", "Content", "Grades", "Courses"].includes(anchor.textContent?.trim() ?? ""));
-    if (courseLink) {
-      courseLink.classList.add("docket-max-course-context");
-      const courseHeader = markMaxAncestor(
-        courseLink,
-        "docket-max-course-header",
-        (_candidate, rect) => rect.top < 180 && rect.width > 480 && rect.height >= 42 && rect.height <= 120
-      );
-      courseHeader?.classList.add("docket-max-course-header");
-    }
-    const navigationToggle = Array.from(document.querySelectorAll("button")).find(
-      (button) => /toggle navigation/i.test(button.getAttribute("aria-label") ?? button.textContent ?? "")
-    );
-    navigationToggle?.classList.add("docket-max-menu-toggle");
-    const userLink = anchors.find((anchor) => {
-      const label = anchor.textContent?.trim() ?? "";
-      const rect = anchor.getBoundingClientRect();
-      return anchor !== courseLink && label.length > 2 && rect.top < 260 && !["Home", "Content", "Grades", "Courses", "iCalendar", "Print"].includes(label);
-    });
-    if (userLink) {
-      userLink.classList.add("docket-max-user-menu");
-    }
-    anchors.filter((anchor) => ["iCalendar", "Print"].includes(anchor.textContent?.trim() ?? "")).forEach((anchor) => anchor.classList.add("docket-max-utility-link"));
-    const textControls = Array.from(document.querySelectorAll("input, [role='searchbox'], [role='textbox'], [contenteditable='true'], [aria-label], [placeholder]"));
-    const navigateControl = textControls.find(
-      (element) => /navigate/i.test([
-        element.getAttribute("placeholder"),
-        element.getAttribute("aria-label"),
-        element.textContent,
-        element instanceof HTMLInputElement ? element.value : ""
-      ].filter(Boolean).join(" "))
-    ) ?? textControls.find((element) => {
-      const rect = element.getBoundingClientRect();
-      return rect.top < 250 && rect.width >= 100 && rect.width <= 700 && rect.height >= 20 && rect.height <= 120;
-    });
-    if (navigateControl) {
-      navigateControl.classList.add("docket-max-empty-search");
-      maxAncestors(navigateControl).find((element) => {
-        const rect = element.getBoundingClientRect();
-        return rect.top < 250 && rect.width >= 100 && rect.width <= 700 && rect.height >= 20 && rect.height <= 120;
-      })?.classList.add("docket-max-empty-search-shell");
-    }
-    const firstNavLink = navLinks[0];
-    if (firstNavLink && navLinks.length >= 3) {
-      const primaryNav = maxAncestors(firstNavLink).find((element) => {
-        const rect = element.getBoundingClientRect();
-        return rect.width > 500 && rect.height <= 140 && navLinks.every((link) => element.contains(link));
-      });
-      primaryNav?.classList.add("docket-max-primary-nav");
-      let activeNav;
-      let activeScore = -1;
-      for (const link of navLinks) {
-        const score = maxPathMatchScore(location.pathname, link.href);
-        if (score > activeScore) {
-          activeScore = score;
-          activeNav = link;
-        }
-      }
-      activeNav?.classList.add("docket-max-active-nav");
-    }
-    const shortcutNames = ["Syllabus", "Notes", "Schedule", "Content", "Grade"];
-    anchors.find((anchor) => anchor.textContent?.trim() === shortcutNames[0]) && Array.from(document.querySelectorAll("body *")).find((element) => {
-      const labels = Array.from(element.querySelectorAll("a"), (link) => link.textContent?.trim());
-      return labels.length === shortcutNames.length && shortcutNames.every((label, index) => labels[index] === label);
-    })?.classList.add("docket-max-shortcuts");
-    const scheduleTable = Array.from(document.querySelectorAll("table")).find((table) => {
-      const text = table.textContent ?? "";
-      const rect = table.getBoundingClientRect();
-      return rect.width > 400 && /Reading|Homework|iClicker/.test(text);
-    });
-    if (scheduleTable) {
-      scheduleTable.classList.add("docket-max-schedule-table");
-      for (const row2 of Array.from(scheduleTable.rows)) {
-        setMaxStyle(row2, { height: "1px", "min-height": "0" });
-        for (const cell of Array.from(row2.cells)) {
-          setMaxStyle(cell, { height: "1px", "min-height": "0", padding: "8px 16px" });
-        }
-      }
-      markMaxAncestor(
-        scheduleTable,
-        "docket-max-main-pane",
-        (_candidate, rect) => rect.left > 180 && rect.width > scheduleTable.getBoundingClientRect().width + 80 && rect.height > 400
-      );
-      const eventSurfaces = /* @__PURE__ */ new Map();
-      for (const cell of Array.from(scheduleTable.querySelectorAll("td, [role='cell']"))) {
-        const cellRect = cell.getBoundingClientRect();
-        const isPaintedEvent = (candidate) => {
-          const rect = candidate.getBoundingClientRect();
-          const background = getComputedStyle(candidate).backgroundColor;
-          const fillsCell = rect.width >= cellRect.width - 4 && rect.height >= cellRect.height - 4;
-          return rect.width > 100 && rect.height > 18 && rect.height < 220 && !fillsCell && background !== "transparent" && background !== "rgba(0, 0, 0, 0)" ? background : void 0;
-        };
-        for (const element of Array.from(cell.querySelectorAll("*"))) {
-          const background = isPaintedEvent(element);
-          if (!background) continue;
-          let eventSurface = element;
-          let eventBackground = background;
-          for (let candidate = element.parentElement; candidate && candidate !== cell; candidate = candidate.parentElement) {
-            const candidateBackground = isPaintedEvent(candidate);
-            if (candidateBackground) {
-              eventSurface = candidate;
-              eventBackground = candidateBackground;
-            }
-          }
-          eventSurfaces.set(eventSurface, eventBackground);
-        }
-      }
-      for (const [eventSurface, background] of eventSurfaces) {
-        eventSurface.classList.add("docket-max-schedule-event");
-        eventSurface.style.setProperty("--docket-max-rail", background);
-        setMaxStyle(eventSurface, {
-          display: "block",
-          float: "none",
-          clear: "both",
-          width: "100%",
-          "max-width": "100%",
-          margin: "3px 0",
-          // Reading/Homework labels arrive in a nested text wrapper; iClicker is
-          // direct text. Give the latter the same final text start column.
-          padding: /^iClicker\b/i.test(eventSurface.textContent?.trim() ?? "") ? "6px 10px 6px 30px" : "6px 10px 6px 14px",
-          background: "transparent",
-          "background-color": "transparent",
-          "background-image": "none",
-          "border-left": `4px solid ${background}`
-        });
-      }
-    }
-    const contentHeading = Array.from(document.querySelectorAll("h1, h2, h3")).find((heading) => heading.textContent?.trim() === "Content");
-    if (contentHeading) {
-      maxAncestors(contentHeading).find((element) => {
-        const rect = element.getBoundingClientRect();
-        return rect.left < 300 && rect.width < 380 && rect.height > 400;
-      })?.classList.add("docket-max-sidebar");
-    }
-    const sidebarHeading = Array.from(document.querySelectorAll("h1, h2, h3")).find((heading) => heading.textContent?.trim() === "Home");
-    if (sidebarHeading) {
-      const sidebar = markMaxAncestor(
-        sidebarHeading,
-        "docket-max-sidebar",
-        (_candidate, rect) => rect.left < 320 && rect.width >= 180 && rect.width <= 360 && rect.height > 360
-      );
-      if (sidebar) {
-        setMaxStyle(sidebar, { background: "var(--docket-max-canvas)", "border-right": "1px solid var(--docket-max-border)" });
-        const activeLabel = location.pathname.includes("/schedule") ? "Schedule" : location.pathname.includes("/calendar") ? "Calendar" : "Dashboard";
-        const activeItem = Array.from(sidebar.querySelectorAll("a, button, div")).find((item) => {
-          const rect = item.getBoundingClientRect();
-          return item.textContent?.trim() === activeLabel && rect.width > 120 && rect.height >= 28 && rect.height < 90;
-        });
-        if (activeItem) {
-          activeItem.classList.add("docket-max-sidebar-active");
-          setMaxStyle(activeItem, { background: "var(--docket-max-accent-container)", color: "var(--docket-max-on-accent-container)" });
-        }
-      }
-    }
-    const railAnchor = anchors.find((anchor) => ["Dashboard", "Schedule", "Syllabus"].includes(anchor.textContent?.trim() ?? ""));
-    if (railAnchor) {
-      const sidebar = markMaxAncestor(
-        railAnchor,
-        "docket-max-sidebar",
-        (_candidate, rect) => rect.left < 320 && rect.width >= 180 && rect.width <= 360 && rect.height > 360
-      );
-      const currentRail = Array.from(sidebar?.querySelectorAll("a") ?? []).reduce(
-        (best, link) => maxPathMatchScore(location.pathname, link.href) > maxPathMatchScore(location.pathname, best?.href ?? "") ? link : best,
-        void 0
-      );
-      currentRail?.classList.add("docket-max-sidebar-active");
-    }
-    const readingHeading = Array.from(document.querySelectorAll("h1")).find((heading) => heading.textContent?.trim() !== "");
-    if (readingHeading) {
-      maxAncestors(readingHeading).find((element) => {
-        const rect = element.getBoundingClientRect();
-        return rect.left >= 200 && rect.width > 1e3 && rect.height > 400;
-      })?.classList.add("docket-max-main-pane");
-    }
-    const dashboardHeading = Array.from(document.querySelectorAll("h1, h2, h3")).find((heading) => /^(Upcoming Week|Announcements)$/i.test(heading.textContent?.trim() ?? ""));
-    if (dashboardHeading) {
-      markMaxAncestor(
-        dashboardHeading,
-        "docket-max-main-pane",
-        (_candidate, rect) => rect.left >= 180 && rect.width > 900 && rect.height > 380
-      );
-    }
-    const contentRows = anchors.filter((anchor) => {
-      const path = new URL(anchor.href).pathname;
-      return path.startsWith(`${location.pathname}/`) && path !== location.pathname;
-    });
-    contentRows.forEach((link) => {
-      maxAncestors(link).find((element) => {
-        const rect = element.getBoundingClientRect();
-        return rect.width > 360 && rect.height > 20 && rect.height < 110 && contentRows.filter((row2) => element.contains(row2)).length === 1;
-      })?.classList.add("docket-max-content-row");
+    syncMaxHeaderOffset();
+    const holdsOnlySelect = (element, select) => !element.querySelector("h1, h2, h3, h4, input, textarea, table, iframe, a[href]") && (element.textContent ?? "").length - (select.textContent ?? "").length < 80;
+    document.querySelectorAll(".docket-max-redundant-outline").forEach((element) => {
+      const select = element.querySelector("select");
+      if (!select || !holdsOnlySelect(element, select)) element.classList.remove("docket-max-redundant-outline");
     });
     Array.from(document.querySelectorAll("select")).forEach((select) => {
       const mirrorsReadingOutline = Array.from(select.options).some((option) => option.textContent?.trim() === "Reading Instructions");
       if (!mirrorsReadingOutline) return;
-      maxAncestors(select).find((element) => {
+      for (const element of maxAncestors(select)) {
+        if (!holdsOnlySelect(element, select)) break;
         const rect = element.getBoundingClientRect();
-        return rect.width > 500 && rect.height < 120;
-      })?.classList.add("docket-max-redundant-outline");
+        if (rect.width > 500 && rect.height > 0 && rect.height < 120) {
+          element.classList.add("docket-max-redundant-outline");
+          break;
+        }
+      }
     });
   }
   function bootMax() {
@@ -3252,7 +3089,10 @@ html[data-docket-max-reskin] .docket-max-user-menu {
     }
   }
   var activeAdapter = null;
-  function runAdapters(settings) {
+  function markReady() {
+    document.documentElement.setAttribute("data-docket-ready", "true");
+  }
+  function runAdapters(settings, settled = true) {
     resetDiagnostics();
     diagnostics.pageKind = location.pathname;
     applyTheme(settings.appearance);
@@ -3270,10 +3110,10 @@ html[data-docket-max-reskin] .docket-max-user-menu {
       document.documentElement.removeAttribute("data-docket-compact-assignments");
     }
     document.documentElement.setAttribute("data-docket-reduced-motion", String(settings.reducedMotion));
-    document.documentElement.setAttribute("data-docket-ready", "true");
     if (settings.compatibilityMode) {
       activeAdapter?.unmount();
       activeAdapter = null;
+      markReady();
       return;
     }
     const match = adapters.find((a) => {
@@ -3287,10 +3127,14 @@ html[data-docket-max-reskin] .docket-max-user-menu {
       activeAdapter?.unmount();
       activeAdapter = match;
     }
-    if (!activeAdapter) return;
+    if (!activeAdapter) {
+      if (settled) markReady();
+      return;
+    }
     try {
       activeAdapter.mount(settings.compatibilityMode);
       diagnostics.activeAdapterId = activeAdapter.id;
+      markReady();
     } catch (err) {
       diagnostics.adapterError = err instanceof Error ? err.message : String(err);
       try {
@@ -3298,6 +3142,7 @@ html[data-docket-max-reskin] .docket-max-user-menu {
       } catch {
       }
       activeAdapter = null;
+      markReady();
     }
   }
   function boot() {
@@ -3305,6 +3150,8 @@ html[data-docket-max-reskin] .docket-max-user-menu {
     document.documentElement.setAttribute("data-docket-reskin", "true");
     injectStyles();
     ensureStylesLast();
+    startSessionKeepAlive();
+    startSessionRelay();
     let currentSettings = loadSettings();
     mountShell(currentSettings, (next) => {
       const needsRemount = next.useCompanionNav !== currentSettings.useCompanionNav || next.compatibilityMode !== currentSettings.compatibilityMode;
@@ -3323,7 +3170,8 @@ html[data-docket-max-reskin] .docket-max-user-menu {
         runAdapters(next);
       }
     });
-    runAdapters(currentSettings);
+    runAdapters(currentSettings, false);
+    setTimeout(markReady, 1500);
     observeMutations(document.body, () => {
       const settings = loadSettings();
       refreshShell(settings);
@@ -3355,17 +3203,17 @@ html[data-docket-max-reskin] .docket-max-user-menu {
       }
       document.documentElement.setAttribute("data-docket-reskin", "true");
       injectStyles();
+      setMeta("darkreader-lock", "");
       pollTheme(0);
-      setTimeout(() => {
-        if (!document.documentElement.hasAttribute("data-docket-ready")) {
-          document.documentElement.setAttribute("data-docket-ready", "true");
-        }
-      }, 400);
+      setTimeout(markReady, 1500);
     };
     if (document.documentElement) tick();
     else setTimeout(tick, 0);
   }
   if (isMaxHost(location.hostname)) {
+    document.documentElement.setAttribute("data-docket-max-reskin", "true");
+    injectMaxStyles();
+    applyMaxTheme(loadSettings());
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bootMax);
     else bootMax();
   } else if (!isLearningSuiteHost(location.hostname)) {

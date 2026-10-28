@@ -18,6 +18,15 @@ test("MAX styles preserve mobile access to wide native tables", () => {
   assert.match(css, /overflow-x: auto/);
 });
 
+test("MAX styles target its confirmed Bootstrap shell and keep icon fonts intact", () => {
+  for (const selector of [".navbar-fixed-top", "#sidebar", "#form-toolbar", ".maximize-minimize", "#today-highlight", ".list-view-item.green-item"]) {
+    assert.ok(selectors.includes(selector), selector);
+  }
+  // Glyphicons and MathJax glyphs are spans with their own fonts; a span font
+  // reset renders them as blank boxes.
+  assert.doesNotMatch(selectors, /:is\([^)]*\bspan\b[^)]*\)[^{]*\{[^}]*font-family/);
+});
+
 test("MAX styles use shared appearance, accessibility, and surface primitives", () => {
   for (const selector of [
     '[data-docket-theme="light"]',
@@ -27,12 +36,8 @@ test("MAX styles use shared appearance, accessibility, and surface primitives", 
     "[aria-current=\"page\"]",
     "[aria-expanded=\"true\"]",
     ".skip-link",
-    ".docket-max-main-pane",
-    ".docket-max-primary-nav",
-    ".docket-max-content-row",
     ".docket-max-redundant-outline",
-    ".docket-max-course-context",
-    ".docket-max-empty-search",
+    ".docket-max-fixed-pane",
   ]) {
     assert.match(css, new RegExp(selector.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")));
   }

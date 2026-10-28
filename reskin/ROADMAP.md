@@ -1,5 +1,66 @@
 # LearningSuite Reskin — Roadmap
 
+## Nineteenth pass: LearningSuite shell matches MAX, load flash and nav bugs (Oct 2026)
+
+The top bar and rail now use the MAX design language. The top bar has two bands: wordmark, course switcher and account first, then underline tabs. The rail has an uppercase section label and an accent-container active row. Both target LearningSuite's own classes (`body > header`,
+`.bg-top-nav > a.bg-top-nav-highlight`, `nav.bg-left-nav a`, `#_topLink`) instead of classes
+shell.ts adds later, so the shell is final at first paint. The wordmark is now CSS pseudo-content,
+and the avatar and icons land in pre-sized slots, so nothing shifts when script runs.
+
+Bugs confirmed live and fixed:
+- **Page scrolled ~12px on every page.** `nav`'s 12px vertical margin overflowed body (nav is
+  an `h-0 flex-grow` column child). The rail now uses padding only (regression test added).
+- **No visible sidebar row highlighted on course pages.** Scoring picked the desktop-hidden
+  section row ("Home"), and on index routes every child href tied. The script now scores visible rows only
+  and trusts LearningSuite's own `lg:font-bold` current-row marker first.
+- **Course tabs all accent blue.** `a.text-primary` outranked the tab rule.
+- **Load flash.** The ready gate opened at DOMContentLoaded, before Vue rendered. It now opens when
+  an adapter mounts, after a quiet debounce window, or at a 1.5s failsafe.
+- **Content tree rail** stacked native `pl-7` / `px-2 pl-4` indents on the icon slot. It is
+  flattened, with ellipsis and leaf rows aligned to the caret column.
+- **White boxes in instructor content** (inline `background-color:#ffffff` in `.default-list`)
+  are cleared in dark theme only.
+- Footer and content well now share the rail's canvas, and native `h1` rules are dropped.
+- The Dark Reader lock now also applies on LearningSuite.
+
+Verified live (Chrome, dark theme, injected build) on course Home/Dashboard, Content, Exams, Grades,
+Schedule and Syllabus, and on top-level Combined Schedule, Course List, Prioritizer, Grade Summary
+and Announcements. Every page measured a header of 89px, a rail of 236px, the correct label and active row, and 0px page scroll.
+**Tables:** the sitewide `table` rule (global.css) now uses MAX's table language. Live-checked on Exam List and Prioritizer; Prioritizer's empty
+detail rows are hidden until LearningSuite fills them. MAX's generic table metrics were aligned to it: 10/14px cells, 14px text, an
+uppercase 11.5px header, and 12px radius.
+**Cross-site sizing, measured live:** both sites have an 89px header, a 48px brand row, a 40px tab row, and 13.5/600 tabs with 12px padding. Both rails are 225px with 18/8
+padding, and the label is 16px tall at y=107. The first row starts at y=130, and rows are 36px tall at 14px with an 8px radius. Row width is 208 (LearningSuite) vs 207 (MAX); the 1px comes from MAX's
+scrollable #sidebar.
+**Not verified:** a true document-start load (injection was post-load, so the flash fix is reasoned,
+not observed), light theme, and widths ≤1023px. **Still native content:** top-level Announcements.
+
+## Eighteenth pass: MAX rebuilt on its real Bootstrap shell, Dark Reader lock (Oct 2026)
+
+Live DOM census on max.byu.edu (Dashboard, Content › Reading) showed that MAX does **not** use
+generated class names. It is a stock Bootstrap 3 app with a fixed shell: `.navbar-fixed-top`
+(`.navbar-header` + `.navbar-brand .brand-sub` + `.searchdiv`, then `.navbar-collapse` /
+`.navbar-nav`), a fixed `#sidebar` (`.sidebar-splitter > h3.sidebar-title .title-icon` +
+`ul.nav-sidebar`, empty `li.dropdown-header` separators, content views use
+`.nav-tree-head` / `.nav-tree-items .nav-tree-link`), and a fixed `#main-content` holding an
+absolute `#form-toolbar` (`.slot > a.button-link` or the outline `<select>`) over
+`#form-content.form-content-display`. The dashboard agenda is `table.listingTable` with
+`ul.calendar-itemlist > li.list-view-item.{green,blue,orange,transparent}-item`. The current
+day is `tr#today-highlight`.
+
+- **Blank boxes on "Home" and the hide/show button.** These were caused by the font reset on `span`, which
+  overrode the Glyphicons/Halflings icon fonts. Spans are now excluded, and MathJax subtrees too.
+- **Spacing.** The old layered rules (`100vw` breakouts, measured-ancestor heuristics, inline
+  `!important` row/event styles) were removed. max.css now targets the confirmed classes and keeps the
+  native shell geometry. Only the header offset sync and the duplicate-outline hide remain in JS.
+- **Today:** the yellow fill is replaced by an accent outline ring with an 8% tint.
+- **Dark Reader / dark-mode extensions** repainted the reskin a second time. Fixed by
+  `<meta name="darkreader-lock">` plus `<meta name="color-scheme">`, which are now applied at
+  document-start rather than DOMContentLoaded.
+- Verified with live CSS injection in Chrome (dark theme): Dashboard, the maximize/minimize toggle, and the Reading outline.
+  **Not verified:** Crest with Dark Reader installed (the automation browser was Chrome), light
+  theme, ≤640px, and the Schedule/Calendar/Grades views. Lighthouse/a11y scores were not run.
+
 ## Seventeenth pass: compact mobile Assignments keeps native controls, gains usable hierarchy (Sep 2026)
 
 Fresh live audit at a real 390px viewport confirmed the roadmap's long-standing mobile

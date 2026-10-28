@@ -11,8 +11,7 @@ let skipLink: HTMLElement | null = null;
 let fabAutoHideAttached = false;
 
 /**
- * Below LearningSuite's own `lg` breakpoint (1024px — see `.docket-wordmark`'s media queries
- * above for the same confirmed cutoff) the sidebar collapses to a hamburger and the floating
+ * Below LearningSuite's own `lg` breakpoint (1024px) the sidebar collapses to a hamburger and the floating
  * settings bar loses the dead column it normally sits in, landing directly on top of scrolled
  * list content instead (confirmed live, Sep 2026 UX audit). Fading it out while the page is
  * actively being scrolled down, and back in on scroll-up or once scrolling stops, keeps it from
@@ -92,9 +91,21 @@ function restyleNav(): Element | null {
   // all). Score every link bidirectionally first, then mark only the single best
   // (most-specific) match active, so a shorter or longer real match can win, but two
   // links can never both light up for one path.
+  // Score only rows the student can actually see. On course pages the section's own
+  // header link ("Home", "Grades", ...) is a mobile-only row hidden on desktop, and its
+  // shorter href matched the index route exactly — so the highlight landed on that
+  // invisible row and no visible item was ever marked active.
+  const visible = links.filter((a) => a.getClientRects().length > 0);
   let bestLink: Element | null = null;
   let bestScore = -1;
-  for (const a of links) {
+  // LearningSuite bolds its own current row (`lg:font-bold`, confirmed live on a course
+  // Dashboard). Trust that when it singles out exactly one visible row: on a section's
+  // index route every child href extends the current path, so URL scoring alone can't
+  // tell Dashboard from its siblings.
+  const nativeCurrent = visible.filter((a) => a.classList.contains("lg:font-bold"));
+  if (nativeCurrent.length === 1) bestScore = Number.POSITIVE_INFINITY;
+  bestLink = nativeCurrent.length === 1 ? nativeCurrent[0]! : null;
+  for (const a of visible.length ? visible : links) {
     const href = a.getAttribute("href");
     if (!href) continue;
     // Confirmed live (Sep 2026): every page carries `<base href="/">`, so these hrefs
@@ -123,11 +134,30 @@ function restyleNav(): Element | null {
       icon.classList.add("docket-nav-icon");
       a.insertBefore(icon, a.firstChild);
     }
-    if (a === bestLink) {
-      a.classList.add("docket-nav-item-active");
-    }
+    a.classList.toggle("docket-nav-item-active", a === bestLink);
   }
+  mountNavLabel(nav);
   return nav;
+}
+
+/**
+ * Small uppercase section label at the top of the rail, matching MAX's rail heading.
+ * The text is LearningSuite's own: its section wrapper carries a
+ * `currentsectiontitle` attribute ("Home", "Grades", ...). Nothing is rendered
+ * when that attribute is absent.
+ */
+function mountNavLabel(nav: Element): void {
+  const title = nav.querySelector("[currentsectiontitle]")?.getAttribute("currentsectiontitle")?.trim();
+  let label = nav.querySelector<HTMLElement>(":scope > .docket-nav-label");
+  if (!title) {
+    label?.remove();
+    return;
+  }
+  if (!label) {
+    label = h("div", { class: "docket-nav-label docket-scope", "aria-hidden": "true" });
+    nav.insertBefore(label, nav.firstChild);
+  }
+  if (label.textContent !== title) label.textContent = title;
 }
 
 /**
@@ -168,39 +198,21 @@ export function computeInitials(name: string): string {
 }
 
 /**
- * Restyles the masthead's own real `#_topLink` (confirmed live, Sep 2026: LearningSuite's own
- * id for the BYU-logo + "Learning Suite" icon-and-text lockup, a real link to the LearningSuite
- * home page) and `.header-userdropdown-trigger` in place — never replaced, per this file's own
- * restyleNav()/restyleTopTabs() discipline above. navigation.css hides the native `<img>`s and
- * stacked text via CSS (`display: none`, not removed from the DOM); this only INSERTS the two
- * new elements CSS alone can't produce: a real text wordmark (a marketing-hero color/weight
- * scale needs its own real DOM text node, not a `content:` pseudo-element — this codebase's only
- * prior use of pseudo-element content is the decorative hover-pill in navigation.css, never real
- * text) and an initials avatar chip (computed from the trigger's own already-rendered name text,
- * `span.hidden.md\:inline` — the same "read what's really on the page" rule matching every other
- * adapter's own extraction). Idempotent — guarded so a later debounced mutation pass never
- * inserts a second copy, matching restyleNav()'s own icon-insertion guard.
+ * Adds an initials avatar to the masthead's real `.header-userdropdown-trigger`,
+ * computed from the trigger's own rendered name text (`span.hidden.md\\:inline`).
+ * The BYU / Learning Suite wordmark is pure CSS on `#_topLink` (navigation.css), so
+ * it is present at first paint. Idempotent across debounced mutation passes.
  */
 function restyleMasthead(): void {
-  const topLink = document.querySelector("#_topLink");
-  if (topLink && !topLink.querySelector(".docket-wordmark")) {
-    topLink.appendChild(
-      h("span", { class: "docket-wordmark docket-scope", "aria-hidden": "true" }, [
-        h("span", { class: "docket-wordmark-brand" }, ["BYU"]),
-        h("span", { class: "docket-wordmark-suite" }, ["Learning Suite"]),
-      ]),
-    );
-  }
-
   const trigger = document.querySelector(".header-userdropdown-trigger");
   if (trigger && !trigger.querySelector(".docket-user-avatar")) {
     const nameEl = trigger.querySelector(".hidden.md\\:inline");
     const initials = computeInitials(nameEl?.textContent ?? "");
+    // The person glyph's wrapper is already sized as the avatar slot in
+    // navigation.css, so the chip replaces it in place without moving the name.
+    const slot = trigger.querySelector(":scope > div.relative") ?? trigger;
     if (initials) {
-      trigger.insertBefore(
-        h("span", { class: "docket-user-avatar docket-scope", "aria-hidden": "true" }, [initials]),
-        trigger.firstChild,
-      );
+      slot.insertBefore(h("span", { class: "docket-user-avatar docket-scope", "aria-hidden": "true" }, [initials]), slot.firstChild);
     }
   }
 }
@@ -289,11 +301,10 @@ export function refreshShell(settings: ReskinSettings): void {
 export function unmountShell(): void {
   if (navEl) {
     navEl.classList.remove("docket-nav-enhanced", "docket-scope");
-    navEl.querySelectorAll(".docket-nav-icon").forEach((icon) => icon.remove());
+    navEl.querySelectorAll(".docket-nav-icon, .docket-nav-label").forEach((node) => node.remove());
     navEl.querySelectorAll(".docket-nav-item").forEach((a) => a.classList.remove("docket-nav-item", "docket-nav-item-active"));
   }
   navEl = null;
-  document.querySelector("#_topLink .docket-wordmark")?.remove();
   document.querySelector(".header-userdropdown-trigger .docket-user-avatar")?.remove();
   document.querySelector(".docket-banner-relocated")?.classList.remove("docket-banner-relocated");
   if (topTabsEl) {

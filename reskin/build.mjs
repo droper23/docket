@@ -38,6 +38,7 @@ const metadata = `// ==UserScript==
 // @grant        GM_setValue
 // @grant        GM_xmlhttpRequest
 // @connect      max.byu.edu
+// @connect      *
 // @updateURL    https://raw.githubusercontent.com/${REPO}/main/${SCRIPT_PATH}?v=${pkg.version}
 // @downloadURL  https://raw.githubusercontent.com/${REPO}/main/${SCRIPT_PATH}?v=${pkg.version}
 // ==/UserScript==

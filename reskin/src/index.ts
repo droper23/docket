@@ -21,6 +21,8 @@ import { markScheduleTableGrids } from "./lib/scheduleLayout.js";
 import type { Adapter } from "./adapters/types.js";
 import { getSetting, setSetting } from "./lib/storage.js";
 import { isLearningSuiteHost, isMaxHost } from "./core/hosts.js";
+import { startSessionKeepAlive } from "./lib/keepAlive.js";
+import { startSessionRelay } from "./lib/sessionRelay.js";
 
 function injectStyles(): void {
   if (document.getElementById("docket-reskin-styles")) return;
@@ -73,6 +75,29 @@ function applyMaxTheme(settings: ReskinSettings): void {
     document.documentElement.removeAttribute("data-docket-background");
   }
   document.documentElement.setAttribute("data-docket-reduced-motion", String(settings.reducedMotion));
+  claimMaxColorScheme(dark);
+}
+
+function setMeta(name: string, content: string): void {
+  let meta = document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
+  if (!meta) {
+    meta = document.createElement("meta");
+    meta.name = name;
+    (document.head ?? document.documentElement).appendChild(meta);
+  }
+  meta.content = content;
+}
+
+/**
+ * Browser dark-mode extensions (Dark Reader and its forks) repaint MAX on top of
+ * the reskin's own palette: they invert the event fills, today's row, and our
+ * surfaces a second time. The reskin already owns MAX's appearance, so opt out
+ * through Dark Reader's documented lock and declare the real color scheme for
+ * extensions and browser auto-dark modes that read it instead.
+ */
+function claimMaxColorScheme(dark: boolean): void {
+  setMeta("darkreader-lock", "");
+  setMeta("color-scheme", dark ? "dark" : "light");
 }
 
 function maxAncestors(element: Element): HTMLElement[] {
@@ -81,271 +106,64 @@ function maxAncestors(element: Element): HTMLElement[] {
   return ancestors;
 }
 
-function maxPathMatchScore(current: string, href: string): number {
-  const path = new URL(href, document.baseURI).pathname.replace(/\/+$/, "");
-  const here = current.replace(/\/+$/, "");
-  if (path === here) return path.length + 1000;
-  return here.startsWith(path + "/") || path.startsWith(here + "/") ? path.length : -1;
-}
-
-function markMaxAncestor(
-  element: Element,
-  className: string,
-  predicate: (candidate: HTMLElement, rect: DOMRect) => boolean,
-): HTMLElement | undefined {
-  const match = maxAncestors(element).find((candidate) => predicate(candidate, candidate.getBoundingClientRect()));
-  match?.classList.add(className);
-  return match;
-}
-
-function setMaxStyle(element: HTMLElement, properties: Record<string, string>): void {
-  for (const [property, value] of Object.entries(properties)) {
-    element.style.setProperty(property, value, "important");
-  }
+// MAX pins #sidebar, #main-content, and its maximize toggle below a fixed
+// navbar using hard-coded `top` offsets sized for its native header. The
+// reskinned header is taller, so it covered the top of each pane (and the
+// view toolbar inside it). Track the header's real height instead.
+let maxHeaderObserver: ResizeObserver | undefined;
+let observedMaxHeader: Element | undefined;
+function syncMaxHeaderOffset(): void {
+  const header = document.querySelector<HTMLElement>(".navbar-fixed-top");
+  if (!header) return;
+  const apply = () => {
+    const visible = getComputedStyle(header).display !== "none";
+    const offset = visible ? Math.ceil(header.getBoundingClientRect().bottom) : 0;
+    document.documentElement.style.setProperty("--docket-max-header-offset", `${Math.max(offset, 0)}px`);
+  };
+  document.querySelectorAll<HTMLElement>("#sidebar, #main-content, .maximize-minimize").forEach((pane) => {
+    pane.classList.toggle("docket-max-fixed-pane", getComputedStyle(pane).position === "fixed");
+  });
+  apply();
+  if (observedMaxHeader === header) return;
+  maxHeaderObserver?.disconnect();
+  maxHeaderObserver = new ResizeObserver(apply);
+  maxHeaderObserver.observe(header);
+  observedMaxHeader = header;
 }
 
 /**
- * MAX's production views use generated class names, so its shell cannot be
- * styled safely with a Bootstrap selector list. Mark the actual visible roles
- * from their stable semantics and measured positions instead. This only adds
+ * MAX is a Bootstrap 3 app with stable class names, so max.css targets its
+ * real roles directly. The only structure that still needs script is the
+ * header offset above and the duplicated outline select below. This only adds
  * classes; MAX retains all existing links, menus, and handlers.
  */
 function markMaxStructure(): void {
-  const anchors = Array.from(document.querySelectorAll<HTMLAnchorElement>("a"));
-  const courseSegment = location.pathname.split("/").filter(Boolean)[0];
-  const courseLink = anchors.find((anchor) => courseSegment && new URL(anchor.href).pathname === `/${courseSegment}/`);
-  const navLinks = anchors.filter((anchor) => ["Home", "Content", "Grades", "Courses"].includes(anchor.textContent?.trim() ?? ""));
+  syncMaxHeaderOffset();
 
-  if (courseLink) {
-    courseLink.classList.add("docket-max-course-context");
-    const courseHeader = markMaxAncestor(courseLink, "docket-max-course-header", (_candidate, rect) =>
-      rect.top < 180 && rect.width > 480 && rect.height >= 42 && rect.height <= 120,
-    );
-    courseHeader?.classList.add("docket-max-course-header");
-  }
-
-  const navigationToggle = Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find((button) =>
-    /toggle navigation/i.test(button.getAttribute("aria-label") ?? button.textContent ?? ""),
-  );
-  navigationToggle?.classList.add("docket-max-menu-toggle");
-
-  const userLink = anchors.find((anchor) => {
-    const label = anchor.textContent?.trim() ?? "";
-    const rect = anchor.getBoundingClientRect();
-    return anchor !== courseLink && label.length > 2 && rect.top < 260 &&
-      !["Home", "Content", "Grades", "Courses", "iCalendar", "Print"].includes(label);
+  // Content exposes the same outline twice: the rail's tree and a native
+  // select in #form-toolbar. Keep the rail and hide this duplicate only when its
+  // options plainly mirror the rail's Reading view.
+  // The hidden wrapper must hold nothing but the select: while Safari is still
+  // streaming a page, the content pane can measure under 120px tall, and hiding
+  // it there blanked the whole page once the content arrived.
+  const holdsOnlySelect = (element: HTMLElement, select: HTMLSelectElement): boolean =>
+    !element.querySelector("h1, h2, h3, h4, input, textarea, table, iframe, a[href]") &&
+    (element.textContent ?? "").length - (select.textContent ?? "").length < 80;
+  document.querySelectorAll<HTMLElement>(".docket-max-redundant-outline").forEach((element) => {
+    const select = element.querySelector("select");
+    if (!select || !holdsOnlySelect(element, select)) element.classList.remove("docket-max-redundant-outline");
   });
-  if (userLink) {
-    userLink.classList.add("docket-max-user-menu");
-  }
-
-  anchors.filter((anchor) => ["iCalendar", "Print"].includes(anchor.textContent?.trim() ?? ""))
-    .forEach((anchor) => anchor.classList.add("docket-max-utility-link"));
-
-  // MAX renders its unused "Navigate" search control differently across views.
-  // Mark its small, top-level shell rather than changing the header's DOM.
-  const textControls = Array.from(document.querySelectorAll<HTMLElement>("input, [role='searchbox'], [role='textbox'], [contenteditable='true'], [aria-label], [placeholder]"));
-  const navigateControl = textControls.find((element) =>
-    /navigate/i.test([
-      element.getAttribute("placeholder"),
-      element.getAttribute("aria-label"),
-      element.textContent,
-      element instanceof HTMLInputElement ? element.value : "",
-    ].filter(Boolean).join(" ")),
-  ) ?? textControls.find((element) => {
-    const rect = element.getBoundingClientRect();
-    return rect.top < 250 && rect.width >= 100 && rect.width <= 700 && rect.height >= 20 && rect.height <= 120;
-  });
-  if (navigateControl) {
-    navigateControl.classList.add("docket-max-empty-search");
-    maxAncestors(navigateControl).find((element) => {
-      const rect = element.getBoundingClientRect();
-      return rect.top < 250 && rect.width >= 100 && rect.width <= 700 && rect.height >= 20 && rect.height <= 120;
-    })?.classList.add("docket-max-empty-search-shell");
-  }
-
-  const firstNavLink = navLinks[0];
-  if (firstNavLink && navLinks.length >= 3) {
-    const primaryNav = maxAncestors(firstNavLink).find((element) => {
-      const rect = element.getBoundingClientRect();
-      return rect.width > 500 && rect.height <= 140 && navLinks.every((link) => element.contains(link));
-    });
-    primaryNav?.classList.add("docket-max-primary-nav");
-    let activeNav: HTMLAnchorElement | undefined;
-    let activeScore = -1;
-    for (const link of navLinks) {
-      const score = maxPathMatchScore(location.pathname, link.href);
-      if (score > activeScore) {
-        activeScore = score;
-        activeNav = link;
-      }
-    }
-    activeNav?.classList.add("docket-max-active-nav");
-  }
-
-  // Dashboard repeats the rail's essential links in a legacy light strip.
-  // Hide only that short, fully duplicated group; the rail remains the context nav.
-  const shortcutNames = ["Syllabus", "Notes", "Schedule", "Content", "Grade"];
-  anchors.find((anchor) => anchor.textContent?.trim() === shortcutNames[0])
-    && Array.from(document.querySelectorAll<HTMLElement>("body *")).find((element) => {
-      const labels = Array.from(element.querySelectorAll("a"), (link) => link.textContent?.trim());
-      return labels.length === shortcutNames.length && shortcutNames.every((label, index) => labels[index] === label);
-    })?.classList.add("docket-max-shortcuts");
-
-  // Legacy schedule events use course-provided pastel fills. Detect only visible
-  // painted descendants inside the dated schedule table and apply the shared,
-  // contrast-safe event treatment without altering any event handlers.
-  const scheduleTable = Array.from(document.querySelectorAll<HTMLTableElement>("table")).find((table) => {
-    const text = table.textContent ?? "";
-    const rect = table.getBoundingClientRect();
-    return rect.width > 400 && /Reading|Homework|iClicker/.test(text);
-  });
-  if (scheduleTable) {
-    scheduleTable.classList.add("docket-max-schedule-table");
-    // MAX applies fixed row heights inline on this legacy table. A 1px table
-    // row is allowed to expand for its contents but cannot retain that empty
-    // vertical allocation.
-    for (const row of Array.from(scheduleTable.rows)) {
-      setMaxStyle(row, { height: "1px", "min-height": "0" });
-      for (const cell of Array.from(row.cells)) {
-        setMaxStyle(cell, { height: "1px", "min-height": "0", padding: "8px 16px" });
-      }
-    }
-    markMaxAncestor(scheduleTable, "docket-max-main-pane", (_candidate, rect) =>
-      rect.left > 180 && rect.width > scheduleTable.getBoundingClientRect().width + 80 && rect.height > 400,
-    );
-    const eventSurfaces = new Map<HTMLElement, string>();
-    for (const cell of Array.from(scheduleTable.querySelectorAll<HTMLElement>("td, [role='cell']"))) {
-      const cellRect = cell.getBoundingClientRect();
-      const isPaintedEvent = (candidate: HTMLElement): string | undefined => {
-        const rect = candidate.getBoundingClientRect();
-        const background = getComputedStyle(candidate).backgroundColor;
-        const fillsCell = rect.width >= cellRect.width - 4 && rect.height >= cellRect.height - 4;
-        return rect.width > 100 && rect.height > 18 && rect.height < 220 && !fillsCell
-          && background !== "transparent" && background !== "rgba(0, 0, 0, 0)"
-          ? background
-          : undefined;
-      };
-
-      for (const element of Array.from(cell.querySelectorAll<HTMLElement>("*"))) {
-        const background = isPaintedEvent(element);
-        if (!background) continue;
-        // Several nested descendants can inherit one event's color. Keep the
-        // outermost painted wrapper only, so each event receives exactly one
-        // rail, width, and left padding.
-        let eventSurface = element;
-        let eventBackground = background;
-        for (let candidate = element.parentElement; candidate && candidate !== cell; candidate = candidate.parentElement) {
-          const candidateBackground = isPaintedEvent(candidate);
-          if (candidateBackground) {
-            eventSurface = candidate;
-            eventBackground = candidateBackground;
-          }
-        }
-        eventSurfaces.set(eventSurface, eventBackground);
-      }
-    }
-
-    for (const [eventSurface, background] of eventSurfaces) {
-      eventSurface.classList.add("docket-max-schedule-event");
-      // MAX paints event categories with inline colors. Keep each category as a thin
-      // LearningSuite-style rail, but clear the large legacy color block itself.
-      eventSurface.style.setProperty("--docket-max-rail", background);
-      setMaxStyle(eventSurface, {
-        display: "block",
-        float: "none",
-        clear: "both",
-        width: "100%",
-        "max-width": "100%",
-        margin: "3px 0",
-        // Reading/Homework labels arrive in a nested text wrapper; iClicker is
-        // direct text. Give the latter the same final text start column.
-        padding: /^iClicker\b/i.test(eventSurface.textContent?.trim() ?? "")
-          ? "6px 10px 6px 30px"
-          : "6px 10px 6px 14px",
-        background: "transparent",
-        "background-color": "transparent",
-        "background-image": "none",
-        "border-left": `4px solid ${background}`,
-      });
-    }
-  }
-
-  const contentHeading = Array.from(document.querySelectorAll<HTMLElement>("h1, h2, h3")).find((heading) => heading.textContent?.trim() === "Content");
-  if (contentHeading) {
-    maxAncestors(contentHeading).find((element) => {
-      const rect = element.getBoundingClientRect();
-      return rect.left < 300 && rect.width < 380 && rect.height > 400;
-    })?.classList.add("docket-max-sidebar");
-  }
-
-  const sidebarHeading = Array.from(document.querySelectorAll<HTMLElement>("h1, h2, h3")).find((heading) => heading.textContent?.trim() === "Home");
-  if (sidebarHeading) {
-    const sidebar = markMaxAncestor(sidebarHeading, "docket-max-sidebar", (_candidate, rect) =>
-      rect.left < 320 && rect.width >= 180 && rect.width <= 360 && rect.height > 360,
-    );
-    if (sidebar) {
-      setMaxStyle(sidebar, { background: "var(--docket-max-canvas)", "border-right": "1px solid var(--docket-max-border)" });
-      const activeLabel = location.pathname.includes("/schedule") ? "Schedule" : location.pathname.includes("/calendar") ? "Calendar" : "Dashboard";
-      const activeItem = Array.from(sidebar.querySelectorAll<HTMLElement>("a, button, div")).find((item) => {
-        const rect = item.getBoundingClientRect();
-        return item.textContent?.trim() === activeLabel && rect.width > 120 && rect.height >= 28 && rect.height < 90;
-      });
-      if (activeItem) {
-        activeItem.classList.add("docket-max-sidebar-active");
-        setMaxStyle(activeItem, { background: "var(--docket-max-accent-container)", color: "var(--docket-max-on-accent-container)" });
-      }
-    }
-  }
-
-  const railAnchor = anchors.find((anchor) => ["Dashboard", "Schedule", "Syllabus"].includes(anchor.textContent?.trim() ?? ""));
-  if (railAnchor) {
-    const sidebar = markMaxAncestor(railAnchor, "docket-max-sidebar", (_candidate, rect) =>
-      rect.left < 320 && rect.width >= 180 && rect.width <= 360 && rect.height > 360,
-    );
-    const currentRail = Array.from(sidebar?.querySelectorAll<HTMLAnchorElement>("a") ?? []).reduce<HTMLAnchorElement | undefined>((best, link) =>
-      maxPathMatchScore(location.pathname, link.href) > maxPathMatchScore(location.pathname, best?.href ?? "") ? link : best,
-    undefined);
-    currentRail?.classList.add("docket-max-sidebar-active");
-  }
-
-  const readingHeading = Array.from(document.querySelectorAll<HTMLElement>("h1")).find((heading) => heading.textContent?.trim() !== "");
-  if (readingHeading) {
-    maxAncestors(readingHeading).find((element) => {
-      const rect = element.getBoundingClientRect();
-      return rect.left >= 200 && rect.width > 1000 && rect.height > 400;
-    })?.classList.add("docket-max-main-pane");
-  }
-
-  const dashboardHeading = Array.from(document.querySelectorAll<HTMLElement>("h1, h2, h3")).find((heading) => /^(Upcoming Week|Announcements)$/i.test(heading.textContent?.trim() ?? ""));
-  if (dashboardHeading) {
-    markMaxAncestor(dashboardHeading, "docket-max-main-pane", (_candidate, rect) =>
-      rect.left >= 180 && rect.width > 900 && rect.height > 380,
-    );
-  }
-
-  const contentRows = anchors.filter((anchor) => {
-    const path = new URL(anchor.href).pathname;
-    return path.startsWith(`${location.pathname}/`) && path !== location.pathname;
-  });
-  contentRows.forEach((link) => {
-    maxAncestors(link).find((element) => {
-      const rect = element.getBoundingClientRect();
-      return rect.width > 360 && rect.height > 20 && rect.height < 110 &&
-        contentRows.filter((row) => element.contains(row)).length === 1;
-    })?.classList.add("docket-max-content-row");
-  });
-
-  // Content exposes the same outline three ways: rail, a native select, and
-  // the reading list. Keep the rail as the contextual outline and remove this
-  // duplicate only when its options plainly mirror the rail's Reading view.
   Array.from(document.querySelectorAll<HTMLSelectElement>("select")).forEach((select) => {
     const mirrorsReadingOutline = Array.from(select.options).some((option) => option.textContent?.trim() === "Reading Instructions");
     if (!mirrorsReadingOutline) return;
-    maxAncestors(select).find((element) => {
+    for (const element of maxAncestors(select)) {
+      if (!holdsOnlySelect(element, select)) break;
       const rect = element.getBoundingClientRect();
-      return rect.width > 500 && rect.height < 120;
-    })?.classList.add("docket-max-redundant-outline");
+      if (rect.width > 500 && rect.height > 0 && rect.height < 120) {
+        element.classList.add("docket-max-redundant-outline");
+        break;
+      }
+    }
   });
 }
 
@@ -466,7 +284,19 @@ let activeAdapter: Adapter | null = null;
  * here, before any adapter runs, keeping only the CSS polish already
  * injected — no DOM rewriting at all.
  */
-function runAdapters(settings: ReskinSettings): void {
+/**
+ * Lifts global.css's ready-gate (`main { visibility: hidden }`). LearningSuite is a Vue
+ * app: at DOMContentLoaded its views usually haven't rendered yet, so revealing `main`
+ * then showed native markup for a beat before an adapter replaced it (the load-time
+ * flash). The gate now opens only once an adapter has mounted, or once the page has been
+ * quiet for a full debounce window with nothing to adapt (`settled`). earlyInject()'s
+ * failsafe still guarantees the page is never left hidden.
+ */
+function markReady(): void {
+  document.documentElement.setAttribute("data-docket-ready", "true");
+}
+
+function runAdapters(settings: ReskinSettings, settled = true): void {
   resetDiagnostics();
   diagnostics.pageKind = location.pathname;
   // Re-checked on every pass, not just at boot: LearningSuite's own dark-mode toggle can
@@ -509,16 +339,10 @@ function runAdapters(settings: ReskinSettings): void {
   // (settingsPanel.ts/diagnosticsPanel.ts read this same attribute at open time) can
   // suppress motion from one explicit signal — see settings.ts's reducedMotion field.
   document.documentElement.setAttribute("data-docket-reduced-motion", String(settings.reducedMotion));
-  // Lifts global.css's ready-gate (`main { visibility: hidden }` until this is set — see
-  // earlyInject()'s own failsafe timeout for the "no adapter ever runs" case). Safe to set
-  // before the adapter branch below despite hiding native content synchronously inside
-  // mount(): everything from here to the end of this function call runs in one JS task, so
-  // the browser can't paint an intermediate "ready but not yet hidden" frame in between.
-  document.documentElement.setAttribute("data-docket-ready", "true");
-
   if (settings.compatibilityMode) {
     activeAdapter?.unmount();
     activeAdapter = null;
+    markReady();
     return;
   }
 
@@ -535,11 +359,17 @@ function runAdapters(settings: ReskinSettings): void {
     activeAdapter?.unmount();
     activeAdapter = match;
   }
-  if (!activeAdapter) return;
+  if (!activeAdapter) {
+    if (settled) markReady();
+    return;
+  }
 
+  // mount() hides native content synchronously in this same task, so revealing `main`
+  // right after it can never paint a "ready but not yet hidden" frame.
   try {
     activeAdapter.mount(settings.compatibilityMode);
     diagnostics.activeAdapterId = activeAdapter.id;
+    markReady();
   } catch (err) {
     // Spec §27: a broken adapter must never destroy the page — undo whatever
     // it managed to do and fall back to LearningSuite's native UI untouched.
@@ -550,6 +380,7 @@ function runAdapters(settings: ReskinSettings): void {
       // Already broken; nothing more to safely undo.
     }
     activeAdapter = null;
+    markReady();
   }
 }
 
@@ -559,6 +390,8 @@ function boot(): void {
   document.documentElement.setAttribute("data-docket-reskin", "true");
   injectStyles();
   ensureStylesLast();
+  startSessionKeepAlive();
+  startSessionRelay();
 
   let currentSettings = loadSettings();
 
@@ -596,7 +429,11 @@ function boot(): void {
     }
   });
 
-  runAdapters(currentSettings);
+  // Not settled: LearningSuite may still be rendering. The observer passes below only
+  // run after 150ms without DOM changes, so they count as settled.
+  runAdapters(currentSettings, false);
+  // Same failsafe as earlyInject()'s, for loads where boot() ran without it.
+  setTimeout(markReady, 1500);
   observeMutations(document.body, () => {
     const settings = loadSettings();
     refreshShell(settings);
@@ -679,21 +516,26 @@ function earlyInject(): void {
     }
     document.documentElement.setAttribute("data-docket-reskin", "true");
     injectStyles();
+    // Same opt-out as MAX (see claimMaxColorScheme): the reskin owns LearningSuite's
+    // palette, and a dark-mode extension repainting on top of it double-inverts it.
+    setMeta("darkreader-lock", "");
     pollTheme(0);
-    // Failsafe for global.css's ready-gate (`main { visibility: hidden }` until
-    // `data-docket-ready` is set, normally by runAdapters() at the end of boot()): a native
-    // page with no matching adapter must still become visible, never fail permanently hidden.
-    setTimeout(() => {
-      if (!document.documentElement.hasAttribute("data-docket-ready")) {
-        document.documentElement.setAttribute("data-docket-ready", "true");
-      }
-    }, 400);
+    // Failsafe for global.css's ready-gate (see markReady()): a page that never mounts an
+    // adapter and never goes quiet (a ticking clock, a polling widget) must still become
+    // visible, never fail permanently hidden.
+    setTimeout(markReady, 1500);
   };
   if (document.documentElement) tick();
   else setTimeout(tick, 0);
 }
 
 if (isMaxHost(location.hostname)) {
+  // Theme, styles, and the dark-mode-extension lock must land at document-start:
+  // by DOMContentLoaded an extension like Dark Reader has already repainted the
+  // page. bootMax repeats these idempotently once the body exists.
+  document.documentElement.setAttribute("data-docket-max-reskin", "true");
+  injectMaxStyles();
+  applyMaxTheme(loadSettings());
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bootMax);
   else bootMax();
 } else if (!isLearningSuiteHost(location.hostname)) {

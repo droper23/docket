@@ -1,126 +1,160 @@
 /**
- * Applied to LearningSuite's OWN existing top-level nav element in place
- * (see adapters/shell.ts) — never a fabricated replacement nav with guessed
- * routes. An opaque "island" rail (macOS Sonoma's own sidebar treatment):
- * inset with a margin so canvas shows all the way around it, one step
- * darker/lighter than canvas via the surface-1 token, edge-defined with a
- * 1px separator border rather than a shadow.
+ * App shell: the same two-band top bar and quiet context rail as the MAX reskin
+ * (styles/max.css), so both BYU sites read as one product.
  *
- * `background-color` (not the `background` shorthand) with `!important`:
- * confirmed live this element also carries LearningSuite's own
- * `.bg-left-nav` utility class, which global.css deliberately leaves alone
- * for every OTHER `.bg-left-nav` element (body) so the plain sitewide
- * canvas rule doesn't apply here — but without `!important` here too, any
- * equal-or-higher-specificity native rule on the same element could still
- * win by source order. Both column layout (`nav`'s own native `flex-col`)
- * and this vertical sidebar's row treatment below (`padding`/`gap` reused
- * as vertical spacing, since `.docket-nav-enhanced` never overrides
- * `flex-direction`) were confirmed live to already compose correctly —
- * only the fill color was ever actually broken.
- *
- * A pass tried stretching this card to fill nav's own native full-height flex-grow column
- * (`flex: 1 1 auto; align-self: stretch`), chasing a mockup reference whose sidebar panel ran
- * almost to the bottom of its (short, ~800px) reference canvas. Live-verified against a real
- * maximized Safari window (Sep 2026) and reverted: nav's real column is however tall the actual
- * browser window is, not the mockup's canvas — on a normal-to-large monitor that stretched this
- * bordered card across a huge dead gap below the 6 real rows, reading as a mostly-empty box
- * rather than a full panel, and orphaned the settings/eye FAB in the middle of that void. Back
- * to shrink-wrapping its own content; the FAB stays genuinely floating below it (see
- * `.docket-floating-bar` below), which is the honest description of that empty space rather
- * than something this card can safely pretend to own.
+ * Every rule here targets LearningSuite's own stable classes (`header`,
+ * `.bg-header`, `.bg-top-nav` / `.bg-top-nav-highlight`, `nav.bg-left-nav`) rather
+ * than classes shell.ts adds later, so the shell is already in its final shape at
+ * first paint. Script-inserted pieces (nav icons, the avatar) land in space that is
+ * reserved here, so nothing shifts when they arrive.
  */
-.docket-nav-enhanced {
-  display: flex !important;
-  gap: 4px;
-  padding: 10px;
-  margin: 12px 10px;
-  background-color: transparent !important;
-  border: 0;
-  border-radius: 0;
-  font-family: var(--docket-font);
-  overflow-x: auto;
+[data-docket-reskin] {
+  --docket-shell-hairline: color-mix(in srgb, var(--docket-separator) 65%, transparent);
 }
-.docket-nav-enhanced .docket-nav-item {
-  display: flex !important;
-  align-items: center !important;
-  gap: 10px;
+
+/* Top bar. */
+[data-docket-reskin] body > header {
+  background-color: var(--docket-surface-1) !important;
+  border-bottom: 1px solid var(--docket-shell-hairline) !important;
+}
+[data-docket-reskin] header .bg-header {
+  position: relative;
+  align-items: center;
+  height: 48px;
+  padding: 0 20px 0 0;
+  background-color: transparent !important;
+  border-bottom: 0 !important;
+}
+[data-docket-reskin] header .bg-top-nav {
+  align-items: stretch;
+  height: 40px;
+  padding: 0 8px;
+  line-height: 1;
+  background-color: transparent !important;
+  border-bottom: 0 !important;
+}
+[data-docket-reskin] header .bg-top-nav > a {
+  display: flex;
+  align-items: center;
+  padding: 0 12px !important;
+  background-color: transparent !important;
+  border-bottom: 2px solid transparent;
+  color: var(--docket-label-secondary) !important;
   font-family: var(--docket-font) !important;
-  font-size: 13px !important;
-  font-weight: 590 !important;
-  color: var(--docket-label) !important;
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
   text-decoration: none !important;
-  padding: 10px 14px !important;
-  border-radius: var(--docket-radius-pill) !important;
-  white-space: nowrap;
-  background-color: transparent !important;
-  transition: background-color var(--docket-dur-fast) var(--docket-ease-standard);
+  transition: color var(--docket-dur-fast) var(--docket-ease-standard), background-color var(--docket-dur-fast) var(--docket-ease-standard);
 }
-.docket-nav-enhanced .docket-nav-item:hover { background-color: transparent !important; }
-/* Real `<a>` — reachable by keyboard already; this replaces the browser's own default ring
-   (which varies per browser and never matches the app's own accent) with the same focus
-   language every other control in this reskin uses. Negative offset keeps the ring inside
-   the pill instead of overlapping the next nav item in a tight sidebar. */
-.docket-nav-enhanced .docket-nav-item:focus-visible {
+[data-docket-reskin] header .bg-top-nav > a:hover {
+  background-color: var(--docket-fill) !important;
+  color: var(--docket-label) !important;
+}
+[data-docket-reskin] header .bg-top-nav > a.bg-top-nav-highlight {
+  border-bottom-color: var(--docket-accent);
+  color: var(--docket-accent) !important;
+}
+[data-docket-reskin] header .bg-top-nav > a.bg-top-nav-highlight:hover { background-color: transparent !important; }
+[data-docket-reskin] header .bg-top-nav > a:focus-visible {
   outline: 2px solid var(--docket-accent) !important;
   outline-offset: -2px;
 }
-/* A prior pass tried a solid, fully-saturated accent fill here and reverted it — that read as a
-   literal button sitting under the label (real complaint: "the label looked like it had a button
-   behind it"). This is a different, much lower-contrast treatment (the mockup reference's own
-   active row: a faint accent-tinted wash, not a solid chip) — `color-mix` against the pill's own
-   surface rather than a flat opaque fill, so it reads as a soft selection state (the same idiom
-   macOS's own sidebar uses for the selected row) rather than a button. Text/icon color still
-   carries most of the signal, same as the no-fill version this replaces. */
-.docket-nav-enhanced .docket-nav-item-active {
-  background: transparent !important;
-  color: var(--docket-accent) !important;
-}
-.docket-nav-enhanced .docket-nav-item-active:hover {
-  background: transparent !important;
-}
-/* Matched by real label text in shell.ts's restyleNav() — see icons.ts's navIconByLabel.
-   Secondary/muted at rest so the label text stays the primary read, full label color when
-   the row is active (inherits currentColor, so both states come free from .docket-icon's
-   own `stroke: currentColor`). */
-.docket-nav-enhanced .docket-nav-icon {
-  width: 16px !important;
-  height: 16px !important;
-  flex-shrink: 0;
-  color: var(--docket-label-secondary);
-}
-.docket-nav-enhanced .docket-nav-item-active .docket-nav-icon {
-  color: var(--docket-accent);
+/* The strip's trailing text block ("Back to Instructor View", term notes). */
+[data-docket-reskin] header .bg-top-nav > div {
+  display: flex;
+  align-items: center;
+  color: var(--docket-label-tertiary) !important;
+  font-size: 12.5px !important;
 }
 
-/**
- * The course-level top tab strip (Home/Content/Exams/Grades/Schedule/
- * Syllabus, see adapters/shell.ts's restyleTopTabs()). LearningSuite fills
- * the active tab with a solid highlight color by default; this swaps that
- * for an Apple-tab-bar-style underline instead, on top of LearningSuite's
- * own real tabs/hrefs — never a replacement bar.
- */
-.docket-top-tabs .docket-top-tab {
-  font-family: var(--docket-font) !important;
-  font-size: 13px !important;
-  font-weight: 600 !important;
-  color: var(--docket-label-secondary) !important;
-  text-decoration: none !important;
-  background: transparent !important;
-  border-bottom: 3px solid transparent !important;
-  transition: color var(--docket-dur-fast) var(--docket-ease-standard), border-color var(--docket-dur-fast) var(--docket-ease-standard);
+/* Context rail. */
+[data-docket-reskin] div.bg-left-nav:has(> nav) {
+  /* Same rail width as MAX's native #sidebar, so both sites line up. */
+  flex: 0 0 225px;
+  width: 225px !important;
+  max-width: 225px;
+  background-color: var(--docket-canvas) !important;
+  border-right: 1px solid var(--docket-shell-hairline);
 }
-.docket-top-tabs .docket-top-tab:hover {
+/* No vertical margin: nav is a flex-grow, h-0 column child, so any margin
+   overflows body and makes the whole page scroll by that amount. */
+[data-docket-reskin] nav.bg-left-nav {
+  display: flex !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  gap: 0;
+  margin: 0 !important;
+  padding: 18px 8px !important;
+  background-color: transparent !important;
+  border: 0;
+  font-family: var(--docket-font);
+  overflow-x: hidden;
+}
+[data-docket-reskin] nav.bg-left-nav a {
+  position: relative;
+  display: flex !important;
+  align-items: center !important;
+  min-height: 36px;
+  margin: 1px 0;
+  /* Left padding reserves the icon slot so inserted icons never shift labels. */
+  padding: 7px 12px 7px 38px !important;
+  background-color: transparent !important;
+  border-radius: 8px !important;
+  color: var(--docket-label-secondary) !important;
+  font-family: var(--docket-font) !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  text-decoration: none !important;
+  white-space: nowrap;
+  transition: background-color var(--docket-dur-fast) var(--docket-ease-standard), color var(--docket-dur-fast) var(--docket-ease-standard);
+}
+[data-docket-reskin] nav.bg-left-nav a * { color: inherit !important; }
+[data-docket-reskin] nav.bg-left-nav a:hover {
+  background-color: var(--docket-fill) !important;
   color: var(--docket-label) !important;
 }
-.docket-top-tabs .docket-top-tab:focus-visible {
+[data-docket-reskin] nav.bg-left-nav a:focus-visible {
   outline: 2px solid var(--docket-accent) !important;
-  outline-offset: 2px;
-  border-radius: var(--docket-radius-xs);
+  outline-offset: -2px;
 }
-/* A flat accent underline, not a gradient border-image. */
-.docket-top-tabs .docket-top-tab-active {
-  color: var(--docket-accent) !important;
-  border-bottom-color: var(--docket-accent) !important;
+[data-docket-reskin] nav.bg-left-nav a.docket-nav-item-active {
+  background-color: var(--docket-accent-container) !important;
+  color: var(--docket-on-accent-container) !important;
+  font-weight: 600 !important;
+}
+[data-docket-reskin] nav.bg-left-nav .docket-nav-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  width: 16px !important;
+  height: 16px !important;
+  transform: translateY(-50%);
+  color: var(--docket-label-tertiary) !important;
+}
+[data-docket-reskin] nav.bg-left-nav .docket-nav-item-active .docket-nav-icon { color: inherit !important; }
+/* Section label, read from LearningSuite's own current-section title (shell.ts). */
+[data-docket-reskin] .docket-nav-label {
+  margin: 0 0 6px;
+  line-height: 16px;
+  padding: 0 12px;
+  color: var(--docket-label-tertiary);
+  font-family: var(--docket-font);
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+@media (min-width: 1024px) {
+  /* LearningSuite ships a mobile-only "Back to Instructor View" row as nav's first
+     child; its wrapper's border-b doesn't collapse with it on desktop. */
+  [data-docket-reskin] nav.bg-left-nav > :is(:first-child, .docket-nav-label + *) { border-bottom: none !important; }
+}
+
+/* The content well shares the rail's canvas, as on MAX. */
+[data-docket-reskin] #fullLSPage {
+  background-color: var(--docket-canvas) !important;
 }
 
 .docket-floating-bar {
@@ -271,166 +305,129 @@
 }
 
 /**
- * The masthead's own two dropdown triggers — confirmed live real elements:
- * `button.header-coursedropdown-trigger` ("All courses" / the course name, top-left) and
- * `button.header-userdropdown-trigger` (the account name, top-right). Both present on
- * literally every page, and — unlike the sidebar and the dropdown panels they open — never
- * given a hover/pill treatment: bare text next to a caret with no affordance at all that
- * they're interactive. A soft pill-shaped hover fill (the same idiom already used for menu
- * rows and nav items) is enough to make the one piece of chrome that's on every screen stop
- * reading as unstyled Bootstrap.
+ * Masthead: wordmark, course switcher, account. Natively a 36px row with the
+ * BYU logo, a small icon mark between border-l/border-r dividers, and stacked
+ * "Learning / Suite" text. All of it stays in the DOM (#_topLink remains the
+ * real home link); only the visual parts are hidden, and the wordmark is drawn
+ * with pseudo-elements so it exists at first paint instead of popping in.
  */
-/**
- * Confirmed live (Sep 2026, real 5-course account): the padding+negative-margin version of
- * this pill ("padding: 4px 12px; margin: -4px -12px" — visually neutral for POSITION only)
- * shrank the button's own content box by the padding amount on every affected page. This
- * button's course-name child is a `min-w-0` flex-shrink item with no fixed width of its own,
- * so that shrunk content box came entirely out of its available room — "MATH 113 – Calculus 2"
- * (164.9px needed, confirmed against the real unstyled page) truncated to "MATH 113 – Calc…" in
- * a masthead element present on every single course-scoped page. A `::before` pseudo-element
- * gives the same hover-pill footprint without touching the real button's own box model at all.
- */
-/* `z-index: 0` (not just `position: relative`) is required so this button establishes its
-   OWN local stacking context — without it, a `z-index: -1` on the `::before` below escapes to
-   the nearest ANCESTOR stacking context instead, painting the hover pill behind unrelated
-   ancestor content (confirmed live: it rendered fully invisible, behind the header bar's own
-   background) rather than merely behind this button's own text. */
+[data-docket-reskin] #_topLink > div { display: none !important; }
+[data-docket-reskin] #_topLink {
+  display: flex !important;
+  align-items: center;
+  gap: 5px;
+  min-width: 44px;
+  height: 48px;
+  padding: 0 20px;
+  font-family: var(--docket-font);
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  text-decoration: none !important;
+  white-space: nowrap;
+}
+[data-docket-reskin] #_topLink::before {
+  content: "BYU";
+  color: var(--docket-accent);
+  font-weight: 800;
+}
+[data-docket-reskin] #_topLink::after {
+  content: "Learning Suite";
+  color: var(--docket-label-secondary);
+  font-weight: 500;
+}
+/* Course switcher: course name as the bar's title, term as quiet metadata. */
+[data-docket-reskin] header .header-coursedropdown {
+  display: flex;
+  align-items: center;
+  height: auto;
+  margin: 0 !important;
+  padding: 0 0 0 16px !important;
+  border-left: 1px solid var(--docket-shell-hairline);
+}
 [data-docket-reskin] .header-coursedropdown-trigger,
 [data-docket-reskin] .header-userdropdown-trigger {
   position: relative;
   z-index: 0;
+  align-items: center;
+  height: 32px !important;
+  padding: 0 !important;
+  font-family: var(--docket-font) !important;
 }
-/* Live-measured (Sep 2026): `.header-userdropdown-trigger`'s own native padding is
-   `6.4px 0 0` — top-only, no bottom (`.header-coursedropdown-trigger`'s is a plain `0`, unaffected
-   — confirmed live, this asymmetry is unique to the user-dropdown button, likely a leftover
-   sizing hack from LearningSuite's own original small icon-only avatar). The pill `::before`
-   below is built from this button's own box via a symmetric `-4px`/`-12px` inset, so it centers
-   correctly on the box — but the avatar/name/chevron content inside was pushed 6.4px toward the
-   bottom by that lopsided padding, reading as "the pill and its content don't line up" even
-   though the pill itself was never off-center. */
-[data-docket-reskin] .header-userdropdown-trigger {
+/* The top level shows a lone "All courses" label that LearningSuite uppercases. */
+[data-docket-reskin] .header-coursedropdown-trigger {
+  color: var(--docket-label) !important;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  text-transform: none !important;
+}
+[data-docket-reskin] .header-coursedropdown-trigger > div { text-transform: none !important; }
+[data-docket-reskin] .header-coursedropdown-trigger > div:first-child:not(:only-of-type) {
+  order: 2;
+  margin: 0 0 0 10px !important;
+  color: var(--docket-label-tertiary) !important;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+[data-docket-reskin] .header-coursedropdown-trigger > div:nth-child(2) {
+  order: 1;
+  margin: 0 !important;
+  color: var(--docket-label) !important;
+}
+[data-docket-reskin] .header-coursedropdown-trigger .fa-caret-down,
+[data-docket-reskin] .header-userdropdown-trigger .fa-caret-down {
+  order: 3;
+  margin-left: 8px;
+  color: var(--docket-label-tertiary) !important;
+  font-size: 11px;
+}
+[data-docket-reskin] header .header-userdropdown {
+  display: flex;
+  align-items: center;
+  height: auto;
+  margin: 0 0 0 auto !important;
   padding: 0 !important;
 }
+[data-docket-reskin] .header-userdropdown-trigger span {
+  margin-right: 0 !important;
+  color: var(--docket-label-secondary) !important;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+/* A hover pill drawn outside the button's own box, so long course names never
+   lose width to padding. z-index: 0 above keeps it inside this stacking context. */
 [data-docket-reskin] .header-coursedropdown-trigger::before,
 [data-docket-reskin] .header-userdropdown-trigger::before {
   content: "";
   position: absolute;
-  inset: -4px -12px;
+  inset: 0 -10px;
   z-index: -1;
-  border-radius: var(--docket-radius-pill);
+  border-radius: var(--docket-radius-xs);
   transition: background-color var(--docket-dur-fast) var(--docket-ease-standard);
   pointer-events: none;
 }
 [data-docket-reskin] .header-coursedropdown-trigger:hover::before,
 [data-docket-reskin] .header-userdropdown-trigger:hover::before {
-  background-color: var(--docket-fill) !important;
+  background-color: var(--docket-fill);
 }
 [data-docket-reskin] .header-coursedropdown-trigger:focus-visible,
 [data-docket-reskin] .header-userdropdown-trigger:focus-visible {
-  outline: 2px solid var(--docket-accent);
+  outline: 2px solid var(--docket-accent) !important;
   outline-offset: 2px;
 }
-
-/**
- * Masthead brand lockup (`#_topLink`, confirmed live real element, a genuine link to the
- * LearningSuite home page): the native BYU logo image, small LearningSuite icon mark, and
- * stacked "Learning"/"Suite" text are hidden here — never removed from the DOM, `#_topLink`
- * itself stays the real click target — and replaced by a single real text wordmark inserted by
- * shell.ts's restyleMasthead(). Hidden by their own stable component classnames
- * (`header-byu-logo`/`header-ls-logo`) or the stacked-text div's own component classes, never
- * the long incidental Tailwind utility chain on their wrapper divs, which is far more likely to
- * drift on a native LearningSuite update.
- */
-[data-docket-reskin] #_topLink img.header-byu-logo,
-[data-docket-reskin] #_topLink img.header-ls-logo,
-[data-docket-reskin] #_topLink div.hidden.md\:inline-flex.flex-col {
-  display: none !important;
-}
-/* Hiding the native children can collapse #_topLink's own box toward zero size — this keeps a
-   real hit area for the real home link, matching this codebase's own established 44px touch
-   target (cards.css's .docket-row, responsive.css's own HIG comment). */
-[data-docket-reskin] #_topLink {
+/* The avatar slot is sized at first paint; shell.ts swaps the generic person
+   glyph for an initials chip inside it without moving the name. */
+[data-docket-reskin] .header-userdropdown-trigger > div.relative {
   display: flex;
   align-items: center;
-  min-width: 44px;
-  min-height: 100%;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin: 0 8px 0 0 !important;
 }
-/* Live-measured (Sep 2026): this row's own native height is a bare 36px with zero vertical
-   padding — every child (the course dropdown, the wordmark, the avatar chip) has to fit and
-   self-center inside that, which reads as visibly cramped once a real text wordmark and an
-   avatar circle are added on top of what used to be a small icon. Padding only (native's own
-   `border-b` and flex children stay exactly as they are; each child already centers itself
-   within whatever height this row ends up with, so this alone gives every child more room
-   without needing to touch their own sizing individually. */
-[data-docket-reskin] .bg-header {
-  position: relative;
-  padding: 8px 0;
-}
-[data-docket-reskin] .docket-wordmark {
-  font-family: var(--docket-font);
-  font-size: 16px;
-  letter-spacing: -0.01em;
-  color: var(--docket-label);
-  white-space: nowrap;
-}
-/* A flat single-weight string read as a generic placeholder label, not a brand mark — split
-   into a two-part lockup (bold accent "BYU" + a lighter, secondary-toned product name) the way
-   a real product wordmark pairs an org mark with a suite name, reusing only tokens already used
-   elsewhere (no new colors introduced for this). */
-[data-docket-reskin] .docket-wordmark-brand {
-  font-weight: 800;
-  color: var(--docket-accent);
-}
-[data-docket-reskin] .docket-wordmark-suite {
-  font-weight: 500;
-  color: var(--docket-label-secondary);
-  margin-left: 5px;
-}
-/* Below the native site's own `md` breakpoint (confirmed live: this is exactly where
-   LearningSuite already hides the BYU logo and the stacked text, leaving only the small icon —
-   now itself hidden above) there's no room left for a third piece of text next to the
-   hamburger and the course dropdown. */
-@media (max-width: 767px) {
-  [data-docket-reskin] .docket-wordmark { display: none; }
-}
-/* Between `md` and `lg` (matches the hamburger's own `lg:hidden`): left-aligned in normal flow
-   where the old logo/text used to sit — true centering below is only safe once the course
-   dropdown (a flex-grow sibling whose width varies a lot with a real course name's length) has
-   enough room that it can't collide with a centered wordmark. */
-@media (min-width: 768px) and (max-width: 1023px) {
-  [data-docket-reskin] .docket-wordmark { display: inline-block; }
-}
-@media (min-width: 1024px) {
-  [data-docket-reskin] .docket-wordmark {
-    display: inline-block;
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    max-width: 38vw;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    pointer-events: none; /* decorative — #_topLink remains the real click target underneath */
-  }
-}
-
-/**
- * User-dropdown trigger: a resting fill (the hover-pill ::before above only painted on hover,
- * so at rest this read as bare icon+text+arrow with zero affordance) plus an initials avatar
- * chip replacing the generic fa-user-circle glyph, computed from the trigger's own real
- * rendered name text by shell.ts's restyleMasthead()/computeInitials() — reuses the exact
- * container/on-container token pair the active nav item and the Grade Summary percentage badge
- * already use (see docket-nav-item-active above / global.css), not a new color.
- */
-[data-docket-reskin] .header-userdropdown-trigger::before {
-  background-color: var(--docket-surface-2);
-}
-[data-docket-reskin] .header-userdropdown-trigger:hover::before {
-  background-color: var(--docket-fill) !important;
-}
-[data-docket-reskin] .header-userdropdown-trigger .fa-user-circle {
-  display: none;
-}
+[data-docket-reskin] .header-userdropdown-trigger > div.relative:has(.docket-user-avatar) .fa-user-circle { display: none; }
 [data-docket-reskin] .docket-user-avatar {
   display: flex;
   align-items: center;
@@ -438,18 +435,15 @@
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  margin-right: 8px;
   background: var(--docket-accent-container);
   color: var(--docket-on-accent-container);
   font-family: var(--docket-font);
   font-size: 11px;
   font-weight: 700;
-  flex-shrink: 0;
 }
-[data-docket-reskin] .header-userdropdown-trigger .fa-caret-down {
-  font-size: 11px;
-  color: var(--docket-label-tertiary);
-  margin-left: 4px;
+@media (max-width: 767px) {
+  [data-docket-reskin] #_topLink::after { content: none; }
+  [data-docket-reskin] header .header-coursedropdown { padding-left: 12px !important; }
 }
 
 /* Student View banner (see global.css's .bg-attention rule, kept as the fallback treatment for
@@ -506,3 +500,51 @@
 [data-docket-reskin] .popupWrapper .hover\:bg-accent:hover {
   background-color: var(--docket-fill) !important;
 }
+
+/* Page footer ("© BYU", Dark Mode toggle, LS Help): part of the shell, so it takes the
+   shell's canvas and hairline instead of its own native .bg-base fill. */
+[data-docket-reskin] main ~ footer,
+[data-docket-reskin] #fullLSPage footer.bg-base {
+  background-color: var(--docket-canvas) !important;
+  border-top: 1px solid var(--docket-shell-hairline) !important;
+}
+/* LearningSuite rules every page title (h1.pb-px, border-b) — MAX titles carry no rule,
+   and the shell's own hairlines already separate the chrome from the page. */
+[data-docket-reskin] main h1 { border-bottom: 0 !important; }
+
+/* Content's rail is a collapsible tree: .navItem > .dynamicNavLink > div > a, with its
+   own pl-7 / px-2 pl-4 indents and a fixed h-5 row. Collapse those so tree rows share
+   the flat rail's geometry; tree links carry no icon, so they skip the icon slot. */
+[data-docket-reskin] nav.bg-left-nav .navItem {
+  min-height: 0 !important;
+  padding-left: 0 !important;
+  border: 0 !important;
+}
+[data-docket-reskin] nav.bg-left-nav .navItem .navItem { padding-left: 14px !important; }
+[data-docket-reskin] nav.bg-left-nav .dynamicNavLink {
+  align-items: center;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+[data-docket-reskin] nav.bg-left-nav .dynamicNavLink > div.flex { flex: 1 1 auto; min-width: 0; }
+[data-docket-reskin] nav.bg-left-nav .dynamicNavLink a {
+  flex: 1 1 auto;
+  display: block !important;
+  min-width: 0;
+  padding-left: 12px !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+[data-docket-reskin] nav.bg-left-nav .dynamicNavLink > :not(div.flex) {
+  flex: 0 0 auto;
+  width: 20px;
+  margin: 0 !important;
+  padding: 0 !important;
+  color: var(--docket-label-tertiary) !important;
+  text-align: center;
+}
+[data-docket-reskin] nav.bg-left-nav .navItem .h-3 { display: none; }
+[data-docket-reskin] nav.bg-left-nav .sideNavList { padding-top: 0 !important; border: 0 !important; }
+/* Leaf rows have no disclosure caret; indent them to the caret rows' text column. */
+[data-docket-reskin] nav.bg-left-nav .dynamicNavLink > div.flex:only-child a { padding-left: 32px !important; }

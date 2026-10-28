@@ -13,6 +13,7 @@ declare const GM_xmlhttpRequest:
       method: string;
       url: string;
       headers?: Record<string, string>;
+      data?: string;
       timeout?: number;
       onload: (response: { status: number; responseText: string }) => void;
       onerror: (error: unknown) => void;
@@ -31,6 +32,33 @@ export function gmFetchText(url: string): Promise<string> {
         method: "GET",
         url,
         headers: { Accept: "text/calendar" },
+        timeout: 15000,
+        onload: (response) => {
+          if (response.status >= 200 && response.status < 300) resolve(response.responseText);
+          else reject(new Error(`HTTP ${response.status}`));
+        },
+        onerror: () => reject(new Error("network error")),
+        ontimeout: () => reject(new Error("timed out")),
+      });
+    } catch (error) {
+      reject(error instanceof Error ? error : new Error(String(error)));
+    }
+  });
+}
+
+/** Cross-origin JSON POST through the same grant — used only by lib/sessionRelay.ts. */
+export function gmPostJson(url: string, body: unknown, headers: Record<string, string> = {}): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (typeof GM_xmlhttpRequest !== "function") {
+      reject(new Error("GM_xmlhttpRequest not granted by this userscript manager"));
+      return;
+    }
+    try {
+      GM_xmlhttpRequest({
+        method: "POST",
+        url,
+        headers: { "Content-Type": "application/json", ...headers },
+        data: JSON.stringify(body),
         timeout: 15000,
         onload: (response) => {
           if (response.status >= 200 && response.status < 300) resolve(response.responseText);

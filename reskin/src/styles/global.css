@@ -306,18 +306,67 @@ html[data-docket-reskin],
    layout-purposed table turned up, so a bare tag selector is safe here the way it isn't for
    `<button>`/`<select>` (see the file comment at the top). Re-audit before assuming this
    holds if a new page type is ever added to the adapter set. */
+/* Oct 2026: tables now share MAX's agenda-card language: one rounded card, hairline row
+   dividers only (no grid lines), a quiet uppercase header, and a hover fill. Confirmed live on
+   Prioritizer (`table.border-t`, rows `tr.h-10.bg-base` interleaved with empty
+   `tr.border-b > td[colspan]` detail slots that only fill when a row is expanded) and Exam List
+   (`table.md:border`, thead, every cell `td.border.p-2`). */
 [data-docket-reskin] table {
-  border-collapse: separate;
+  width: 100%;
+  border-collapse: separate !important;
   border-spacing: 0;
-  border-radius: var(--docket-radius-md);
+  border-radius: 12px;
   overflow: hidden;
-  border: 1px solid var(--docket-separator);
+  border: 1px solid var(--docket-shell-hairline, var(--docket-separator)) !important;
   background-color: var(--docket-surface-1);
+  font-family: var(--docket-font);
 }
-[data-docket-reskin] table td,
-[data-docket-reskin] table th {
-  border-color: var(--docket-separator) !important;
+[data-docket-reskin] table tr {
+  height: auto !important;
+  background-color: transparent !important;
+  border: 0 !important;
 }
+[data-docket-reskin] table :is(td, th) {
+  padding: 10px 14px !important;
+  border: 0 !important;
+  background-color: transparent !important;
+  color: var(--docket-label-secondary) !important;
+  font-size: 14px;
+  text-align: start;
+  vertical-align: middle;
+}
+[data-docket-reskin] table td:first-child { color: var(--docket-label) !important; font-weight: 550; }
+[data-docket-reskin] table tr + tr > td,
+[data-docket-reskin] table thead + tbody > tr:first-child > td {
+  border-top: 1px solid var(--docket-shell-hairline, var(--docket-separator)) !important;
+}
+[data-docket-reskin] table thead :is(th, td) {
+  padding-block: 9px !important;
+  background-color: var(--docket-surface-2) !important;
+  color: var(--docket-label-tertiary) !important;
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+[data-docket-reskin] table thead :is(th, td) * { color: inherit !important; }
+[data-docket-reskin] table tbody tr:hover > td { background-color: var(--docket-fill) !important; }
+[data-docket-reskin] table :is(time, .text-xs) { color: var(--docket-label-tertiary); }
+/* Prioritizer's per-row detail slot stays out of the layout until LearningSuite fills it. */
+[data-docket-reskin] table tr:has(> td[colspan]:only-child):not(:has(> td > *)) { display: none; }
+/* Row actions (Exam List "View"): a compact tonal button, not a full-width pill. */
+[data-docket-reskin] table button.bg-primary-dark {
+  width: auto !important;
+  min-width: 0;
+  padding: 0 !important;
+  border-radius: var(--docket-radius-xs) !important;
+  background-color: var(--docket-accent-container) !important;
+  color: var(--docket-on-accent-container) !important;
+  font-size: 13px;
+}
+[data-docket-reskin] table button.bg-primary-dark > div { padding: 5px 14px !important; }
+[data-docket-reskin] table button.bg-primary-dark:hover { filter: brightness(1.15); }
 
 /**
  * The course Dashboard's per-day schedule (Sep 2026 comparison pass) — confirmed live this
@@ -463,4 +512,14 @@ html[data-docket-reskin],
   border-radius: var(--docket-radius-md);
   overflow: hidden;
   border: 1px solid var(--docket-separator);
+}
+
+/* Instructor-authored rich text (Content pages' `.default-list`, notes in `.instructorText`)
+   often pastes in inline `background-color:#ffffff` and a mid-gray text color meant for
+   LearningSuite's light page. On the dark theme that renders as glaring white boxes with
+   unreadable text (confirmed live, Oct 2026, MATH 113 Review Materials). Drop only white
+   inline fills, and lift their paired text color to the label tone. */
+[data-docket-reskin][data-docket-theme="dark"] :is(.default-list, .instructorText) :is([style*="background-color:#fff" i], [style*="background-color: #fff" i], [style*="background-color:rgb(255, 255, 255)" i], [style*="background-color: rgb(255, 255, 255)" i], [style*="background-color:white" i], [style*="background-color: white" i]) {
+  background-color: transparent !important;
+  color: var(--docket-label) !important;
 }

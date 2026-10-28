@@ -43,6 +43,12 @@ export interface ReskinSettings {
    * same as a real LearningSuite course code.
    */
   externalFeeds: { label: string; url: string }[];
+  /**
+   * Opt-in, off by default: an always-on machine running tools/session-relay.mjs that keeps
+   * this LearningSuite session alive while the laptop sleeps (see lib/sessionRelay.ts). Empty
+   * URL means off.
+   */
+  sessionRelay: { url: string; secret: string };
 }
 
 export const DEFAULT_SETTINGS: ReskinSettings = {
@@ -53,6 +59,7 @@ export const DEFAULT_SETTINGS: ReskinSettings = {
   background: "default",
   courseColors: {},
   externalFeeds: [],
+  sessionRelay: { url: "", secret: "" },
 };
 
 const KEY = "settings";

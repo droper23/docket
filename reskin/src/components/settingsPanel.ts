@@ -221,6 +221,40 @@ function externalFeedsSection(feeds: { label: string; url: string }[], onChange:
   return [title, group([...rows, addRow]), note];
 }
 
+/**
+ * Settings > Session Relay: where tools/session-relay.mjs is running. Same plain input/button
+ * idiom as External Calendars above.
+ */
+function sessionRelaySection(relay: { url: string; secret: string }, onChange: (next: { url: string; secret: string }) => void): HTMLElement[] {
+  const title = document.createElement("div");
+  title.className = "group-title";
+  title.textContent = "Session Relay";
+
+  const row = document.createElement("div");
+  row.className = "row row-col";
+  const urlInput = document.createElement("input");
+  urlInput.className = "text-input";
+  urlInput.type = "url";
+  urlInput.placeholder = "Relay URL (e.g. http://desktop.tailnet.ts.net:8787)";
+  urlInput.value = relay.url;
+  const secretInput = document.createElement("input");
+  secretInput.className = "text-input";
+  secretInput.type = "password";
+  secretInput.placeholder = "Relay secret";
+  secretInput.value = relay.secret;
+  const saveBtn = document.createElement("button");
+  saveBtn.className = "seg";
+  saveBtn.textContent = relay.url ? "Update" : "Save";
+  saveBtn.addEventListener("click", () => onChange({ url: urlInput.value.trim().replace(/\/+$/, ""), secret: secretInput.value.trim() }));
+  row.append(urlInput, secretInput, saveBtn);
+
+  const note = document.createElement("div");
+  note.className = "footer-note";
+  note.textContent = "Sends your LearningSuite session cookie to this relay so it can keep you signed in while this computer sleeps. Use only a machine you own, over a private network. Clear the URL to turn off. See PRIVACY.md.";
+
+  return [title, group([row]), note];
+}
+
 function diagnosticsRow(): HTMLElement {
   const row = document.createElement("div");
   row.className = "row";
@@ -332,6 +366,7 @@ export function openSettingsPanel(onSave: (settings: ReskinSettings) => void): v
     group([appearanceRow(settings.appearance, (v) => persist({ appearance: v })), backgroundRow(settings.background, (v) => persist({ background: v }))]),
     ...courseColorSection,
     ...externalFeedsSection(settings.externalFeeds, (next) => persist({ externalFeeds: next })),
+    ...sessionRelaySection(settings.sessionRelay, (next) => persist({ sessionRelay: next })),
     group([
       switchRow(shadow, "Use Companion navigation", settings.useCompanionNav, (v) => persist({ useCompanionNav: v })),
       switchRow(shadow, "Reduce Motion", settings.reducedMotion, (v) => persist({ reducedMotion: v })),

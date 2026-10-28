@@ -6,15 +6,32 @@ Plain language, not legal boilerplate.
 
 Whatever LearningSuite or MAX has already rendered into the page you're looking at — course
 names/links, an assignment's title/due text/category/completion status, a schedule item's title
-and date. Never a password, a Duo code, a session cookie, or a `subsessionID`.
+and date. Never a password or a Duo code. It reads the session cookie and `subsessionID` only
+if you turn on Session Relay (below).
 
 ## What this sends, and to whom
 
-Nothing, to anyone, by default. This reskin's core behavior makes no network requests of
+Nothing, to anyone, by default. Apart from the LearningSuite session keep-alive below, this reskin's core behavior makes no network requests of
 its own at all — it only reads and restyles the DOM of a page your own browser already
 loaded from LearningSuite or MAX. No backend, no analytics, no third-party service, no external AI.
 
-**The one opt-in exception: External Calendars (Settings).** If you add a course's
+**Session keep-alive (LearningSuite only).** While a LearningSuite tab is open, this reskin asks
+LearningSuite itself to keep your session alive every 10 minutes, using the same `keepAlive`
+request LearningSuite's own "session expiring" dialog sends. It goes only to
+learningsuite.byu.edu, through the page's own request code, and carries nothing beyond what
+LearningSuite already sends on every request. If the session has already expired (for example after the laptop slept
+for more than 2 hours), it reloads the page so BYU's own sign-in can restore it; it never does
+that over unsaved form edits.
+
+**Opt-in: Session Relay (Settings).** Off by default. If you enter a relay URL, this reskin
+sends your LearningSuite session cookie (`PHPSESSID`), subsession id and app id to that URL every
+10 minutes, through `GM_xmlhttpRequest`. The relay (`tools/session-relay.mjs`, which you run
+yourself) uses them only to send LearningSuite's `keepAlive` request while your laptop sleeps,
+holds them in memory only and never logs them. Anyone who gets that cookie can use LearningSuite
+as you until the session ends, so run the relay only on a machine you own and reach it only over
+a private network such as Tailscale.
+
+**Opt-in: External Calendars (Settings).** If you add a course's
 iCalendar feed URL there (e.g. a BYU MAX course, which has no LearningSuite page to read at
 all), this reskin fetches that exact URL on your behalf — a plain, read-only GET, using the
 userscript manager's own cross-origin grant (`GM_xmlhttpRequest`, declared in the script's
