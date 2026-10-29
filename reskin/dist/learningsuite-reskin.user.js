@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         LearningSuite Reskin
 // @namespace    https://github.com/droper23/learningsuite-reskin
-// @version      0.4.2
+// @version      0.4.3
 // @description  A visual and interaction layer for BYU LearningSuite and MAX. BYU's own applications stay in control — nothing is replaced.
 // @author       LearningSuite Reskin contributors
 // @match        https://learningsuite.byu.edu/*
@@ -12,8 +12,8 @@
 // @grant        GM_xmlhttpRequest
 // @connect      max.byu.edu
 // @connect      *
-// @updateURL    https://raw.githubusercontent.com/droper23/learningsuite-reskin/main/dist/learningsuite-reskin.user.js?v=0.4.2
-// @downloadURL  https://raw.githubusercontent.com/droper23/learningsuite-reskin/main/dist/learningsuite-reskin.user.js?v=0.4.2
+// @updateURL    https://raw.githubusercontent.com/droper23/learningsuite-reskin/main/dist/learningsuite-reskin.user.js?v=0.4.3
+// @downloadURL  https://raw.githubusercontent.com/droper23/learningsuite-reskin/main/dist/learningsuite-reskin.user.js?v=0.4.3
 // ==/UserScript==
 
 (() => {
@@ -497,6 +497,9 @@ html[data-docket-max-reskin] :is(pre, code, kbd, samp) { font-family: var(--dock
 /* MathJax 2 falls back to black PNG glyphs when its web fonts are unavailable
  * (Safari), and text color cannot reach those images. Invert them to the label tone. */
 html[data-docket-max-reskin][data-docket-theme="dark"] :is(.MathJax, .MathJax_Display) img { filter: invert(.86) !important; }
+/* Homework's .data boxes keep their native light blue fill (#e7f4ff).
+ * Keep fallback PNG glyphs dark there, including after MathJax's delayed render. */
+html[data-docket-max-reskin][data-docket-theme="dark"] .assignment .data :is(.MathJax, .MathJax_Display) img { filter: none !important; }
 html[data-docket-max-reskin] a { color: var(--docket-max-accent) !important; }
 html[data-docket-max-reskin] ::selection { background: var(--docket-max-accent); color: var(--docket-max-on-accent); }
 

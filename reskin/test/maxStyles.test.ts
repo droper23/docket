@@ -2,9 +2,33 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { JSDOM } from "jsdom";
 
 const css = readFileSync(new URL("../src/styles/max.css", import.meta.url), "utf8");
 const selectors = css.replace(/\/\*[\s\S]*?\*\//g, "");
+
+test("delayed MathJax PNGs stay dark in light homework data boxes only", () => {
+  const dom = new JSDOM(`<html data-docket-max-reskin data-docket-theme="dark"><head><style>${css}</style></head><body>
+    <div class="assignment"><span class="data" style="background-color:#e7f4ff;color:#258"></span>
+    <span class="MathJax"><img id="ordinary"></span></div>
+    <div class="data"><span class="MathJax"><img id="outside-assignment"></span></div>
+  </body></html>`);
+  const { document, getComputedStyle } = dom.window;
+  // MathJax can replace its preview with image glyphs after the stylesheet loads.
+  const box = document.querySelector(".assignment .data")!;
+  for (const renderer of ["MathJax", "MathJax_Display"]) {
+    const math = document.createElement("span");
+    math.className = renderer;
+    const glyph = math.appendChild(document.createElement("img"));
+    box.appendChild(math);
+    assert.equal(getComputedStyle(glyph).filter, "none");
+  }
+  assert.equal(getComputedStyle(document.getElementById("ordinary")!).filter, "invert(.86)");
+  assert.equal(getComputedStyle(document.getElementById("outside-assignment")!).filter, "invert(.86)");
+  document.documentElement.dataset.docketTheme = "light";
+  assert.equal(getComputedStyle(box.querySelector("img")!).filter, "");
+  dom.window.close();
+});
 
 test("MAX styles are semantic and course-agnostic", () => {
   for (const selector of ["h1", "h2", "h3", "table", "ul", "ol", "a", ":focus-visible"]) {

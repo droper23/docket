@@ -46,6 +46,9 @@ html[data-docket-max-reskin] :is(pre, code, kbd, samp) { font-family: var(--dock
 /* MathJax 2 falls back to black PNG glyphs when its web fonts are unavailable
  * (Safari), and text color cannot reach those images. Invert them to the label tone. */
 html[data-docket-max-reskin][data-docket-theme="dark"] :is(.MathJax, .MathJax_Display) img { filter: invert(.86) !important; }
+/* Homework's .data boxes keep their native light blue fill (#e7f4ff).
+ * Keep fallback PNG glyphs dark there, including after MathJax's delayed render. */
+html[data-docket-max-reskin][data-docket-theme="dark"] .assignment .data :is(.MathJax, .MathJax_Display) img { filter: none !important; }
 html[data-docket-max-reskin] a { color: var(--docket-max-accent) !important; }
 html[data-docket-max-reskin] ::selection { background: var(--docket-max-accent); color: var(--docket-max-on-accent); }
 

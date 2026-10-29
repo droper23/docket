@@ -1,5 +1,20 @@
 # LearningSuite Reskin — Roadmap
 
+## MAX homework: delayed MathJax glyph contrast (Oct 2026)
+
+Confirmed in Crest's live Elements inspector: homework variables use
+`.assignment .data` with native `color: #258` and `background-color: #e7f4ff`.
+MathJax 2.7.5 replaces the preview with `.MathJax` HTML-CSS output containing PNG
+glyph images. Our blanket dark-theme `invert(.86)` filter made those images pale
+on the light blue boxes, explaining the delayed color and font change even with
+the Dark Mode extension disabled. A scoped exception keeps these glyph images
+dark while retaining inversion for formulas elsewhere on the dark page.
+
+Typecheck, build, and all 81 tests pass, including delayed image insertion,
+both MathJax wrappers, the ordinary formula path, and light theme. Live DOM and
+native colors were checked in Crest; installation of the rebuilt userscript,
+post-fix screenshots, and Lighthouse/a11y scores remain unverified.
+
 ## Nineteenth pass: LearningSuite shell matches MAX, load flash and nav bugs (Oct 2026)
 
 The top bar and rail now use the MAX design language. The top bar has two bands: wordmark, course switcher and account first, then underline tabs. The rail has an uppercase section label and an accent-container active row. Both target LearningSuite's own classes (`body > header`,
