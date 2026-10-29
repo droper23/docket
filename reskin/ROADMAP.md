@@ -12,8 +12,12 @@ dark while retaining inversion for formulas elsewhere on the dark page.
 
 Typecheck, build, and all 81 tests pass, including delayed image insertion,
 both MathJax wrappers, the ordinary formula path, and light theme. Live DOM and
-native colors were checked in Crest; installation of the rebuilt userscript,
-post-fix screenshots, and Lighthouse/a11y scores remain unverified.
+native colors were checked in Crest. Published v0.4.3 and updated Crest's
+Tampermonkey installation from the exact release commit (the branch's raw URL
+initially served a cached v0.4.2). Before/after screenshots in a separate homework
+tab confirmed that, after the delayed font/image fallback, boxed glyphs stay black
+while ordinary formulas stay light. The original homework tab was preserved.
+Lighthouse/a11y scores were not run.
 
 ## Nineteenth pass: LearningSuite shell matches MAX, load flash and nav bugs (Oct 2026)
 
